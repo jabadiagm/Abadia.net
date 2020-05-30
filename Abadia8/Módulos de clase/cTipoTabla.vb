@@ -1,11 +1,11 @@
 ﻿Public Class cTipoTabla
     Public Extension As String
-    Public DireccionInicio As Long
-    Public Tamaño As Long
+    Public DireccionInicio As Integer
+    Public Tamaño As Integer
     Public Descripcion As String
     Private Archivo() As Byte
 
-    Public Sub Init(cExtension As String, cDireccionInicio As Long, cTamaño As Long, cDescripcion As String)
+    Public Sub Init(cExtension As String, cDireccionInicio As Integer, cTamaño As Integer, cDescripcion As String)
         Extension = cExtension
         DireccionInicio = cDireccionInicio
         Tamaño = cTamaño

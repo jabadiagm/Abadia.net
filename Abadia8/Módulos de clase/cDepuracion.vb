@@ -27,7 +27,7 @@ Public Class cDepuracion
     Public CamaraManual As Boolean 'true para sobreescribir el personaje al que apunta la camara
     Public CamaraPersonaje As Byte 'número de personaje al que sigue la cámara, si CamaraManual=true
     '                               0 = Guillermo, 1 = Adso, 2 = Malaquías, 3 = Abad, 4 = Berengario, 5 = Severino
-
+    Public QuitarSonido As Boolean
 
 
 
@@ -50,6 +50,7 @@ Public Class cDepuracion
         SaltarMomentoDiaEnter = True
         BugDejarObjetoPresente = False
         PuertasAbiertas = False
+        QuitarSonido = True
     End Sub
 
     Public Sub Init()
@@ -67,8 +68,9 @@ Public Class cDepuracion
         SaltarPresentacion = False
         PararAdsoCTRL = True
         SaltarMomentoDiaEnter = True
-        BugDejarObjetoPresente = True
+        BugDejarObjetoPresente = False
         PuertasAbiertas = False
         CamaraManual = False
+        QuitarSonido = False
     End Sub
 End Class

@@ -62,11 +62,11 @@ Namespace My
      Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
      Global.System.Runtime.CompilerServices.CompilerGeneratedAttribute()>  _
     Friend Module MySettingsProperty
-
-        <Global.System.ComponentModel.Design.HelpKeywordAttribute("My.Settings")>
-        Friend ReadOnly Property Settings() As Global.Abadia7.My.MySettings
+        
+        <Global.System.ComponentModel.Design.HelpKeywordAttribute("My.Settings")>  _
+        Friend ReadOnly Property Settings() As Global.Abadia8.My.MySettings
             Get
-                Return Global.Abadia7.My.MySettings.Default
+                Return Global.Abadia8.My.MySettings.Default
             End Get
         End Property
     End Module

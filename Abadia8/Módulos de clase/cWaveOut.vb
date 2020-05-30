@@ -1,14 +1,15 @@
-﻿Imports System.Threading
+﻿Option Explicit On
+Imports System.Threading
 Imports System.Runtime.InteropServices
+Imports System.Runtime.InteropServices.Marshal
 
 Public Interface Reproducible
     Function Reproducir() As Byte
 End Interface
 
 Public Class cWaveOut
-    Public Const WAVE_FREQ = 22050 'frecuencia de muestreo
+    Public Const WAVE_FREQ = 11025 'frecuencia de muestreo
     Private Const WAVE_BUFFER_SIZE = 2000
-    Private Const DEMO_FREQ = 500
     Private hWaveOut As Integer 'handle del dispositivo
     Private WavFormat As WAVEFORMATEX
     Private WaveHeader(1) As WAVEHDR
@@ -102,7 +103,7 @@ Public Class cWaveOut
     Public Function Abrir() As Integer
         Dim Ret As Integer 'return value
         Dim Cadena As String
-
+        Dim Contador As Byte
         BytesPorTic = WAVE_FREQ / Stopwatch.Frequency
         'protect WaveHeader from garbage collector
         m_HeaderHandle = GCHandle.Alloc(WaveHeader, GCHandleType.Pinned)
@@ -129,7 +130,6 @@ Public Class cWaveOut
             Abrir = 1
             Exit Function
         End If
-
         For Contador = 0 To 1
             With WaveHeader(Contador)
                 .lpData = Buffer1.ToInt32

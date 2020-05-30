@@ -1,6 +1,6 @@
 ﻿Public Class cStringList
     Private cStrings() As String
-    Private NumberStrings As Long
+    Private NumberStrings As Integer
 
     Public Sub Append(Text As String)
         'append a string at the end of the list
@@ -12,16 +12,17 @@
 
     Public Function Count(Text As String)
         'return the number of times Text appears in the list
-        Dim Counter As Long
-        Dim Found As Long
+        Dim Counter As Integer
+        Dim Found As Integer
         For Counter = 0 To NumberStrings - 1
             If cStrings(Counter) = Text Then Found = Found + 1
         Next
         Count = Found
     End Function
 
-    Public Function ElementAt(Index As Long) As String
+    Public Function ElementAt(Index As Integer) As String
         'return element
+        ElementAt = ""
         If IsValidIndex(Index) Then
             ElementAt = cStrings(Index)
         Else
@@ -31,15 +32,15 @@
 
     Public Sub Extend(StringList As cStringList)
         'append a list at the end of the current list
-        Dim Counter As Long
+        Dim Counter As Integer
         For Counter = 0 To StringList.Lenght - 1
             Append(StringList.ElementAt(Counter))
         Next
     End Sub
 
-    Public Function Index(Text As String, Optional NotCaseSensitive As Boolean = True) As Long
+    Public Function Index(Text As String, Optional NotCaseSensitive As Boolean = True) As Integer
         'Return the index in the list of the first item whose value is x. if there is no such item return -1
-        Dim Counter As Long
+        Dim Counter As Integer
         For Counter = 0 To NumberStrings - 1
             If cStrings(Counter) = Text Or (NotCaseSensitive And LCase(cStrings(Counter)) = LCase(Text)) Then
                 Index = Counter
@@ -49,9 +50,9 @@
         Index = -1 'not found
     End Function
 
-    Public Sub Insert(Index As Long, Text As String)
+    Public Sub Insert(Index As Integer, Text As String)
         'insert a text at a given position
-        Dim Counter As Long
+        Dim Counter As Integer
         If IsValidIndex(Index) Then
             If NumberStrings Mod 100 = 0 Then ResizeArray(NumberStrings + 100)  'check space
             For Counter = NumberStrings To Index + 1 Step -1
@@ -65,7 +66,8 @@
     End Sub
 
     Public Function IsIn(Text As String, Optional CaseSensitive As Boolean = False) As Boolean
-        Dim Counter As Long
+        Dim Counter As Integer
+        IsIn = False
         For Counter = 0 To NumberStrings - 1
             If (CaseSensitive And ElementAt(Counter) = Text) Or (Not CaseSensitive And LCase(ElementAt(Counter)) = LCase(Text)) Then
                 IsIn = True
@@ -74,14 +76,15 @@
         Next
     End Function
 
-    Public Function Lenght() As Long
+    Public Function Lenght() As Integer
         'return number of elements
         Lenght = NumberStrings
     End Function
 
-    Public Function Pop(Optional ByVal Index As Long = -1)
-        Dim Counter As Long
+    Public Function Pop(Optional ByVal Index As Integer = -1) As String
+        Dim Counter As Integer
         Dim Value As String
+        Pop = ""
         If Index = -1 Then Index = NumberStrings - 1
         If IsValidIndex(Index) Then
             Value = cStrings(Index)
@@ -102,9 +105,10 @@
         End If
     End Function
 
-    Public Function Remove(Text As String) As Long
+    Public Function Remove(Text As String) As Integer
         'Remove the first item from the list whose value is Text. if not found, do nothing and return -1
-        Dim IndexValue As Long
+        Remove = 0
+        Dim IndexValue As Integer
         IndexValue = Index(Text)
         If IndexValue = -1 Then
             Remove = -1
@@ -114,18 +118,19 @@
     End Function
 
     Public Sub Reverse()
-        Dim Counter As Long
+        Dim Counter As Integer
         If NumberStrings < 2 Then Exit Sub
         For Counter = 0 To (Int(NumberStrings / 2)) - 1
             Swap(Counter, NumberStrings - Counter - 1)
         Next
     End Sub
 
-    Public Function SubList(ByVal Start As Long, ByVal Finish As Long, Optional ByVal StepValue As Long = 1) As cStringList
+    Public Function SubList(ByVal Start As Integer, ByVal Finish As Integer, Optional ByVal StepValue As Integer = 1) As cStringList
         'return a new list with elements from Start to Finish, incrementing StepValue
         'if Start=-1, start from origin
         'if Finish=-1, end in the last element
-        Dim Counter As Long
+        Dim Counter As Integer
+        SubList = Nothing
         If StepValue = 0 Then
             MsgBox("Error no Esperado en cStringList/Sublist: StepValue=0", vbCritical)
             Exit Function
@@ -143,15 +148,15 @@
         quickSort(0, NumberStrings - 1)
     End Sub
 
-    Private Sub Swap(Index1 As Long, Index2 As Long)
+    Private Sub Swap(Index1 As Integer, Index2 As Integer)
         Dim Temporal As String
         Temporal = cStrings(Index1)
         cStrings(Index1) = cStrings(Index2)
         cStrings(Index2) = Temporal
     End Sub
 
-    Private Sub quickSort(First As Long, Last As Long)
-        Dim splitPoint As Long
+    Private Sub quickSort(First As Integer, Last As Integer)
+        Dim splitPoint As Integer
         If First < Last Then
             splitPoint = Partition(First, Last)
             quickSort(First, splitPoint - 1)
@@ -159,10 +164,10 @@
         End If
         Application.DoEvents()
     End Sub
-    Private Function Partition(First As Long, Last As Long) As Long
+    Private Function Partition(First As Integer, Last As Integer) As Integer
         Dim PivotValue As String
-        Dim LeftMark As Long
-        Dim RightMark As Long
+        Dim LeftMark As Integer
+        Dim RightMark As Integer
         Dim Done As Boolean
         PivotValue = ElementAt(First)
         LeftMark = First + 1
@@ -203,11 +208,15 @@
         Partition = RightMark
     End Function
 
-    Private Function IsValidIndex(Index As Long) As Boolean
-        If Index >= 0 And Index < NumberStrings Then IsValidIndex = True
+    Private Function IsValidIndex(Index As Integer) As Boolean
+        If Index >= 0 And Index < NumberStrings Then
+            IsValidIndex = True
+        Else
+            IsValidIndex = False
+        End If
     End Function
 
-    Private Sub ResizeArray(Size As Long)
+    Private Sub ResizeArray(Size As Integer)
         ReDim Preserve cStrings(Size)
     End Sub
 

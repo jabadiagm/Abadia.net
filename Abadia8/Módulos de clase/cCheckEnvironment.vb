@@ -5,16 +5,17 @@ Public Class cCheckEnvironment
 
     Dim ListaTipos As New cListaTipoTabla
 
-    Public Function Init(DumpFolder As String, CheckFolder As String, Log As String) As Long
+    Public Function Init(DumpFolder As String, CheckFolder As String, Log As String) As Integer
         'comprueba que la rutas son correctas y que están todas las tablas correspondientes cada volcado
         'si falta alguna tabla, la genera
         Dim ArchivosDump As cStringList
-        Dim Contador As Long
-        Dim Contador2 As Long
+        Dim Contador As Integer
+        Dim Contador2 As Integer
         Dim NombreVolcado As String
         Dim PrefijoTabla As String
         Dim NombreTabla As String
         Dim TipoTabla As cTipoTabla
+        Init = 0
         CargarTiposTabla()
         ArchivosDump = ModFunciones.DirFolder(DumpFolder, "*.bin")
         Log = "Encontrados " + CStr(ArchivosDump.Lenght) + " archivos .bin" + vbCrLf
@@ -70,16 +71,18 @@ Public Class cCheckEnvironment
         ListaTipos.Append(Tipo)
     End Sub
 
-    Private Function GenerarTabla(RutaVolcado As String, RutaTabla As String, TipoTabla As cTipoTabla) As Long
-        Dim Volcado() As Byte
+    Private Function GenerarTabla(RutaVolcado As String, RutaTabla As String, TipoTabla As cTipoTabla) As Integer
+        Dim Volcado() As Byte = {}
         Dim Tabla() As Byte
+        GenerarTabla = 0
         ReDim Tabla(TipoTabla.Tamaño - 1)
         ModFunciones.CargarArchivo(RutaVolcado, Volcado)
         CargarTablaArchivo(Volcado, Tabla, TipoTabla.DireccionInicio)
         GuardarArchivo(RutaTabla, Tabla)
     End Function
 
-    Public Function GenerarTablasCheckPantalla(Posicion As cPosicion, RutaCheck As String) As Long
+    Public Function GenerarTablasCheckPantalla(Posicion As cPosicion, RutaCheck As String) As Integer
+        GenerarTablasCheckPantalla = 0
         With Posicion
             ModAbadia.CheckDefinir(.NumeroPantalla, .Orientacion, .X, .Y, .Z, .Escaleras, RutaCheck)
         End With
@@ -91,12 +94,12 @@ Public Class cCheckEnvironment
         Dim ArchivosVolcado As New cStringList
         Dim ArchivosPrueba As New cStringList
         Dim Contador As Byte
-        Dim Contador2 As Long
-        Dim Index As Long
-        Dim Retorno As Long
+        Dim Contador2 As Integer
+        Dim Index As Integer
+        Dim Retorno As Integer
         Dim RutaArchivo1 As String
         Dim RutaArchivo2 As String
-        Dim Log As String
+        Dim Log As String = ""
         ArchivosPrueba = ModFunciones.DirFolder(RutaCheck, "", True)
         For Contador = 0 To 254
             ArchivosVolcado = ModFunciones.DirFolder(RutaVolcados, Byte2AsciiHex(Contador) + ".*", True)
@@ -115,9 +118,9 @@ Public Class cCheckEnvironment
     End Sub
 
     Public Sub GenerarTablasCheck(RutaArchivoPosiciones As String, RutaCheck As String, Log As String)
-        Dim Result As Long
+        Dim Result As Integer
         Dim ArchivoPosiciones As String
-        Dim Contador As Long
+        Dim Contador As Integer
         Dim Posicion As cPosicion
         Dim ListaPosiciones As New cListaPosiciones
         ArchivoPosiciones = RutaArchivoPosiciones
@@ -147,10 +150,10 @@ Public Class cCheckEnvironment
 
     Public Sub GenerarModelos(RutaArchivoPosiciones As String, RutaModelos As String, RutaModelo As String, Log As String)
         'genera los archivos DSK con las posiciones de inicio indicadas
-        Dim ArchivoMaestro() As Byte
+        Dim ArchivoMaestro() As Byte = {}
         Dim ListaPosiciones As New cListaPosiciones
         Dim Posicion As cPosicion
-        Dim Contador As Long
+        Dim Contador As Integer
         ListaPosiciones = LeerArchivoPosiciones(RutaArchivoPosiciones)
         ModFunciones.CargarArchivo(RutaModelo, ArchivoMaestro)
         For Contador = 0 To ListaPosiciones.Lenght - 1

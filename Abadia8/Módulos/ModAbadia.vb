@@ -5,6 +5,7 @@ Module ModAbadia
     'variables públicas del módulo
     Public Activa As Boolean
     Public FPS As Integer 'fotogramas por segundo
+    Public FPSSonido As Integer 'número de ciclos por segundo de la tarea de sonido
     Public Depuracion As New cDepuracion
     Public Check As Boolean 'true para hacer una pasada por el bucle principal, ajustando la posición y orientación de guillermo, y guardando las tablas en disco
     Public Pintar As Boolean
@@ -15,6 +16,7 @@ Module ModAbadia
     Private WithEvents TmTick As New Timer
     Private Reloj As New Stopwatch 'reloj para retardos
     Private RelojFPS As New Stopwatch 'reloj para al cálculo de frames por segundo
+    Private RelojSonido As New Stopwatch 'reloj para la tarea de sonido
     Private SiguienteTickTiempoms As Integer = 100
     Private SiguienteTickNombreFuncion As String = "BuclePrincipal_25B7"
     Private AY38910 As New cAY8912(cWaveOut.WAVE_FREQ) 'sintetizador de audio
@@ -33,6 +35,8 @@ Module ModAbadia
 
     Private Thread1 As System.Threading.Thread
     Private WithEvents TmRetardo As New Timer()
+
+    Dim nose(100) As Byte
 
 
     'tablas del juego
@@ -258,6 +262,8 @@ Module ModAbadia
         Reloj.Stop()
         RelojFPS.Stop()
         PararTareaSonido()
+        'WaveOut.Parar()
+        'WaveOut.Cerrar()
         Parado = True
     End Sub
 
@@ -266,6 +272,7 @@ Module ModAbadia
         Reloj.Start()
         RelojFPS.Start()
         Parado = False
+        ArrancarTareaSonido()
     End Sub
 
     Public Sub CheckDefinir(ByVal NumeroPantalla As Byte, ByVal Orientacion As Byte, ByVal X As Byte, ByVal Y As Byte, ByVal Z As Byte, ByVal Escaleras As Byte, ByVal RutaCheck As String)
@@ -297,31 +304,31 @@ Module ModAbadia
         Dim BugDejarObjeto(255) As Byte
         Try
             Conjunto = [Assembly].GetExecutingAssembly()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.ABADIA0.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.ABADIA0.BIN")
             StrArchivo.Read(Abadia0, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.ABADIA1.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.ABADIA1.BIN")
             StrArchivo.Read(Abadia1, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.ABADIA2.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.ABADIA2.BIN")
             StrArchivo.Read(Abadia2, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.ABADIA3.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.ABADIA3.BIN")
             StrArchivo.Read(Abadia3, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.ABADIA5.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.ABADIA5.BIN")
             StrArchivo.Read(Abadia5, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.ABADIA6.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.ABADIA6.BIN")
             StrArchivo.Read(Abadia6, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.ABADIA7.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.ABADIA7.BIN")
             StrArchivo.Read(Abadia7, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.ABADIA8.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.ABADIA8.BIN")
             StrArchivo.Read(Abadia8, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.BugDejarObjeto.bin")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.BugDejarObjeto.bin")
             StrArchivo.Read(BugDejarObjeto, 0, 256)
             StrArchivo.Dispose()
         Catch ex As Exception
@@ -417,7 +424,7 @@ Module ModAbadia
         Next
     End Sub
 
-    Sub CopiarTabla(ByRef TablaOrigen() As Byte, ByRef TablaDestino() As Byte)
+    Sub CopiarTabla(ByVal TablaOrigen() As Byte, ByRef TablaDestino() As Byte)
         Dim Contador As Integer
         For Contador = 0 To UBound(TablaOrigen)
             TablaDestino(Contador) = TablaOrigen(Contador)
@@ -442,7 +449,7 @@ Module ModAbadia
             If Not Check Then
                 DibujarPantalla_4EB2() 'dibuja en pantalla el contenido de la rejilla desde el centro hacia afuera
             Else
-                DibujarPantalla_4EB2_anterior() 'función sin retardos
+                DibujarPantalla_4EB2_check() 'función sin retardos
             End If
         Else
             SiguienteTick(20, "BuclePrincipal_25B7_PantallaDibujada")
@@ -490,7 +497,6 @@ Module ModAbadia
         Dim Byte1 As Byte
         Dim Byte2 As Byte
         Dim Byte3 As Byte
-        Dim Byte4 As Byte
         Dim X As Byte 'pos en x del elemento (sistema de coordenadas del buffer de tiles)
         Dim nX As Byte 'longitud del elemento en x
         Dim Y As Byte 'pos en y del elemento (sistema de coordenadas del buffer de tiles)
@@ -517,13 +523,15 @@ Module ModAbadia
             '1A24
             X = Byte1 And &H1F 'pos en x del elemento (sistema de coordenadas del buffer de tiles)
             '1A28
-            nX = ModFunciones.shr(Byte1, 5) And &H7 'longitud del elemento en x
+            'nX = ModFunciones.shr(Byte1, 5) And &H7 'longitud del elemento en x
+            nX = (Byte1 >> 5) And &H7 'longitud del elemento en x
             '1A2F
             Byte2 = DatosHabitaciones_4000(PunteroPantallaGlobal + 2)
             '1A32
             Y = Byte2 And &H1F 'pos en y del elemento (sistema de coordenadas del buffer de tiles)
             '1A36
-            nY = ModFunciones.shr(Byte2, 5) And &H7 'longitud del elemento en y
+            'nY = ModFunciones.shr(Byte2, 5) And &H7 'longitud del elemento en y
+            nY = (Byte2 >> 5) And &H7 'longitud del elemento en y
             '1A3D
             VariablesBloques_1FCD(&H1FDE - &H1FCD) = 0 'inicia a (0, 0) la posición del bloque en la rejilla (sistema de coordenadas local de la rejilla)
             VariablesBloques_1FCD(&H1FDF - &H1FCD) = 0 'inicia a (0, 0) la posición del bloque en la rejilla (sistema de coordenadas local de la rejilla)
@@ -547,7 +555,7 @@ Module ModAbadia
         Loop
     End Sub
 
-    Public Sub DibujarPantalla_4EB2_anterior()
+    Public Sub DibujarPantalla_4EB2_check()
         'dibuja en pantalla el contenido de la rejilla desde el centro hacia afuera
         Dim PunteroPantalla As Integer
         Dim PunteroRejilla As Integer
@@ -740,16 +748,16 @@ Module ModAbadia
         ' Ymapa = Yrejilla + Xmapa - 16
         ' de esta forma los datos de la rejilla se almacenan en el mapa de tiles de forma que la conversión a la pantalla es directa
         If Altura = &HFF Then Exit Sub
-        Xr = CInt(Y) + CInt(X) + CInt(Altura / 2) - 15
-        Yr = CInt(Y) - CInt(X) + CInt(Altura / 2) + 16
+        Xr = CInt(Y) + CInt(X) + CInt(Altura >> 1) - 15
+        Yr = CInt(Y) - CInt(X) + CInt(Altura >> 1) + 16
         If Xr < 0 Then
             Xr = Xr + 256
         End If
         If Yr < 0 Then
             Yr = Yr + 256
         End If
-        VariablesBloques_1FCD(&H1FDE - &H1FCD) = Xr
-        VariablesBloques_1FCD(&H1FDF - &H1FCD) = Yr
+        VariablesBloques_1FCD(&H1FDE - &H1FCD) = CByte(Xr)
+        VariablesBloques_1FCD(&H1FDF - &H1FCD) = CByte(Yr)
         'comprobar
     End Sub
 
@@ -879,7 +887,7 @@ Module ModAbadia
         Dim Valor As Byte
         Dim PunteroRegistro As Integer
         Dim Resultado As Integer
-        Dim ValorAnterior
+        Dim ValorAnterior As Byte
         Dim PunteroRegistroGuardado As Integer
         Registro = TablaCaracteristicasMaterial_1693(PunteroRutinasBloque - &H1693)
         LeerPosicionBufferConstruccionBloque_2214(PunteroRutinasBloque, PunteroRegistro) 'lee una posición del buffer de construcción del bloque y guarda en PunteroRegistro la dirección accedida
@@ -984,7 +992,6 @@ Module ModAbadia
         Dim PunteroCaracteristicasBloque As Integer
         Dim PunteroTilesBloque As Integer
         Dim PunteroRutinasBloqueAnterior As Integer
-        Dim Valor As Integer
         Dim Altura As Byte
         PunteroRutinasBloqueAnterior = PunteroRutinasBloque + 2 'dirección para continuar con el proceso
         PunteroCaracteristicasBloque = Leer16(TablaCaracteristicasMaterial_1693, PunteroRutinasBloque - &H1693)
@@ -1105,7 +1112,6 @@ Module ModAbadia
         'recupera la longitud y si no es 0, vuelve a saltar a procesar las instrucciones desde la dirección que se guardó.
         'En otro caso, limpia la pila y continúa
         Dim Longitud As Integer
-        Dim PunteroRutinasBloquePila As Integer
         Longitud = Pop() 'recupera de la pila la longitud del bloque (bien sea en x o en y)
         Longitud = Longitud - 1 'decrementa la longitud
         If Longitud = 0 Then 'si se ha terminado la longitud, saca el otro valor de la pila y salta
@@ -1161,7 +1167,7 @@ Module ModAbadia
         'modifica el registro del buffer de construcción del bloque, sumándole el valor indicado
         Dim PunteroRegistro As Integer
         LeerRegistroBufferConstruccionBloque_2219(Registro, PunteroRegistro, PunteroRutinasBloque)
-        VariablesBloques_1FCD(Registro - &H61 + 2) = VariablesBloques_1FCD(Registro - &H61 + 2) + Incremento '0x61=índice en el buffer de construcción del bloque
+        VariablesBloques_1FCD(Registro - &H61 + 2) = Z80Add(VariablesBloques_1FCD(Registro - &H61 + 2), Incremento) '0x61=índice en el buffer de construcción del bloque
     End Sub
 
     Sub SaltarComandosIntermedios_20A5(ByRef PunteroRutinasBloque As Integer)
@@ -1361,8 +1367,6 @@ Module ModAbadia
         Dim Puntero As Integer
         Dim Contador As Integer
         Dim a As Integer
-        Dim b As Integer
-        Dim c As Integer
         Dim d As Integer
         Dim e As Integer
         For Contador = 0 To 255
@@ -1386,10 +1390,14 @@ Module ModAbadia
             a = a And Contador      'and  c        ; a = (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4 (b3^b7)&b3 (b2^b6)&b2 (b1^b5)&b1 (b0^b4)&b0
             a = a And &HF&          'and  $0F      ; a = 0 0 0 0 (b3^b7)&b3 (b2^b6)&b2 (b1^b5)&b1 (b0^b4)&b0
             d = a                   'ld   d,a      ; d = 0 0 0 0 (b3^b7)&b3 (b2^b6)&b2 (b1^b5)&b1 (b0^b4)&b0
-            a = shl(a, 1)           'add  a,a      ; a = 0 0 0 (b3^b7)&b3 (b2^b6)&b2 (b1^b5)&b1 (b0^b4)&b0 0
-            a = shl(a, 1)           'add  a,a      ; a = 0 0 (b3^b7)&b3 (b2^b6)&b2 (b1^b5)&b1 (b0^b4)&b0 0 0
-            a = shl(a, 1)           'add  a,a      ; a = 0 (b3^b7)&b3 (b2^b6)&b2 (b1^b5)&b1 (b0^b4)&b0 0 0 0
-            a = shl(a, 1)           'add  a,a      ; a = (b3^b7)&b3 (b2^b6)&b2 (b1^b5)&b1 (b0^b4)&b0 0 0 0 0
+            'a = shl(a, 1)           'add  a,a      ; a = 0 0 0 (b3^b7)&b3 (b2^b6)&b2 (b1^b5)&b1 (b0^b4)&b0 0
+            a = a << 1              'add  a,a      ; a = 0 0 0 (b3^b7)&b3 (b2^b6)&b2 (b1^b5)&b1 (b0^b4)&b0 0
+            'a = shl(a, 1)           'add  a,a      ; a = 0 0 (b3^b7)&b3 (b2^b6)&b2 (b1^b5)&b1 (b0^b4)&b0 0 0
+            a = a << 1              'add  a,a      ; a = 0 0 (b3^b7)&b3 (b2^b6)&b2 (b1^b5)&b1 (b0^b4)&b0 0 0
+            'a = shl(a, 1)           'add  a,a      ; a = 0 (b3^b7)&b3 (b2^b6)&b2 (b1^b5)&b1 (b0^b4)&b0 0 0 0
+            a = a << 1              'add  a,a      ; a = 0 (b3^b7)&b3 (b2^b6)&b2 (b1^b5)&b1 (b0^b4)&b0 0 0 0
+            'a = shl(a, 1)           'add  a,a      ; a = (b3^b7)&b3 (b2^b6)&b2 (b1^b5)&b1 (b0^b4)&b0 0 0 0 0
+            a = a << 1              'add  a,a      ; a = (b3^b7)&b3 (b2^b6)&b2 (b1^b5)&b1 (b0^b4)&b0 0 0 0 0
             a = a Or d              'or   d        ; a = (b3^b7)&b3 (b2^b6)&b2 (b1^b5)&b1 (b0^b4)&b0 (b7^b3)&b3 (b6^b2)&b2 (b5^b1)&b1 (b0^b4)&b0
             TablasAndOr_9D00(Puntero) = a 'ld   (bc),a   ; graba pixel i = ((Pi1^Pi0)&Pi1 (Pi1^Pi0)&Pi1) (0->0, 1->0, 2->3, 3->0)
 
@@ -1409,10 +1417,14 @@ Module ModAbadia
             a = a And Contador      'and  c        ; a = (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4 (b7^b3)&b3 (b6^b2)&b2 (b5^b1)&b1 (b4^b0)&b0
             a = a And &HF0&         'and  $F0      ; a = (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4 0 0 0 0
             d = a                   'ld   d,a      ; d = (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4 0 0 0 0
-            a = shr(a, 1)           'srl  a        ; a = 0 (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4 0 0 0
-            a = shr(a, 1)           'srl  a        ; a = 0 0 (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4 0 0
-            a = shr(a, 1)           'srl  a        ; a = 0 0 0 (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4 0
-            a = shr(a, 1)           'srl  a        ; a = 0 0 0 0 (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4
+            'a = shr(a, 1)           'srl  a        ; a = 0 (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4 0 0 0
+            a = a >> 1              'srl  a        ; a = 0 (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4 0 0 0
+            'a = shr(a, 1)           'srl  a        ; a = 0 0 (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4 0 0
+            a = a >> 1              'srl  a        ; a = 0 0 (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4 0 0
+            'a = shr(a, 1)           'srl  a        ; a = 0 0 0 (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4 0
+            a = a >> 1              'srl  a        ; a = 0 0 0 (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4 0
+            'a = shr(a, 1)           'srl  a        ; a = 0 0 0 0 (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4
+            a = a >> 1              'srl  a        ; a = 0 0 0 0 (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4
             a = a Or d 'or   d        ; a = (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4 (b3^b7)&b7 (b2^b6)&b6 (b1^b5)&b5 (b0^b4)&b4
             TablasAndOr_9D00(Puntero) = a 'ld   (bc),a   ; graba pixel i = ((Pi1^Pi0)&Pi0 (Pi1^Pi0)&Pi0) (0->0, 1->3, 2->0, 3->0)
             Puntero = Puntero - 767 '; apunta a la tabla inicial
@@ -1468,9 +1480,11 @@ Module ModAbadia
             '24DD
             'cambia un valor relacionado con el tempo de la música
             TempoMusica_1086 = &H0B '###pendiente de ajustar bien
-            TempoMusica_1086 = &H0D
+            TempoMusica_1086 = &H0B
             If Not Check Then
-                ArrancarTareaSonido()
+                If Not Depuracion.QuitarSonido Then
+                    ArrancarTareaSonido()
+                End If
                 ReproducirSonidoPergamino()
             End If
             DeshabilitarInterrupcion()
@@ -1523,7 +1537,6 @@ Module ModAbadia
         Dim Contador As Integer
         Dim Linea As Integer
         Dim Relleno As Integer
-        Dim Puntero As Integer
         For Contador = 0 To &H3FFF& 'limpia la memoria de video
             PantallaCGA(Contador) = 0
         Next
@@ -1567,12 +1580,15 @@ Module ModAbadia
         Dim Valor1 As Integer
         Dim Valor2 As Integer
         Dim Valor3 As Integer
-        Valor1 = ModFunciones.shr(X, 2) 'l / 4 (cada 4 pixels = 1 byte)
+        'Valor1 = ModFunciones.shr(X, 2) 'l / 4 (cada 4 pixels = 1 byte)
+        Valor1 = X >> 2 'l / 4 (cada 4 pixels = 1 byte)
         Valor2 = Y And &HF8& 'obtiene el valor para calcular el desplazamiento dentro del banco de VRAM
         Valor2 = Valor2 * 10 'dentro de cada banco, la línea a la que se quiera ir puede calcularse como (y & 0xf8)*10
         Valor3 = Y And 7 '3 bits menos significativos en y (para calcular al banco de VRAM al que va)
-        Valor3 = shl(Valor3, 3)
-        Valor3 = shl(Valor3, 8) Or Valor2 'completa el cálculo del banco
+        'Valor3 = shl(Valor3, 3)
+        Valor3 = Valor3 << 3
+        'Valor3 = shl(Valor3, 8) Or Valor2 'completa el cálculo del banco
+        Valor3 = (Valor3 << 8) Or Valor2 'completa el cálculo del banco
         Valor3 = Valor3 + Valor1 'suma el desplazamiento en x
         CalcularDesplazamientoPantalla_68C7 = Valor3 + 8 'ajusta para que salga 32 pixels más a la derecha
     End Function
@@ -1589,14 +1605,13 @@ Module ModAbadia
                 PantallaCGA2PC(PunteroPantalla, DatosGraficosPergamino_788A(PunteroDatos + Linea))
                 PunteroPantalla = DireccionSiguienteLinea_3A4D_68F2(PunteroPantalla)
             Next
-            PunteroDatos = PunteroDatos + Linea
+            PunteroDatos = PunteroDatos + 8 'Linea
             PunteroPantalla = PunteroPantallaAnterior + Contador
         Next
     End Sub
 
     Sub DibujarParteDerechaIzquierdaPergamino_662E(ByVal PunteroPantalla As Integer, ByVal PunteroDatos As Integer)
         'rellena la parte superior (o inferior del pergamino)
-        Dim Linea As Integer
         Dim Contador As Integer
         For Contador = 1 To 192 '192 líneas
             PantallaCGA(PunteroPantalla) = DatosGraficosPergamino_788A(PunteroDatos)
@@ -1674,7 +1689,8 @@ Module ModAbadia
                         End If
                         PunteroCaracter = Caracter - &H20 'solo tiene caracteres a partir de 0x20
                         PunteroCaracter = 2 * PunteroCaracter 'cada entrada ocupa 2 bytes
-                        PunteroCaracter = PunterosCaracteresPergamino_680C(PunteroCaracter) + 256 * PunterosCaracteresPergamino_680C(PunteroCaracter + 1)
+                        'PunteroCaracter = PunterosCaracteresPergamino_680C(PunteroCaracter) + 256 * PunterosCaracteresPergamino_680C(PunteroCaracter + 1)
+                        PunteroCaracter = Bytes2Int(PunterosCaracteresPergamino_680C(PunteroCaracter), PunterosCaracteresPergamino_680C(PunteroCaracter + 1))
                         DibujarCaracterPergamino_6781(PunteroCaracter, ColorLetra_67C0)
                 End Select
             End If
@@ -1721,7 +1737,6 @@ Module ModAbadia
         'dibuja un triángulo rectángulo con los catetos paralelos a los ejes de coordenadas y de longitud Lado
         Dim PunteroPantalla As Integer
         Dim RellenoTriangular_6943(3) As Byte
-        Dim Relleno As Integer
         'Dim d As integer
         Dim Aux As Integer
         Dim Distancia As Integer 'separación en bytes entre la parte derecha y la izquierda del triángulo
@@ -1869,7 +1884,7 @@ Module ModAbadia
         Dim PunteroDatos As Integer
         Dim PunteroPantalla As Integer
         Dim PunteroPantallaAnterior As Integer
-        Dim NumeroPixel As Byte 'número de pixel después del triángulo en la parte superior del pergamino
+        Dim NumeroPixel As Integer 'número de pixel después del triángulo en la parte superior del pergamino
         Dim Linea As Integer
         Dim XBorde As Integer 'coordenadas del borde derecho a restaurar
         Dim YBorde As Integer
@@ -1922,7 +1937,7 @@ Module ModAbadia
 
     End Sub
 
-    Sub ImprimirEspacioPergamino_67CD(ByVal Hueco As Byte, ByRef X As Integer)
+    Sub ImprimirEspacioPergamino_67CD(ByVal Hueco As Integer, ByRef X As Integer)
         'añade un hueco del tamaño indicado, en píxeles
         X = X + Hueco
         SiguienteTick(30, "DibujarTextosPergamino_6725") 'espera un poco (aprox. 30 ms)
@@ -1930,11 +1945,11 @@ Module ModAbadia
 
     Sub DibujarCaracterPergamino_6781(Optional ByVal PunteroCaracter_ As Integer = 0, Optional ByVal Color_ As Byte = 0)
         'dibuja un carácter en el pergamino
-        Dim Valor As Byte 'dato del carácter
+        Dim Valor As Integer 'dato del carácter
         Dim AvanceX As Integer
         Dim AvanceY As Integer
         Dim PunteroPantalla As Integer
-        Dim Pixel As Integer
+        Dim Pixel As Byte
         Dim InversaMascaraAND As Byte
         Dim MascaraOr As Byte
         Dim MascaraAnd As Byte
@@ -1966,10 +1981,11 @@ Module ModAbadia
             Exit Sub
         End If
         AvanceX = Valor And &HF 'avanza la posición x según los 4 bits menos significativos del byte leido de dibujo del caracter
-        AvanceY = ModFunciones.shr(Valor, 4) And &HF& 'avanza la posición y según los 4 bits más significativos del byte leido de dibujo del caracter
+        'AvanceY = ModFunciones.shr(Valor, 4) And &HF& 'avanza la posición y según los 4 bits más significativos del byte leido de dibujo del caracter
+        AvanceY = (Valor >> 4) And &HF& 'avanza la posición y según los 4 bits más significativos del byte leido de dibujo del caracter
         PunteroPantalla = CalcularDesplazamientoPantalla_68C7(PosicionPergaminoX_680B + AvanceX, PosicionPergaminoY_680A + AvanceY) 'calcula el desplazamiento de las coordenadas en pantalla
-        Pixel = (PosicionPergaminoX_680B + AvanceX) And &H3&        'se queda con los 2 bits menos significativos de la posición para saber que pixel pintar
-        MascaraAnd = ModFunciones.ror8(&H88, Pixel)
+        Pixel = CInt((PosicionPergaminoX_680B + AvanceX) And &H3&)        'se queda con los 2 bits menos significativos de la posición para saber que pixel pintar
+        MascaraAnd = CByte(ModFunciones.ror8(&H88, Pixel) And &HFF)
         InversaMascaraAND = MascaraAnd Xor &HFF&
         MascaraOr = InversaMascaraAND And PantallaCGA(PunteroPantalla) 'obtiene el valor del resto de pixels de la pantalla
         PantallaCGA(PunteroPantalla) = (Color And MascaraAnd) Or MascaraOr 'combina con los pixels de pantalla. actualiza la memoria de video con el nuevo pixel
@@ -2021,7 +2037,6 @@ Module ModAbadia
         'obtiene la dirección en donde está la altura del espejo, obtiene la dirección del bloque
         'que forma el espejo y si estaba abierto, lo cierra
         Dim PunteroEspejo As Integer
-        Dim Puntero
         Dim Valor As Byte
         Dim Contador As Integer
         PunteroEspejo = &H5086 'apunta a datos de altura de la planta 2
@@ -2073,7 +2088,7 @@ Module ModAbadia
         DibujarMarcador_272C()
         '2520
         TempoMusica_1086 = 6 'coloca el nuevo tempo de la música ###pendiente ajustar
-        TempoMusica_1086 = 7
+        TempoMusica_1086 = 6
         ColocarVectorInterrupcion()
         VelocidadPasosGuillermo_2618 = 36
         '254e
@@ -2106,7 +2121,7 @@ Module ModAbadia
         InicializarPartida_258F()
     End Sub
 
-    Function TeclaPulsadaNivel_3482(ByVal CodigoTecla As Byte)
+    Function TeclaPulsadaNivel_3482(ByVal CodigoTecla As Byte) As Boolean
         'comprueba si se está pulsando la tecla con el código indicado. si no está siedo pulsada, devuelve true
         TeclaPulsadaNivel_3482 = ModTeclado.TeclaPulsadaNivel(TraducirCodigoTecla(CodigoTecla))
     End Function
@@ -2117,6 +2132,7 @@ Module ModAbadia
     End Function
 
     Function TraducirCodigoTecla(ByVal CodigoTecla As Byte) As EnumTecla
+        TraducirCodigoTecla = Nothing
         Select Case CodigoTecla
             Case Is = &H0
                 TraducirCodigoTecla = EnumTecla.TeclaArriba
@@ -2232,9 +2248,6 @@ Module ModAbadia
             PunteroPantalla = PunteroPantallaAnterior
             PunteroPantalla = PunteroPantalla + &H50
         Next
-
-
-
     End Sub
 
 
@@ -2350,7 +2363,6 @@ Module ModAbadia
 
 
     End Sub
-
 
 
     Sub CopiarVariables_37B6()
@@ -2844,10 +2856,15 @@ Module ModAbadia
     End Sub
 
     Public Sub ActualizarVariablesFormulario()
+        Static Reloj As New Stopwatch
+        Static ContadorSeverino As Integer
+        Static PosicionSeverinoAnterior As Integer
+        Dim PosicionSeverino As Integer
         Dim Guardar As Boolean = False
         Dim EstadoTeclado As String = ""
         Dim BonusString As String
-
+        If Not Reloj.IsRunning Then Reloj.Start()
+        If Reloj.ElapsedMilliseconds < 500 Then Exit Sub
         FrmPrincipal.Label1.Text = "ON"
         If ModTeclado.TeclaPulsadaNivel(EnumTecla.TeclaArriba) Then EstadoTeclado = EstadoTeclado + "UP"
         If ModTeclado.TeclaPulsadaNivel(EnumTecla.TeclaIzquierda) Then EstadoTeclado = EstadoTeclado + "<-"
@@ -2882,6 +2899,18 @@ Module ModAbadia
         FrmPrincipal.TxYSeverino.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3081 + 3 - &H3036))
         FrmPrincipal.TxZSeverino.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3081 + 4 - &H3036))
 
+        FrmPrincipal.TxDondeVaSeverino.Text = CStr(TablaVariablesLogica_3C85(DondeVaSeverino_3D01 - &H3C85))
+        PosicionSeverino = CInt(TablaCaracteristicasPersonajes_3036(&H3081 + 2 - &H3036)) + CInt(TablaCaracteristicasPersonajes_3036(&H3081 + 3 - &H3036)) + CInt(TablaCaracteristicasPersonajes_3036(&H3081 + 4 - &H3036))
+        If PosicionSeverino = PosicionSeverinoAnterior Then
+            ContadorSeverino = ContadorSeverino + 1
+            If ContadorSeverino > 20 Then
+                FrmPrincipal.TextBox1.Text = "Severino KO"
+            End If
+        Else
+            ContadorSeverino = 0
+            FrmPrincipal.TextBox1.Text = ""
+        End If
+        PosicionSeverinoAnterior = PosicionSeverino
         FrmPrincipal.TxTiempoRestante.Text = CStr(TiempoRestanteMomentoDia_2D86)
 
         FrmPrincipal.Label1.Text = "OFF"
@@ -3005,7 +3034,6 @@ Module ModAbadia
         Dim PunteroDatosPersonajesHL As Integer
         Dim PunteroSpritePersonajeIX As Integer 'dirección del sprite asociado al personaje
         Dim PunteroDatosPersonajeIY As Integer 'dirección a los datos de posición del personaje asociado al sprite
-        Dim PunteroRutinaScriptPersonaje As Integer 'dirección de la rutina en la que el personaje piensa
         Dim ValorBufferAlturas As Byte 'valor a poner en las posiciones que ocupa el personaje en el buffer de alturas
         'cambio de cámara para depuración
         If Depuracion.CamaraManual Then 'hay que ajustar manualmente la cámara al personaje indicado
@@ -3075,8 +3103,8 @@ Module ModAbadia
         'aquí se llega con HabitacionIluminada_156C a true o false
         TablaSprites_2E17(&H2FCF - &H2E17) = &HFE 'marca el sprite de la luz como no visible
         '23CE
-        PosX = (PosicionXPersonajeActual_2D75 And &HF0) / 16 'pone en los 4 bits menos significativos de Valor los 4 bits más significativos de PosicionX
-        PosY = (PosicionYPersonajeActual_2D76 And &HF0) / 16 'pone en los 4 bits menos significativos de Valor los 4 bits más significativos de PosicionY
+        PosX = (PosicionXPersonajeActual_2D75 And &HF0) >> 4 'pone en los 4 bits menos significativos de Valor los 4 bits más significativos de PosicionX
+        PosY = (PosicionYPersonajeActual_2D76 And &HF0) >> 4 'pone en los 4 bits menos significativos de Valor los 4 bits más significativos de PosicionY
         OrientacionPantalla_2481 = (((PosY And &H1) Xor (PosX And &H1)) Or ((PosX And &H1) * 2))
         PunteroHabitacion = ((PosicionYPersonajeActual_2D76 And &HF0) Or PosX) + PunteroPlantaActual_23EF '(Y, X) (desplazamiento dentro del mapa de la planta)
         '23F2
@@ -3087,7 +3115,8 @@ Module ModAbadia
         '23F6
         RellenarBufferAlturas_2D22(PunteroDatosPersonajeActual_2D88) 'rellena el buffer de alturas con los datos leidos de la abadia y recortados para la pantalla actual
         '23F9
-        PunteroTablaDesplazamientoAnimacion_2D84 = shl(OrientacionPantalla_2481, 6) 'coloca la orientación en los 2 bits superiores para indexar en la tabla (cada entrada son 64 bytes)
+        'PunteroTablaDesplazamientoAnimacion_2D84 = shl(OrientacionPantalla_2481, 6) 'coloca la orientación en los 2 bits superiores para indexar en la tabla (cada entrada son 64 bytes)
+        PunteroTablaDesplazamientoAnimacion_2D84 = OrientacionPantalla_2481 << 6 'coloca la orientación en los 2 bits superiores para indexar en la tabla (cada entrada son 64 bytes)
         PunteroTablaDesplazamientoAnimacion_2D84 = PunteroTablaDesplazamientoAnimacion_2D84 + &H309F 'apunta a la tabla para el cálculo del desplazamiento según la animación de una entidad del juego
         'tabla de rutinas a llamar en 0x2add según la orientación de la cámara
         '225D:
@@ -3259,8 +3288,6 @@ Module ModAbadia
         Dim Z As Byte 'valor inicial de altura
         Dim nX As Byte 'número de unidades en X
         Dim nY As Byte 'número de unidades en Y
-        Dim Xrecortada As Byte
-        Dim Yrecortada As Byte
         Dim PunteroBufferAlturas As Integer
         Dim Ancho As Integer
         Dim Alto As Integer
@@ -3274,13 +3301,15 @@ Module ModAbadia
             Byte3 = TablaAlturasPantallas_4A00(PunteroAlturasPantalla + 3 - &H4A00) 'lee un byte
             If (Byte0 And &H8) = 0 Then 'si la entrada es de 4 bytes
                 nY = Byte3 And &HF
-                nX = CByte(shr(Byte3, 4)) And &HF 'a = 4 bits más significativos del byte 3
+                'nX = CByte(shr(Byte3, 4)) And &HF 'a = 4 bits más significativos del byte 3
+                nX = (Byte3 >> 4) And &HF 'a = 4 bits más significativos del byte 3
             Else ' si la entrada es de 5 bytes, lee el último byte
                 Byte4 = TablaAlturasPantallas_4A00(PunteroAlturasPantalla + 4 - &H4A00) 'lee el último byte
                 nX = Byte3
                 nY = Byte4
             End If
-            Z = CByte(shr(Byte0, 4)) And &HF 'obtiene los 4 bits superiores del byte 0
+            'Z = CByte(shr(Byte0, 4)) And &HF 'obtiene los 4 bits superiores del byte 0
+            Z = (Byte0 >> 4) And &HF 'obtiene los 4 bits superiores del byte 0
             Byte1 = TablaAlturasPantallas_4A00(PunteroAlturasPantalla + 1 - &H4A00) 'lee un byte
             Byte2 = TablaAlturasPantallas_4A00(PunteroAlturasPantalla + 2 - &H4A00) 'lee un byte
             X = Byte1
@@ -3374,7 +3403,7 @@ Module ModAbadia
         Dim Alto As Integer
         Dim Ancho As Integer
         Dim Altura As Integer
-        Dim AlturaAnterior As Byte
+        Dim AlturaAnterior As Integer
         'tabla de instrucciones para modificar un bucle del cálculo de alturas
         '38EF:   00 00 -> 0 nop, nop (caso imposible)
         '        3C 00 -> 1 inc a, nop
@@ -3513,6 +3542,7 @@ Module ModAbadia
         'devuelve la posición la entidad en coordenadas de pantalla. Si no es visible sale con False
         'si es visible devuelve en Z la profundidad del sprite y en X,Y devuelve la posición en pantalla del sprite
         Dim Visible As Boolean
+        ObtenerCoordenadasObjeto_0E4C = False
         ModificarPosicionSpritePantalla_2B2F = False
         Visible = ProcesarObjeto_2ADD(PunteroSpritesObjetosIX, PunteroDatosObjetosIY, XL, YH, Z, YpC)
         ModificarPosicionSpritePantalla_2B2F = True
@@ -3570,6 +3600,7 @@ Module ModAbadia
 
     Function LeerByteTablaCualquiera(ByVal Puntero As Integer) As Byte
         'lee un byte que puede pertenecer a cualquier tabla. usado en los errores de overflow del programa original
+        LeerByteTablaCualquiera = 0
         If PunteroPerteneceTabla(Puntero, TablaBugDejarObjetos_0000, &H0000) Then
             LeerByteTablaCualquiera = TablaBugDejarObjetos_0000(Puntero)
         End If
@@ -3735,7 +3766,7 @@ Module ModAbadia
         Dim ValorY As Integer
         Dim ValorZ As Byte
         Dim AlturaBase As Byte
-        On Error Resume Next 'desplazamiento puede ser <0
+        'On Error Resume Next 'desplazamiento puede ser <0
         'If PunteroDatosObjetosIY = &H3036 Then Stop
         ValorX = CInt(LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 2)) - LimiteInferiorVisibleX_2AE1
         ValorY = CInt(LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 3)) - LimiteInferiorVisibleY_2AEB
@@ -3807,7 +3838,7 @@ Module ModAbadia
         ProcesarObjeto_2ADD = True 'el objeto es visible
         Ypantalla = Ypantalla - &H10
         If Ypantalla < 0 Then Ypantalla = 0 'si la posición en y < 16, pos y = 0
-        YpC = Long2Byte(Ypantalla)
+        YpC = Int2ByteSigno(Ypantalla)
         If Not ModificarPosicionSpritePantalla_2B2F Then Exit Function
         'si llega aquí modifica la posición del sprite en pantalla
         '2B30
@@ -3842,7 +3873,8 @@ Module ModAbadia
         Dim Desplazamiento As Integer
         Orientacion = ModificarOrientacion_2480(LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 1)) 'obtiene la orientación del personaje. modifica la orientación que se le pasa en a con la orientación de la pantalla actual
         '2b4b
-        Puntero = (shl(Orientacion, 4) And &H30) + 2 * Entrada + PunteroTablaDesplazamientoAnimacion_2D84
+        'Puntero = (shl(Orientacion, 4) And &H30) + 2 * Entrada + PunteroTablaDesplazamientoAnimacion_2D84
+        Puntero = ((Orientacion << 4) And &H30) + 2 * Entrada + PunteroTablaDesplazamientoAnimacion_2D84
         '2b58
         'Desplazamiento = TablaDesplazamientoAnimacion_309F(Puntero - &H309F) 'lee un byte de la tabla
         Desplazamiento = Leer8Signo(TablaDesplazamientoAnimacion_309F, Puntero - &H309F) 'lee un byte de la tabla
@@ -3902,7 +3934,7 @@ Module ModAbadia
         'modifica la orientación que se le pasa en a con la orientación de la pantalla actual
         Dim Resultado As Integer
         Resultado = (CInt(Orientacion) - OrientacionPantalla_2481) And &H3
-        ModificarOrientacion_2480 = Long2Byte(Resultado)
+        ModificarOrientacion_2480 = Int2ByteSigno(Resultado)
         'If Orientacion < OrientacionPantalla_2481 Then
         '    ModificarOrientacion_2480 = 3
         '    Exit Function
@@ -3970,17 +4002,17 @@ Module ModAbadia
         Orientacion = ModificarOrientacion_2480(Orientacion And &H3)  'modifica la orientación que se le pasa con la orientación de la pantalla actual
         '0deb
         Valor = TablaDesplazamientoOrientacionPuertas_05AD(Orientacion * 8) 'indexa en la tabla
-        TablaSprites_2E17(PunteroSpriteIX + 1 - &H2E17) = Long2Byte(Valor + DeltaX + Byte2Long(X)) 'modifica la posición x del sprite
+        TablaSprites_2E17(PunteroSpriteIX + 1 - &H2E17) = Int2ByteSigno(Valor + DeltaX + CInt(X)) 'modifica la posición x del sprite
         '0df1
         Valor = TablaDesplazamientoOrientacionPuertas_05AD(Orientacion * 8 + 1) 'indexa en la tabla
-        TablaSprites_2E17(PunteroSpriteIX + 2 - &H2E17) = Long2Byte(Valor + DeltaY + Byte2Long(Y)) 'modifica la posición y del sprite
+        TablaSprites_2E17(PunteroSpriteIX + 2 - &H2E17) = Int2ByteSigno(Valor + DeltaY + CInt(Y)) 'modifica la posición y del sprite
         '0df8
         Valor = TablaDesplazamientoOrientacionPuertas_05AD(Orientacion * 8 + 2) 'indexa en la tabla
-        Valor = Valor + Byte2Long(Z)
+        Valor = Valor + CInt(Z)
         If PintarPantalla_0DFD Then Valor = Valor Or &H80 'Si se pinta la pantalla, 0x80, en otro caso 0
         If RedibujarPuerta_0DFF Then Valor = Valor Or &H80 'Si se pinta la puerta, 0x80, en otro caso 0
         '0e00
-        TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = Long2Byte(Valor)
+        TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = Int2ByteSigno(Valor)
         If TablaDesplazamientoOrientacionPuertas_05AD(Orientacion * 8 + 3) <> 0 Then PuertaRequiereFlip_2DAF = True
         'modifica la posición x e y del sprite en la rejilla según los 2 siguientes valores de la tabla
         Valor = TablaDesplazamientoOrientacionPuertas_05AD(Orientacion * 8 + 4) 'indexa en la tabla
@@ -4083,6 +4115,7 @@ Module ModAbadia
         Dim AlturaBase As Byte
         Dim X As Byte
         Dim Y As Byte
+        DeterminarPosicionCentral_0CBE = False
         Altura = LeerBytePersonajeObjeto(PunteroDatosIY + 4) 'obtiene la altura del personaje
         AlturaBase = LeerAlturaBasePlanta_2473(Altura) 'dependiendo de la altura, devuelve la altura base de la planta
         If AlturaBasePlantaActual_2DBA <> AlturaBase Then Exit Function 'si las alturas son distintas, sale con false
@@ -4095,6 +4128,7 @@ Module ModAbadia
 
     Function DeterminarPosicionCentral_279B(ByRef X As Byte, ByRef Y As Byte) As Boolean
         'ajusta la posición pasada en X,Y a las 20x20 posiciones centrales que se muestran. Si la posición está fuera, devuelve false
+        DeterminarPosicionCentral_279B = False
         If Y < MinimaPosicionYVisible_279D Then Exit Function 'si la posición en y es < el límite inferior en y en esta pantalla, sale
         Y = Y - MinimaPosicionYVisible_279D 'límite inferior en y
         If Y < 2 Then Exit Function
@@ -4213,6 +4247,7 @@ Module ModAbadia
         Dim X As Byte
         Dim Z As Byte
         Dim Y As Byte
+        ComprobarVisibilidadSprite_245E = False
         Visible = ProcesarObjeto_2ADD(PunteroSpritePersonajeIX, PunteroDatosPersonajeIY, X, Y, Z, Ypantalla) 'comprueba si es visible y si lo es, actualiza su posición si fuese necesario
         If Not Visible Then
             TablaSprites_2E17(PunteroSpritePersonajeIX + 0 - &H2E17) = &HFE 'marca el sprite como no usado
@@ -4221,7 +4256,7 @@ Module ModAbadia
         ComprobarVisibilidadSprite_245E = Visible
     End Function
 
-    Sub ActualizarDatosGraficosPersonaje_2A34(ByVal PunteroSpritePersonajeIX As Integer, ByVal PunteroDatosPersonajeIY As Integer, ByVal PunteroDatosPersonajeHL As Integer, Y As Byte)
+    Sub ActualizarDatosGraficosPersonaje_2A34(ByVal PunteroSpritePersonajeIX As Integer, ByVal PunteroDatosPersonajeIY As Integer, ByVal PunteroDatosPersonajeHL As Integer, ByVal Y As Byte)
         'aquí se llega desde fuera si un sprite es visible, después de haber actualizado su posición.
         'en PunteroDatosPersonajeHL se apunta a la animación correspondiente para el sprite
         'PunteroSpritePersonajeIX = dirección del sprite correspondiente
@@ -4240,7 +4275,8 @@ Module ModAbadia
         '2a4d
         Orientacion = ModificarOrientacion_2480(LeerBytePersonajeObjeto(PunteroDatosPersonajeIY + 1)) 'obtiene la orientación del personaje. modifica la orientación que se le pasa en a con la orientación de la pantalla actual
         '2a53
-        Orientacion = ModFunciones.shr(Orientacion, 1)
+        'Orientacion = ModFunciones.shr(Orientacion, 1)
+        Orientacion = Orientacion >> 1
         '2a55
         If Orientacion <> LeerBytePersonajeObjeto(PunteroDatosPersonajeIY + 6) Then 'comprueba si ha cambiado la orientación del personaje
             'si es así, salta al método correspondiente por si hay que flipear los gráficos
@@ -4540,7 +4576,6 @@ Module ModAbadia
                 '498C
                 PunteroSpriteIX = Punteros(Contador)
                 '498F
-                'TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = (TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) And &HBF) 'pone el bit 6 a 0. sprite no prcesado
                 ClearBitArray(TablaSprites_2E17, PunteroSpriteIX + 0 - &H2E17, 6) 'pone el bit 6 a 0. sprite no prcesado
                 'If (TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) And &H80) <> 0 Then 'el sprite ha cambiado
                 If LeerBitArray(TablaSprites_2E17, PunteroSpriteIX + 0 - &H2E17, 7) Then 'el sprite ha cambiado
@@ -4574,10 +4609,11 @@ Module ModAbadia
                     TablaSprites_2E17(PunteroSpriteIX + &HD - &H2E17) = TileY 'posición en y del tile en el que empieza el sprite (en pixels
                     'dado PunteroSpriteIX, calcula la coordenada correspondiente del buffer de tiles (buffer de tiles de 16x20, donde cada tile ocupa 16x8)
                     '49c9
-                    ValorLongDE = ModFunciones.Byte2Long(TileX) And &HFC& 'posición en x del tile inicial en el que empieza el sprite (en bytes)
-                    ValorLongDE = ValorLongDE + ModFunciones.shr(ValorLongDE, 1) 'x + x/2 (ya que en cada byte hay 4 pixels y cada entrada en el buffer de tiles es de 6 bytes)
+                    ValorLongDE = CInt(TileX) And &HFC& 'posición en x del tile inicial en el que empieza el sprite (en bytes)
+                    'ValorLongDE = ValorLongDE + ModFunciones.shr(ValorLongDE, 1) 'x + x/2 (ya que en cada byte hay 4 pixels y cada entrada en el buffer de tiles es de 6 bytes)
+                    ValorLongDE = ValorLongDE + (ValorLongDE >> 1) 'x + x/2 (ya que en cada byte hay 4 pixels y cada entrada en el buffer de tiles es de 6 bytes)
                     '49d6
-                    PunteroBufferTiles = ModFunciones.Byte2Long(TileY) 'tile inicial en y en el que empieza el sprite (en pixels)
+                    PunteroBufferTiles = CInt(TileY) 'tile inicial en y en el que empieza el sprite (en pixels)
                     PunteroBufferTiles = PunteroBufferTiles * 12 + ValorLongDE 'apunta a la línea correspondiente en el buffer de tiles
                     'TileY tiene valores múltiplos de 8, porque utiliza el pixel como unidad. cada tile son 8 píxeles,
                     'por lo que el cambio de tile supone 12*8=96 bytes
@@ -4593,15 +4629,14 @@ Module ModAbadia
                     PunteroBufferTilesAnterior_3095 = PunteroBufferTiles
                     TablaSprites_2E17(PunteroSpriteIX + &HE - &H2E17) = nXsprite 'ancho final del sprite (en bytes)
                     TablaSprites_2E17(PunteroSpriteIX + &HF - &H2E17) = nYsprite 'alto final del sprite (en pixels)
-                    AltoXanchoSprite = Byte2Long(nXsprite) * Byte2Long(nYsprite) 'alto del sprite*ancho del sprite
+                    AltoXanchoSprite = CInt(nXsprite) * CInt(nYsprite) 'alto del sprite*ancho del sprite
                     PunteroBufferSprites = PunteroBufferSpritesLibre
-                    TablaSprites_2E17(PunteroSpriteIX + &H10 - &H2E17) = LeerByteLong(PunteroBufferSprites, 0) 'dirección del buffer de sprites asignada a este sprite
-                    TablaSprites_2E17(PunteroSpriteIX + &H11 - &H2E17) = LeerByteLong(PunteroBufferSprites, 1) 'dirección del buffer de sprites asignada a este sprite
+                    TablaSprites_2E17(PunteroSpriteIX + &H10 - &H2E17) = LeerByteInt(PunteroBufferSprites, 0) 'dirección del buffer de sprites asignada a este sprite
+                    TablaSprites_2E17(PunteroSpriteIX + &H11 - &H2E17) = LeerByteInt(PunteroBufferSprites, 1) 'dirección del buffer de sprites asignada a este sprite
                     PunteroBufferSpritesLibre = PunteroBufferSprites + AltoXanchoSprite 'guarda la dirección libre del buffer de sprites
                     If PunteroBufferSpritesLibre > &H9CFE& Then Exit For '9CFE= límite del buffer de sprites. si no hay sitio para el sprite, salta pasa vaciar la lista de los procesados y procesa el resto
                     '4a13
                     'aquí llega si hay espacio para procesar el sprite
-                    'TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = (TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) Or &H40) 'pone el bit 6 a 1. marca el sprite como procesado
                     SetBitArray(TablaSprites_2E17, PunteroSpriteIX + 0 - &H2E17, 6) 'pone el bit 6 a 1. marca el sprite como procesado
                     For Contador2 = PunteroBufferSprites To PunteroBufferSpritesLibre - 1
                         BufferSprites_9500(Contador2 - &H9500&) = 0 'limpia la zona asignada del buffer de sprites
@@ -4630,7 +4665,7 @@ Module ModAbadia
                                 If Not ObtenerDistanciaSprites_4D54(TileY, TablaSprites_2E17(PunteroSpriteIY + 2 - &H2E17), nYsprite, TablaSprites_2E17(PunteroSpriteIY + 6 - &H2E17), Distancia1Y, Distancia2Y, LongitudY) Then
                                     '4A9A
                                     'obtiene la posición del sprite en coordenadas de cámara
-                                    ProfundidadMaxima = Bytes2Long(TablaSprites_2E17(PunteroSpriteIY + &H12 - &H2E17), TablaSprites_2E17(PunteroSpriteIY + &H13 - &H2E17)) 'combina los dos bytes en un entero largo
+                                    ProfundidadMaxima = Bytes2Int(TablaSprites_2E17(PunteroSpriteIY + &H12 - &H2E17), TablaSprites_2E17(PunteroSpriteIY + &H13 - &H2E17)) 'combina los dos bytes en un entero largo
                                     'obtiene el límite superior de profundidad de la iteración anterior y lo coloca como límite inferior
                                     PunteroBufferSpritesAnterior = PunteroBufferSprites
                                     'GuardarArchivo "D:\datos\vbasic\Abadia\Abadia2\BufferSprites", BufferSprites_9500
@@ -4763,6 +4798,7 @@ Module ModAbadia
         'en h=Distancia1 devuelve la distancia desde el inicio del sprite actual al inicio del sprite original
         'en l=Distancia2 devuelve la distancia desde el inicio del sprite original al inicio del sprite actual
         'si devuelve true, indica que debe evitarse el proceso de esta combinación de sprites
+        ObtenerDistanciaSprites_4D54 = False
         If PosicionOriginal = PosicionActual Then 'el sprite original empieza en el mismo punto que el sprite actual
             '4d69
             Distancia1 = 0
@@ -4829,14 +4865,13 @@ Module ModAbadia
         Dim ValorRelleno As Integer 'valor de la tabla 48E8 de rellenos de la luz
         Dim HL As String
         '4AA3
-        'If Distancia1Y < 10 Or (Distancia1Y >= 10 And (TablaSprites_2E17(PunteroSpriteIY + &HB - &H2E17) And &H80) <> 0) Then 'si la distancia en y desde el inicio del sprite actual al inicio del sprite original < 10 o no se trata de un monje
         If Distancia1Y < 10 Or (Distancia1Y >= 10 And LeerBitArray(TablaSprites_2E17, PunteroSpriteIY + &HB - &H2E17, 7)) Then 'si la distancia en y desde el inicio del sprite actual al inicio del sprite original < 10 o no se trata de un monje
             '4AD5
             'calcula la línea en la que empezar a dibujar el sprite actual (saltandose la distancia entre el inicio del sprite actual y el inicio del sprite original)
             nX = TablaSprites_2E17(PunteroSpriteIY + 5 - &H2E17) 'obtiene el ancho del sprite actual
-            ValorLong = Byte2Long(Distancia1Y) '(distancia en y desde el inicio del sprite actual al incio del sprite original
+            ValorLong = CInt(Distancia1Y) '(distancia en y desde el inicio del sprite actual al incio del sprite original
             ValorLong = ValorLong * nX
-            PunteroDatosGraficosSpriteHL = Bytes2Long(TablaSprites_2E17(PunteroSpriteIY + 7 - &H2E17), TablaSprites_2E17(PunteroSpriteIY + 8 - &H2E17)) 'dirección de los datos gráficos del sprite
+            PunteroDatosGraficosSpriteHL = Bytes2Int(TablaSprites_2E17(PunteroSpriteIY + 7 - &H2E17), TablaSprites_2E17(PunteroSpriteIY + 8 - &H2E17)) 'dirección de los datos gráficos del sprite
             'dirección de los datos gráficos del sprite (saltando lo que no se superpone con el área del sprite original en y)
             PunteroDatosGraficosSpriteHL = PunteroDatosGraficosSpriteHL + ValorLong
             HL = Hex$(PunteroDatosGraficosSpriteHL)
@@ -4845,16 +4880,16 @@ Module ModAbadia
             '4AB5
             'si llega aquí es porque la distancia en y desde el inicio del sprite actual al inicio del sprite original es >= 10, por lo que del sprite
             'actual (que es un monje), ya se ha pasado la cabeza. Por ello, obtiene un puntero al traje del monje
-            ValorLong = Byte2Long(Distancia1Y - 10)
+            ValorLong = CInt(Distancia1Y) - 10
             nX = TablaSprites_2E17(PunteroSpriteIY + 5 - &H2E17) 'obtiene el ancho del sprite actual
             ValorLong = ValorLong * nX
             Valor = TablaSprites_2E17(PunteroSpriteIY + &HB - &H2E17) 'animación del traje del monje
-            PunteroDatosGraficosSpriteHL = Leer16(TablaPunterosTrajesMonjes_48C8, 2 * Byte2Long(Valor)) 'cada entrada son 2 bytes
+            PunteroDatosGraficosSpriteHL = Leer16(TablaPunterosTrajesMonjes_48C8, 2 * CInt(Valor)) 'cada entrada son 2 bytes
             PunteroDatosGraficosSpriteHL = PunteroDatosGraficosSpriteHL + ValorLong
         End If
         '4ae5
         'dirección de los datos gráficos del sprite (saltando lo que no está en el área del sprite original en x y en y)
-        PunteroDatosGraficosSpriteHL = PunteroDatosGraficosSpriteHL + Distancia1X 'suma la distancia en x desde el inicio del sprite actual al incio del sprite original
+        PunteroDatosGraficosSpriteHL = PunteroDatosGraficosSpriteHL + Distancia1X 'suma la distancia en x desde el inicio del sprite actual al inicio del sprite original
         HL = Hex$(PunteroDatosGraficosSpriteHL)
         '4AED
         'distancia en y desde el inicio del sprite original al inicio del sprite actual * ancho ampliado del sprite original
@@ -4874,21 +4909,20 @@ Module ModAbadia
                 PunteroDatosGraficosSpriteAnterior = PunteroDatosGraficosSpriteHL
                 PunteroBufferSpritesAnterior = PunteroBufferSpritesDE
                 For Contador = 0 To LongitudX - 1
-                    'Valor = TablaGraficosObjetos_A300(PunteroDatosGraficosSpriteHL - &HA300&) 'lee un byte gráfico
-                    Valor = LeerDatoGrafico(PunteroDatosGraficosSpriteHL)
+                    Valor = LeerDatoGrafico(PunteroDatosGraficosSpriteHL) 'lee un byte gráfico
                     If Valor <> 0 Then 'si es 0, salta al siguiente pixel
                         '4B18
-                        MascaraOr = Byte2Long(Valor)                'b7 b6 b5 b4 b3 b2 b1 b0
+                        MascaraOr = CInt(Valor)                'b7 b6 b5 b4 b3 b2 b1 b0
                         ValorLong = ModFunciones.rol8(MascaraOr, 4) 'b3 b2 b1 b0 b7 b6 b5 b4
                         ValorLong = ValorLong Or MascaraOr   'b7|b3 b6|b2 b5|b1 b4|b0 b7|b3 b6|b2 b5|b1 b4|b0
                         If ValorLong <> 0 Then 'si es 0, salta (???, no sería 0 antes tb???)
                             '4B21
                             MascaraAnd = (-ValorLong - 1) And &HFF& 'invierte el byte inferior (los sprites usan el color 0 como transparente)
                             Valor = BufferSprites_9500(PunteroBufferSpritesDE - &H9500&) 'lee un byte del buffer de sprites
-                            Valor = Valor And Long2Byte(MascaraAnd)
+                            Valor = Valor And Int2ByteSigno(MascaraAnd)
                         End If
                         '4b27
-                        Valor = Valor Or Long2Byte(MascaraOr) 'combina el byte leido
+                        Valor = Valor Or Int2ByteSigno(MascaraOr) 'combina el byte leido
                         BufferSprites_9500(PunteroBufferSpritesDE - &H9500&) = Valor 'escribe el byte en buffer de sprites después de haberlo combinado
                     End If
                     '4b2a
@@ -4907,7 +4941,7 @@ Module ModAbadia
                     'puesto que se pasa de dibujar la cabeza de un monje a dibujar su traje
                     Valor = TablaSprites_2E17(PunteroSpriteIY + &HB - &H2E17) And &H7F 'animación del traje del monje
                     PunteroDatosGraficosSpriteHL = &H48C8 'apunta a la tabla de las posiciones de los trajes de los monjes
-                    PunteroDatosGraficosSpriteHL = PunteroDatosGraficosSpriteHL + 2 * Byte2Long(Valor)
+                    PunteroDatosGraficosSpriteHL = PunteroDatosGraficosSpriteHL + 2 * CInt(Valor)
                     PunteroDatosGraficosSpriteHL = Leer16(TablaPunterosTrajesMonjes_48C8, PunteroDatosGraficosSpriteHL - &H48C8)
                     'modifica la dirección de los datos gráficos de origen, para que apunte a la animación del traje del monje
                     PunteroDatosGraficosSpriteHL = PunteroDatosGraficosSpriteHL + Distancia1X 'distancia en x desde el inicio del sprite actual al incio del sprite original
@@ -4928,8 +4962,8 @@ Module ModAbadia
             For Contador = 1 To 15 '15 veces rellena con bloques de 4x4
                 '4b7b
                 PunteroBufferSpritesAnterior = PunteroBufferSpritesIX
-                'ValorRelleno = Leer16(TablaPatronRellenoLuz_48E8, PunteroPatronLuz - &H48E8) 'lee un valor de la tabla
-                ValorRelleno = shl(TablaPatronRellenoLuz_48E8(PunteroPatronLuz - &H48E8), 8) Or TablaPatronRellenoLuz_48E8(PunteroPatronLuz + 1 - &H48E8) 'lee un valor de la tabla
+                'ValorRelleno = shl(TablaPatronRellenoLuz_48E8(PunteroPatronLuz - &H48E8), 8) Or TablaPatronRellenoLuz_48E8(PunteroPatronLuz + 1 - &H48E8) 'lee un valor de la tabla
+                ValorRelleno = Leer16Inv(TablaPatronRellenoLuz_48E8, PunteroPatronLuz - &H48E8) 'lee un valor de la tabla
                 PunteroPatronLuz = PunteroPatronLuz + 2
                 '4B86
                 DesplazAdsoX = SpriteLuzAdsoX_4B89 'posición x del sprite de adso dentro del tile
@@ -4945,7 +4979,8 @@ Module ModAbadia
                 End If
                 '4b9e
                 If SpriteLuzFlip_4BA0 Then
-                    ValorRelleno = shl(ValorRelleno, 1) '0x00 o 0x29 (si los gráficos de adso están flipeados o no)
+                    'ValorRelleno = shl(ValorRelleno, 1) '0x00 o 0x29 (si los gráficos de adso están flipeados o no)
+                    ValorRelleno = ValorRelleno << 1 '0x00 o 0x29 (si los gráficos de adso están flipeados o no)
                 End If
                 For Contador2 = 1 To 16 '16 bits tiene el valor de la tabla 48E8
                     If (ValorRelleno And &H8000&) = 0 Then 'si el bit más significativo es 0, rellena de negro el bloque de 4x4
@@ -4956,7 +4991,8 @@ Module ModAbadia
                         BufferSprites_9500(PunteroBufferSpritesIX + &H3C - &H9500&) = &HFF 'relleno negro
                     End If
                     '4bb0
-                    ValorRelleno = shl(ValorRelleno, 1)
+                    'ValorRelleno = shl(ValorRelleno, 1)
+                    ValorRelleno = ValorRelleno << 1
                     PunteroBufferSpritesIX = PunteroBufferSpritesIX + 1
                 Next 'completa los 16 bits
                 '4BB4
@@ -4985,7 +5021,11 @@ Module ModAbadia
 
     Function EsValidoPunteroBufferTiles(ByVal Puntero As Integer) As Boolean
         'comprueba si un puntero al buffer de tiles está dentro de sus límites
-        If (Puntero - &H8D80&) >= 0 And (Puntero - &H8D80&) <= UBound(BufferTiles_8D80) Then EsValidoPunteroBufferTiles = True
+        If (Puntero - &H8D80&) >= 0 And (Puntero - &H8D80&) <= UBound(BufferTiles_8D80) Then
+            EsValidoPunteroBufferTiles = True
+        Else
+            EsValidoPunteroBufferTiles = False
+        End If
     End Function
 
     Sub CopiarTilesBufferSprites_4D9E(ByVal ProfundidadMaxima As Integer, ByVal ProfundidadMinima As Integer, ByVal SpritesPilaProcesados As Boolean, ByVal PunteroBufferTilesIX As Integer, ByVal PunteroBufferSpritesDE As Integer, ByVal nXsprite As Byte, ByVal nYsprite As Byte)
@@ -5020,23 +5060,23 @@ Module ModAbadia
 
         Dim H4dd9 As String
         Dim DE As String
-        Dim BC As String
         Dim IX As String
         H4dd9 = Hex$(ProfundidadMaxima)
         DE = Hex$(PunteroBufferSpritesDE)
         IX = Hex$(PunteroBufferTilesIX)
 
 
-
         PunteroBufferTilesAnterior3 = PunteroBufferTilesIX
         ProfundidadMaxima = ProfundidadMaxima + 257
-        ProfundidadMinimaX = LeerByteLong(ProfundidadMinima, 0)
-        ProfundidadMinimaY = LeerByteLong(ProfundidadMinima, 1)
-        ProfundidadMaximaX = LeerByteLong(ProfundidadMaxima, 0)
-        ProfundidadMaximaY = LeerByteLong(ProfundidadMaxima, 1)
+        ProfundidadMinimaX = LeerByteInt(ProfundidadMinima, 0)
+        ProfundidadMinimaY = LeerByteInt(ProfundidadMinima, 1)
+        ProfundidadMaximaX = LeerByteInt(ProfundidadMaxima, 0)
+        ProfundidadMaximaY = LeerByteInt(ProfundidadMaxima, 1)
         '4DB8
-        NtilesY = shr(Byte2Long(nYsprite), 3) 'nysprite = nysprite/8 (número de tiles que ocupa el sprite en y)
-        NtilesX = shr(Byte2Long(nXsprite), 2) 'nxsprite = nxsprite/4 (número de tiles que ocupa el sprite en x)
+        'NtilesY = shr(cint(nYsprite), 3) 'nysprite = nysprite/8 (número de tiles que ocupa el sprite en y)
+        NtilesY = CInt(nYsprite) >> 3 'nysprite = nysprite/8 (número de tiles que ocupa el sprite en y)
+        'NtilesX = shr(cint(nXsprite), 2) 'nxsprite = nxsprite/4 (número de tiles que ocupa el sprite en x)
+        NtilesX = CInt(nXsprite) >> 2 'nxsprite = nxsprite/4 (número de tiles que ocupa el sprite en x)
         '4dc2
         For Contador3 = 1 To NtilesY
             PunteroBufferTilesAnterior = PunteroBufferTilesIX
@@ -5083,7 +5123,6 @@ Module ModAbadia
                                 '4E07
                                 If EsDireccionBufferTiles_37A5(PunteroBufferTilesIX) Then 'si ix está dentro del buffer de tiles
                                     If Not BugOverflow Then
-                                        'BufferTiles_8D80(PunteroBufferTilesIX + 0 - &H8D80&) = BufferTiles_8D80(PunteroBufferTilesIX + 0 - &H8D80&) Or &H80 'indica que se ha procesado este tile
                                         SetBitArray(BufferTiles_8D80, PunteroBufferTilesIX + 0 - &H8D80&, 7) 'indica que se ha procesado este tile
                                     End If
                                 End If
@@ -5133,16 +5172,17 @@ Module ModAbadia
         'vuelve si no ha terminado de procesar los sprites de la pila o limpia el bit 7 de (ix+0) del buffer de tiles (si es una posición válida del buffer)
         If Not SpritesPilaProcesados Then Exit Sub
         If EsDireccionBufferTiles_37A5(PunteroBufferTilesIX) Then
-            'If PunteroBufferTilesIX + 0 - &H8D80& >= 0 And PunteroBufferTilesIX + 0 - &H8D80& < UBound(BufferTiles_8D80) Then
-            'BufferTiles_8D80(PunteroBufferTilesIX + 0 - &H8D80&) = BufferTiles_8D80(PunteroBufferTilesIX + 0 - &H8D80&) And &H7F 'limpia el bit mas significativo del buffer de tiles
             ClearBitArray(BufferTiles_8D80, PunteroBufferTilesIX + 0 - &H8D80&, 7) 'limpia el bit mas significativo del buffer de tiles
-            'End If
         End If
     End Sub
 
     Function EsDireccionBufferTiles_37A5(ByVal PunteroBufferTilesIX As Integer) As Boolean
         'dada una dirección, devuelve true si es una dirección válida del buffer de tiles
-        If PunteroBufferTilesIX >= &H8D80 Then EsDireccionBufferTiles_37A5 = True '8d80=inicio del buffer de tiles
+        If PunteroBufferTilesIX >= &H8D80 Then
+            EsDireccionBufferTiles_37A5 = True '8d80=inicio del buffer de tiles
+        Else
+            EsDireccionBufferTiles_37A5 = False
+        End If
     End Function
 
     Sub CombinarTileBufferSprites_4E49(ByVal PunteroBufferTilesIX As Integer, ByVal PunteroBufferSpritesDE As Integer, ByVal nXsprite As Byte)
@@ -5164,7 +5204,7 @@ Module ModAbadia
             NumeroTile = LeerByteTablaCualquiera(PunteroBufferTilesIX + 2)
             BugOverflow = True
         End If
-        PunteroDatosTile = Byte2Long(NumeroTile) * 32 'cada tile ocupa 32 bytes
+        PunteroDatosTile = CInt(NumeroTile) * 32 'cada tile ocupa 32 bytes
         PunteroDatosTile = PunteroDatosTile + &H6D00 'a partir de 0x6d00 están los gráficos de los tiles que forman las pantallas
         If NumeroTile < &HB Then 'si el gráfico es menor que el 0x0b (gráficos sin transparencia, caso más sencillo)
             '4e92
@@ -5202,8 +5242,8 @@ Module ModAbadia
                 For Contador2 = 1 To 4 '4 bytes de ancho (16 pixels)
                     '4e75
                     Valor = TilesAbadia_6D00(PunteroDatosTile - &H6D00) 'obtiene un byte del gráfico
-                    MascaraOr = TablasAndOr_9D00(PunteroTablasAndOr + Byte2Long(Valor) - &H9D00&) 'obtiene el or
-                    MascaraAnd = TablasAndOr_9D00(PunteroTablasAndOr + Byte2Long(Valor) + 256 - &H9D00&) 'obtiene el and
+                    MascaraOr = TablasAndOr_9D00(PunteroTablasAndOr + CInt(Valor) - &H9D00&) 'obtiene el or
+                    MascaraAnd = TablasAndOr_9D00(PunteroTablasAndOr + CInt(Valor) + 256 - &H9D00&) 'obtiene el and
                     Valor = BufferSprites_9500(PunteroBufferSpritesDE - &H9500&) 'obtiene un valor del buffer de sprites
                     Valor = (Valor And MascaraAnd) Or MascaraOr 'aplica el valor de las máscaras
                     BufferSprites_9500(PunteroBufferSpritesDE - &H9500&) = Valor 'graba el valor obtenido combinando el fondo con el sprite
@@ -5252,7 +5292,7 @@ Module ModAbadia
         End If
         '4C45
         'dirección del buffer de sprites asignada a este sprit
-        PunteroBufferSpritesHL = Bytes2Long(TablaSprites_2E17(PunteroSpriteIX + &H10 - &H2E17), TablaSprites_2E17(PunteroSpriteIX + &H11 - &H2E17))
+        PunteroBufferSpritesHL = Bytes2Int(TablaSprites_2E17(PunteroSpriteIX + &H10 - &H2E17), TablaSprites_2E17(PunteroSpriteIX + &H11 - &H2E17))
         PunteroBufferSpritesHL = PunteroBufferSpritesHL + PunteroPantallaDE 'salta los bytes no visibles en y
         '4C4E
         Xsprite = TablaSprites_2E17(PunteroSpriteIX + &HC - &H2E17) 'posición en x del tile en el que empieza el sprite (en bytes)
@@ -5315,15 +5355,16 @@ Module ModAbadia
         'l = coordenada X (en bytes)
         Dim PunteroPantalla As Integer
         Dim ValorLong As Integer
-        PunteroPantalla = Byte2Long(Y And &HF8) 'obtiene el valor para calcular el desplazamiento dentro del banco de VRAM
+        PunteroPantalla = CInt(Y And &HF8) 'obtiene el valor para calcular el desplazamiento dentro del banco de VRAM
         'dentro de cada banco, la línea a la que se quiera ir puede calcularse como (y & 0xf8)*10
         'o lo que es lo mismo, (y >> 3)*0x50
         PunteroPantalla = 10 * PunteroPantalla 'PunteroPantalla = desplazamiento dentro del banco
-        ValorLong = Byte2Long(Y And &H7) '3 bits menos significativos en y (para calcular al banco de VRAM al que va)
-        ValorLong = shl(ValorLong, 11) 'ajusta los 3 bits
+        ValorLong = CInt(Y And &H7) '3 bits menos significativos en y (para calcular al banco de VRAM al que va)
+        'ValorLong = shl(ValorLong, 11) 'ajusta los 3 bits
+        ValorLong = ValorLong << 11 'ajusta los 3 bits
         PunteroPantalla = PunteroPantalla Or ValorLong 'completa el cálculo del banco
         PunteroPantalla = PunteroPantalla Or &HC000&
-        PunteroPantalla = PunteroPantalla + Byte2Long(X) 'suma el desplazamiento en x
+        PunteroPantalla = PunteroPantalla + CInt(X) 'suma el desplazamiento en x
         PunteroPantalla = PunteroPantalla + 8 'ajusta para que salga 32 pixels más a la derecha
         ObtenerDesplazamientoPantalla_3C42 = PunteroPantalla
     End Function
@@ -5342,7 +5383,6 @@ Module ModAbadia
         Dim PunteroRutinaComportamientoHL As Integer
         Dim PunteroRutinaFlipearGraficos As Integer
         Dim Valor As Byte
-        Dim Volver As Boolean
         PunteroSpriteIX = ModFunciones.Leer16(TablaPunterosPersonajes_2BAE, PunteroPersonajeHL + 0 - &H2BAE)
         PunteroCaracteristicasPersonajeIY = ModFunciones.Leer16(TablaPunterosPersonajes_2BAE, PunteroPersonajeHL + 2 - &H2BAE)
         PunteroRutinaComportamientoHL = ModFunciones.Leer16(TablaPunterosPersonajes_2BAE, PunteroPersonajeHL + 4 - &H2BAE)
@@ -5362,7 +5402,7 @@ Module ModAbadia
             '2948
             'lee el contador de la animación
             Valor = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 0 - &H3036)
-            If (Valor And &O1&) <> 0 Then
+            If (Valor And 1) <> 0 Then
                 '294d
                 IncrementarContadorAnimacionSprite_2A01(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY)
             Else
@@ -5387,7 +5427,6 @@ Module ModAbadia
         'avanza la animación del sprite y lo redibuja
         Dim PunteroTablaAnimacionesHL As Integer
         Dim Yp As Byte 'posición y en pantalla del sprite
-        Dim Valor As Byte
         'cambia la animación de los trajes de los monjes según la posición y el contador de animaciones y
         'obtiene la dirección de los datos de la animación que hay que poner en hl
         PunteroTablaAnimacionesHL = CambiarAnimacionTrajesMonjes_2A61(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY)
@@ -5409,6 +5448,7 @@ Module ModAbadia
         Dim Z As Byte
         'comprueba si es visible y si lo es, actualiza su posición si fuese necesario.
         'Si es visible no vuelve, sino que sale a la rutina que lo llamó
+        EsSpriteVisible_2AC9 = False
         Visible = ProcesarObjeto_2ADD(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, X, Y, Z, Yp)
         If Visible Then
             EsSpriteVisible_2AC9 = True
@@ -5423,7 +5463,6 @@ Module ModAbadia
             Exit Sub
         Else
             TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = &H80 'en otro caso, indica que hay que redibujar el sprite
-            'TablaSprites_2E17(PunteroSpriteIX + 5 - &H2E17) = TablaSprites_2E17(PunteroSpriteIX + 5 - &H2E17) Or &H80 'indica que el sprite va a pasar a inactivo, y solo se quiere redibujar la zona que ocupaba
             SetBitArray(TablaSprites_2E17, PunteroSpriteIX + 5 - &H2E17, 7)  'indica que el sprite va a pasar a inactivo, y solo se quiere redibujar la zona que ocupaba
         End If
     End Sub
@@ -5690,6 +5729,7 @@ Module ModAbadia
         '        0001 0018 FFCF 00 FF -> +1  +24 -49 [00 -1]
         '        FFE8 0001 0016 FF 00 -> -24  +1 +22 [-1 00]
         '        FFFF FFE8 0031 00 01 -> -1  -24 +49 [00 +1]
+        LeerDatoTablaAvancePersonaje = 0
         If PunteroPosicionVecinaPersonajeHL < &H286D Then 'personaje ocupa 4 tiles
             If NBits = 8 Then
                 LeerDatoTablaAvancePersonaje = Leer8Signo(TablaAvancePersonaje4Tiles_284D, PunteroPosicionVecinaPersonajeHL - &H284D)
@@ -5715,7 +5755,6 @@ Module ModAbadia
         ' en HL se pasa el puntero a la tabla de avence de personaje para actualizar la posición del personaje
         Dim AlturaPersonajeE As Byte
         Dim TamañoOcupadoA As Byte 'tamaño ocupado por el personaje en el buffer de alturas
-        'TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) And &HEF 'pone a 0 el bit que indica si el personaje está bajando o subiendo
         ClearBitArray(TablaCaracteristicasPersonajes_3036, PunteroCaracteristicasPersonajeIY + 5 - &H3036, 4)  'pone a 0 el bit que indica si el personaje está bajando o subiendo
         '295C
         AlturaPersonajeE = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) 'altura del personaje
@@ -5782,7 +5821,6 @@ Module ModAbadia
                     TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) = Z80Dec(TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036)) 'deshace el incremento
                     If Altura1A <> -1 Then Exit Sub 'si no se está bajando una unidad, sale
                     '298a
-                    'TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) Or &H10 'indica que está bajando
                     SetBitArray(TablaCaracteristicasPersonajes_3036, PunteroCaracteristicasPersonajeIY + 5 - &H3036, 4) 'indica que está bajando
                     '298e
                     TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) = Z80Dec(TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036)) 'decrementa la altura del personaje
@@ -5911,8 +5949,8 @@ Module ModAbadia
         '26d1
         PosicionX = (PosicionX And &HFC) - 8
         If PosicionX < 0 Then PosicionX = 0
-        TablaSprites_2E17(&H2FCF + 1 - &H2E17) = Long2Byte(PosicionX) 'fija la posición x del sprite
-        TablaSprites_2E17(&H2FCF + 3 - &H2E17) = Long2Byte(PosicionX) 'fija la posición anterior x del sprite
+        TablaSprites_2E17(&H2FCF + 1 - &H2E17) = Int2ByteSigno(PosicionX) 'fija la posición x del sprite
+        TablaSprites_2E17(&H2FCF + 3 - &H2E17) = Int2ByteSigno(PosicionX) 'fija la posición anterior x del sprite
         '26de
         If Not Depuracion.LuzEnGuillermo Then
             PosicionY = TablaSprites_2E17(&H2E2D - &H2E17) 'obtiene la posición y del sprite de adso '###depuración
@@ -5930,8 +5968,8 @@ Module ModAbadia
         PosicionY = (PosicionY And &HF8) - &H18 'ajusta la posición y del sprite de adso al tile más cercano y la traslada
         If PosicionY < 0 Then PosicionY = 0
         '26FE
-        TablaSprites_2E17(&H2FCF + 2 - &H2E17) = Long2Byte(PosicionY) 'modifica la posición y del sprite
-        TablaSprites_2E17(&H2FCF + 4 - &H2E17) = Long2Byte(PosicionY) 'modifica la posición anterior y del sprite
+        TablaSprites_2E17(&H2FCF + 2 - &H2E17) = Int2ByteSigno(PosicionY) 'modifica la posición y del sprite
+        TablaSprites_2E17(&H2FCF + 4 - &H2E17) = Int2ByteSigno(PosicionY) 'modifica la posición anterior y del sprite
         '2704
         If TablaCaracteristicasPersonajes_3036(&H304B - &H3036) <> 0 Then 'si los gráficos estan flipeados
             SpriteLuzFlip_4BA0 = True
@@ -6051,6 +6089,7 @@ Module ModAbadia
         Dim NBits As Byte
         Dim PunteroDE As Integer
         Dim Comando As Byte
+        EscribirComando_0CE9 = 0
         For Contador = 0 To LongitudDatosB - 1
             NBits = TablaCaracteristicasPersonajes_3036(PersonajeIY + 9 - &H3036) 'lee el contador
             '0cec
@@ -6078,7 +6117,7 @@ Module ModAbadia
     End Function
 
 
-    Public Function EscribirComando_4729(PersonajeIY As Integer, Altura1A As Byte, Altura2C As Byte, ByVal PunteroTablaAvancePersonajeHL As Integer)
+    Public Sub EscribirComando_4729(ByVal PersonajeIY As Integer, ByVal Altura1A As Byte, ByVal Altura2C As Byte, ByVal PunteroTablaAvancePersonajeHL As Integer)
         '; escribe un comando dependiendo de si sube, baja o se mantiene
         '; llamado con:
         ';  iy = datos de posición del personaje 
@@ -6087,7 +6126,7 @@ Module ModAbadia
         Dim NuevoEstadoA As Byte
         Dim Comando As Integer
         Dim LongitudComando As Byte
-        EscribirComando_4729 = 0
+        'EscribirComando_4729 = 0
         ClearBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 5 - &H3036, 4) 'indica que el personaje no está bajando en altura
         '4731
         If LeerBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 5 - &H3036, 7) Then 'si el personaje ocupa una posición
@@ -6172,7 +6211,7 @@ Module ModAbadia
         Comando = Leer16Inv(TablaComandos_440C, PunteroTablaComandosHL - &H440C) 'lee en el comando a poner
         LongitudComando = TablaComandos_440C(PunteroTablaComandosHL + 2 - &H440C) 'lee la longitud del comando
         EscribirComando_0CE9(PersonajeIY, Comando, LongitudComando) 'escribe b bits del comando que se le pasa en hl del personaje pasado en iy
-    End Function
+    End Sub
 
     Public Sub GenerarComandosOrientacionPersonaje_47C3(ByVal PersonajeIY As Integer, ByVal ActualA As Byte, ByRef RequeridaC As Byte)
         'escribe unos comandos para cambiar la orientación del personaje desde la orientación actual a la deseada
@@ -6215,7 +6254,6 @@ Module ModAbadia
         Dim PosicionYB As Byte 'nibble superior de BC
         Dim OrientacionA As Byte
         Dim OrientacionB As Byte
-        Dim OrientacionResultadoC As Byte
         Dim Valor As Integer
         Dim Valor1 As Byte
         Dim Valor2 As Byte
@@ -6323,7 +6361,7 @@ Module ModAbadia
             End If
             '46fd
             ObtenerAlturaDestinoPersonaje_27B8(0, OrientacionA, PersonajeIY, Altura1A, Altura2C, PunteroTablaAvanceHL)
-            EscribirComando_4729(PersonajeIY, Int2Byte(Altura1A), Int2Byte(Altura2C), PunteroTablaAvanceHL)
+            EscribirComando_4729(PersonajeIY, Int2ByteSigno(Altura1A), Int2ByteSigno(Altura2C), PunteroTablaAvanceHL)
             Do
                 '4707
                 PunteroBufferSpritesIX = PunteroBufferSpritesIX - 3 'avanza a la siguiente posición del camino
@@ -6353,6 +6391,8 @@ Module ModAbadia
         Dim OrientacionActualA As Byte
         Dim Altura1A As Integer
         Dim Altura2C As Integer
+        Dim Altura1AByte As Byte
+        Dim Altura2CByte As Byte
         Dim PunteroTablaAvanceHL As Integer
         OrientacionActualA = TablaCaracteristicasPersonajes_3036(PersonajeIY + 1 - &H3036) 'obtiene la orientación del personaje
         TablaCaracteristicasPersonajes_3036(PersonajeIY + 1 - &H3036) = OrientacionNuevaC 'pone la nueva orientación del personaje
@@ -6363,9 +6403,11 @@ Module ModAbadia
         End If
         '4659
         'comprueba la altura de las posiciones a las que va a moverse el personaje y las devuelve en a y c
-        ObtenerAlturaDestinoPersonaje_27B8(0, OrientacionNuevaC, PersonajeIY, Int2Byte(Altura1A), Int2Byte(Altura2C), PunteroTablaAvanceHL)
+        ObtenerAlturaDestinoPersonaje_27B8(0, OrientacionNuevaC, PersonajeIY, Altura1A, Altura2C, PunteroTablaAvanceHL)
+        Altura1AByte = Int2ByteSigno(Altura1A)
+        Altura2CByte = Int2ByteSigno(Altura2C)
         'escribe un comando dependiendo de si sube, baja o se mantiene
-        EscribirComando_4729(PersonajeIY, Altura1A, Altura2C, PunteroTablaAvanceHL)
+        EscribirComando_4729(PersonajeIY, Altura1AByte, Altura2CByte, PunteroTablaAvanceHL)
     End Sub
 
     Public Sub GenerarComandos_47E6(ByVal PersonajeIY As Integer, ByVal OrientacionNuevaC As Byte, ByVal NumeroRutina As Integer, ByVal PunteroPilaCaminoHL As Integer)
@@ -6479,7 +6521,7 @@ Module ModAbadia
         End If
     End Function
 
-    Public Function ComprobarPosicionesVecinas_450E(ByVal PosicionDE As Integer, ByVal OrientacionA As Byte, AlturaBase_451C As Byte, PunteroBufferAlturasIX As Integer) As Boolean
+    Public Function ComprobarPosicionesVecinas_450E(ByVal PosicionDE As Integer, ByVal OrientacionA As Byte, ByVal AlturaBase_451C As Byte, PunteroBufferAlturasIX As Integer) As Boolean
         'si no se había explorado esta posición, comprueba las 4 posiciones vecinas ((x,y),(x,y-1),(x-1,y)(x-1,y-1) y
         'si no hay mucha diferencia de altura, pone el bit 7 de (x,y). también escribe la orientación final en 0x4418
         'si devuelve true, la función llamante debe terminar
@@ -6528,15 +6570,15 @@ Module ModAbadia
         End If
     End Function
 
-    Public Function EscribirByteBufferAlturas(ByVal Puntero As Integer, ByVal Valor As Byte)
+    Public Sub EscribirByteBufferAlturas(ByVal Puntero As Integer, ByVal Valor As Byte)
         If PunteroBufferAlturas_2D8A = &H01C0 Then 'buffer principal con la pantalla actual
-            If Not PunteroPerteneceTabla(Puntero, TablaBufferAlturas_01C0, &H01C0) Then Exit Function
+            If Not PunteroPerteneceTabla(Puntero, TablaBufferAlturas_01C0, &H01C0) Then Exit Sub
             TablaBufferAlturas_01C0(Puntero - &H01C0) = Valor
         Else 'buffer auxiliar para la búsqueda de caminos
-            If Not PunteroPerteneceTabla(Puntero, TablaBufferAlturas_96F4, &H96F4) Then Exit Function
+            If Not PunteroPerteneceTabla(Puntero, TablaBufferAlturas_96F4, &H96F4) Then Exit Sub
             TablaBufferAlturas_96F4(Puntero - &H96F4) = Valor
         End If
-    End Function
+    End Sub
 
     Public Function LeerBitBufferAlturas(ByVal Puntero As Integer, NBit As Byte) As Byte
         LeerBitBufferAlturas = 0
@@ -6552,6 +6594,10 @@ Module ModAbadia
         'escribe un valor de 16 bits en el buffer de sprites cuando se utiliza como pila
         'para el cálculo de caminos
         PunteroPilaCamino = PunteroPilaCamino - 2
+        If PunteroPilaCamino < &H9500 Then
+            'Stop 'final del buffer de sprites
+            Exit Sub
+        End If
         Escribir16(BufferSprites_9500, PunteroPilaCamino - &H9500, Valor)
         'PilaDebug(UBound(PilaDebug) - (&H9CFC - PunteroPilaCamino) / 2) = Valor
     End Sub
@@ -6755,6 +6801,8 @@ Module ModAbadia
             DatosHabitacion = TablaConexionesHabitaciones_05CD(PunteroTablaConexionesHabitacionesIX - &H05CD) 'obtiene los datos de la habitación
         Else
             DatosHabitacion = 0
+            'Stop
+            Exit Function
         End If
         If (DatosHabitacion And OrientacionSalidaC) <> 0 Then Exit Function 'si no se puede salir de la habitación por la orientación que se le pasa, sale
         '48a0
@@ -6796,6 +6844,10 @@ Module ModAbadia
         '484B
         Do
             PunteroPilaHL = PunteroPilaHL - 2
+            If PunteroPilaHL < &H9500 Then
+                ResultadoBusqueda_2DB6 = 0 'escribe el resultado de la búsqueda
+                Exit Function
+            End If
             ElementoActualPilaDE = LeerPilaCamino(PunteroPilaHL)
             If ElementoActualPilaDE = &HFFFF Then 'si no se ha completado una iteración
                 '4854
@@ -7360,7 +7412,6 @@ Module ModAbadia
         'ix apunta a los datos del personaje buscado
         Dim OrigenX As Byte
         Dim OrigenY As Byte
-        Dim OrigenZ As Byte
         Dim OrigenOrientacion As Byte
         Dim DestinoX As Byte
         Dim DestinoY As Byte
@@ -8397,7 +8448,6 @@ Module ModAbadia
         'comportamiento de adso
         Dim PersonajeIY As Integer
         Dim PunteroDatosAdsoIX As Integer
-        Dim PunteroVariablesAuxiliaresHL As Integer
         Dim PunteroBufferAlturasIX As Integer
         Dim PunteroAuxiliarHL As Integer
         Dim PosicionXAdsoL As Byte
@@ -8784,7 +8834,7 @@ Module ModAbadia
         PunteroFraseActual_2D9E = PunteroFrasesHL
         'pone a 0 los caracteres en blanco que quedan por salir para que la frase haya salido totalmente por pantalla
         CaracteresPendientesFrase_2D9B = 0
-        EscribirFraseMarcador_5026 = False = True
+        EscribirFraseMarcador_5026 = False
     End Function
 
     Public Sub LimpiarFrasesMarcador_5001()
@@ -9172,21 +9222,24 @@ Module ModAbadia
 
     Public Sub Start(ObjetoPantalla As PictureBox)
         'arranca el juego y dibuja en ObjetoPantalla
-
+        Depuracion.Init()
         'prueba sonido
         'AY38910.EscribirRegistro(0, 168)
         'AY38910.EscribirRegistro(1, 0)
         'AY38910.EscribirRegistro(2, &H10)
         'AY38910.EscribirRegistro(4, &H4)
-        'AY38910.EscribirRegistro(6, 16)
-        'AY38910.EscribirRegistro(7, 248)
-        'AY38910.EscribirRegistro(8, 6)
-        'AY38910.EscribirRegistro(14, 255)
-
-        WaveOut.Abrir()
-        WaveOut.Reproducir()
-
-
+        'AY38910.EscribirRegistro(6, 15)
+        'AY38910.EscribirRegistro(7, 0)
+        'AY38910.EscribirRegistro(8, 16)
+        'AY38910.EscribirRegistro(9, 4)
+        'AY38910.EscribirRegistro(11, 25)
+        'AY38910.EscribirRegistro(12, 8)
+        'AY38910.EscribirRegistro(13, 8)
+        'AY38910.EscribirRegistro(14, 8)
+        If Not Depuracion.QuitarSonido Then
+            WaveOut.Abrir()
+            WaveOut.Reproducir()
+        End If
 
         InicializarPantalla(2, ObjetoPantalla)
         InicializarJuego_249A()
@@ -13123,7 +13176,7 @@ Module ModAbadia
         TablaVariablesLogica_3C85(DondeVaSeverino_3D01 - &H3C85) = 0
     End Sub
 
-    Public Sub AñadirNumerosRomanosPergamino_5643(NumeroA As Byte)
+    Public Sub AñadirNumerosRomanosPergamino_5643(ByVal NumeroA As Byte)
         'copia a la cadena del pergamino los números romanos de la habitación del espejo
         Dim PunteroNumeroHL As Integer
         Dim PunteroCadenaPergaminoDE As Integer
@@ -13236,11 +13289,7 @@ Module ModAbadia
         Dim ObjetoZA As Byte
         Dim ObjetoHL As Integer 'posición del objeto o dirección del personaje que lo tiene
         Dim ObjetosPersonajeHL As Integer 'si el objeto está cogido, dirección del personaje que lo tiene. apunta a TablaObjetosPersonajes_2DEC
-        Dim PersonajeHL As Integer 'si el objeto está cogido, dirección del personaje que lo tiene. apunta a TablaCaracteristicasPersonajes_3036
         Dim Saltar_5166 As Boolean 'true para no pasar por 5166 cuando salta desde 5156
-        Dim PersonajeXL As Integer 'posición del personaje que tiene el objeto
-        Dim PersonajeYH As Integer
-        Dim PersonajeZA As Integer
         Dim MascaraObjetoHL As Integer 'máscara con un bit indicando el objeto que está siendo comprobado
         Dim MascaraObjetoH As Byte 'nibbles de MascaraObjetoHL
         Dim MascaraObjetoL As Byte
@@ -14083,7 +14132,7 @@ Module ModAbadia
         End If
     End Function
 
-    Public Sub LeerEnvolventeVolumen_129B(ByVal PunteroCanalIX)
+    Public Sub LeerEnvolventeVolumen_129B(ByVal PunteroCanalIX As Integer)
         'lee valores de la tabla de envolventes y volumen base y actualiza los registros
         Dim PunteroSonidoHL As Integer
         Dim ValorA As Byte
@@ -14150,7 +14199,7 @@ Module ModAbadia
         TablaDatosSonidos_0F96(PunteroCanalIX + &H0C - &H0F96) = ValorA
     End Sub
 
-    Public Sub ActualizarEnvolventeVolumen_1275(ByVal PunteroCanalIX)
+    Public Sub ActualizarEnvolventeVolumen_1275(ByVal PunteroCanalIX As Integer)
         'comprueba si hay que actualizar la generación de envolventes y el volumen
         Dim VolumenA As Byte
         DecByteArray(TablaDatosSonidos_0F96, PunteroCanalIX + &H12 - &H0F96)
@@ -14183,7 +14232,7 @@ Module ModAbadia
         TablaDatosSonidos_0F96(PunteroCanalIX + &H07 - &H0F96) = VolumenA
     End Sub
 
-    Public Sub ActualizarTono_1231(ByVal PunteroCanalIX)
+    Public Sub ActualizarTono_1231(ByVal PunteroCanalIX As Integer)
         'comprueba si hay que actualizar el tono base de las notas
         Dim PunteroSonidoHL As Integer
         Dim ValorA As Byte
@@ -14431,17 +14480,30 @@ Module ModAbadia
     Public Sub ActualizarSonidos_1060()
         'actualiza la música si fuera necesario
         Dim ValorA As Byte
+        Dim Limite As Single
         'si ninguna de las 3 entradas tenían activo el bit 0, finaliza la interrupcion
-        If ((TablaDatosSonidos_0F96(&H0FAE - &H0F96) Or TablaDatosSonidos_0F96(&H0FC6 - &H0F96) Or TablaDatosSonidos_0F96(&H0FDE - &H0F96)) And &H01) = False Then Exit Sub
+        If ((TablaDatosSonidos_0F96(&H0FAE - &H0F96) Or TablaDatosSonidos_0F96(&H0FC6 - &H0F96) Or TablaDatosSonidos_0F96(&H0FDE - &H0F96)) And &H01) = False Then
+            RelojSonido.Stop()
+            Exit Sub
+        End If
+        If RelojSonido.IsRunning = False Then RelojSonido.Restart()
+        Limite = TempoMusica_1086 * 3.45  'ms
+        If RelojSonido.ElapsedMilliseconds > Limite Then
+            ValorA = 0
+            RelojSonido.Restart()
+        Else
+            ValorA = TempoMusica_1086 '- TempoMusica_1086 * RelojSonido.ElapsedMilliseconds / Limite + 1
+        End If
         '1079
         'rutina que actualiza la música (según valga 0x0f98, el tempo es mayor o menor)
-        ValorA = TablaDatosSonidos_0F96(&H0F98 - &H0F96)
+        'ValorA = TablaDatosSonidos_0F96(&H0F98 - &H0F96)
         'decrementa el tempo de la música, pero lo mantiene entre 0 y [0x1086]
         If ValorA = 0 Then
-            ValorA = TempoMusica_1086
+            'ValorA = TempoMusica_1086
         Else
-            ValorA = ValorA - 1
+            'ValorA = ValorA - 1
         End If
+
         TablaDatosSonidos_0F96(&H0F98 - &H0F96) = ValorA
         '108A
         'activa los tonos y el generador de ruido para todos los canales
@@ -14566,7 +14628,12 @@ Module ModAbadia
     End Sub
 
     Public Sub TareaSonido()
+        Dim Reloj As New Stopwatch
+        Dim Relojnose As New Stopwatch
+        Dim Contador As Integer
         TareaSonidoActiva = True
+        Reloj.Start()
+        Relojnose.Start()
         Do
             If ContadorInterrupcion_2D4B = &HFF Then
                 ContadorInterrupcion_2D4B = 0
@@ -14575,14 +14642,27 @@ Module ModAbadia
             End If
             ActualizarSonidos_1060()
             If CancelarTareaSonido Then Exit Do
-            Sleep(2)
+            Relojnose.Restart()
+            Do
+                Application.DoEvents()
+            Loop While Relojnose.ElapsedMilliseconds < 3
+
+            'System.Threading.Thread.Sleep(1)
+
+            Contador = Contador + 1
+            If Reloj.ElapsedMilliseconds > 1000 Then
+                Reloj.Restart()
+                FPSSonido = Contador
+                Contador = 0
+            End If
         Loop
-        TareaSonidoActiva = False
+            TareaSonidoActiva = False
     End Sub
 
     Public Sub ArrancarTareaSonido()
         CancelarTareaSonido = False
         Thread1 = New System.Threading.Thread(AddressOf TareaSonido)
+        Thread1.Priority = Threading.ThreadPriority.BelowNormal
         Thread1.Start()
     End Sub
 
@@ -14800,7 +14880,7 @@ Module ModAbadia
     Public Sub DibujarPergaminoFinal_3868()
         ModPantalla.SeleccionarPaleta(0) 'pone una paleta de colores negra
         TempoMusica_1086 = &H08 '###pendiente de ajustar bien
-        TempoMusica_1086 = &H09
+        TempoMusica_1086 = &H08
         ReproducirSonidoPergaminoFinal()
         DibujarPergaminoIntroduccion_659D(&H8330) 'dibuja el Pergamino y cuenta la introducción. De aquí vuelve al pulsar espacio
     End Sub

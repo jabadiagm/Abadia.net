@@ -83,6 +83,10 @@ Partial Class FrmPrincipal
         Me.TxBonus = New System.Windows.Forms.TextBox()
         Me.Label3 = New System.Windows.Forms.Label()
         Me.TxEstadoAbad = New System.Windows.Forms.TextBox()
+        Me.LbFPSSonido = New System.Windows.Forms.Label()
+        Me.BtMasTiempo = New System.Windows.Forms.Button()
+        Me.LbTiempo = New System.Windows.Forms.Label()
+        Me.TxDondeVaSeverino = New System.Windows.Forms.TextBox()
         CType(Me.PbPantalla, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.SuspendLayout()
         '
@@ -632,11 +636,52 @@ Partial Class FrmPrincipal
         Me.TxEstadoAbad.TabIndex = 48
         Me.TxEstadoAbad.TabStop = False
         '
+        'LbFPSSonido
+        '
+        Me.LbFPSSonido.AutoSize = True
+        Me.LbFPSSonido.Location = New System.Drawing.Point(16, 528)
+        Me.LbFPSSonido.Name = "LbFPSSonido"
+        Me.LbFPSSonido.Size = New System.Drawing.Size(27, 13)
+        Me.LbFPSSonido.TabIndex = 49
+        Me.LbFPSSonido.Text = "FPS"
+        '
+        'BtMasTiempo
+        '
+        Me.BtMasTiempo.FlatStyle = System.Windows.Forms.FlatStyle.System
+        Me.BtMasTiempo.Location = New System.Drawing.Point(160, 480)
+        Me.BtMasTiempo.Name = "BtMasTiempo"
+        Me.BtMasTiempo.Size = New System.Drawing.Size(32, 24)
+        Me.BtMasTiempo.TabIndex = 50
+        Me.BtMasTiempo.TabStop = False
+        Me.BtMasTiempo.Text = "+T"
+        Me.BtMasTiempo.UseVisualStyleBackColor = True
+        '
+        'LbTiempo
+        '
+        Me.LbTiempo.AutoSize = True
+        Me.LbTiempo.Location = New System.Drawing.Point(160, 512)
+        Me.LbTiempo.Name = "LbTiempo"
+        Me.LbTiempo.Size = New System.Drawing.Size(27, 13)
+        Me.LbTiempo.TabIndex = 51
+        Me.LbTiempo.Text = "FPS"
+        '
+        'TxDondeVaSeverino
+        '
+        Me.TxDondeVaSeverino.Location = New System.Drawing.Point(160, 528)
+        Me.TxDondeVaSeverino.Name = "TxDondeVaSeverino"
+        Me.TxDondeVaSeverino.Size = New System.Drawing.Size(24, 20)
+        Me.TxDondeVaSeverino.TabIndex = 52
+        Me.TxDondeVaSeverino.TabStop = False
+        '
         'FrmPrincipal
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.ClientSize = New System.Drawing.Size(646, 552)
+        Me.Controls.Add(Me.TxDondeVaSeverino)
+        Me.Controls.Add(Me.LbTiempo)
+        Me.Controls.Add(Me.BtMasTiempo)
+        Me.Controls.Add(Me.LbFPSSonido)
         Me.Controls.Add(Me.TxEstadoAbad)
         Me.Controls.Add(Me.Label3)
         Me.Controls.Add(Me.TxBonus)
@@ -764,4 +809,8 @@ End Sub
     Friend WithEvents TxBonus As TextBox
     Friend WithEvents Label3 As Label
     Friend WithEvents TxEstadoAbad As TextBox
+    Friend WithEvents LbFPSSonido As Label
+    Friend WithEvents BtMasTiempo As Button
+    Friend WithEvents LbTiempo As Label
+    Friend WithEvents TxDondeVaSeverino As TextBox
 End Class

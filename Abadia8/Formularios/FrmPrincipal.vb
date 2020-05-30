@@ -98,7 +98,11 @@
     End Sub
 
     Private Sub Button1_Click_1(sender As Object, e As EventArgs) Handles Button1.Click
-        ReproducirSonidoAbrirEspejoCanal1_0FFD()
+        Dim Nose As Integer
+        Dim nose2
+        Nose = &H80
+        nose2 = ror8(Nose, 8)
+        DibujarPergaminoFinal_3868()
     End Sub
 
     Private Sub FrmPrincipal_KeyUp(sender As Object, e As KeyEventArgs) Handles Me.KeyUp
@@ -140,7 +144,7 @@
     End Sub
 
     Private Sub BtPantalla_Click(sender As Object, e As EventArgs) Handles BtPantalla.Click
-        Dim NumeroHabitacion As Long
+        Dim NumeroHabitacion As Integer
         Pintar = True
         NumeroHabitacion = CInt(TxNumeroHabitacion.Text)
         ModPantalla.DibujarRectangulo(0, 0, 319, 160, 0)
@@ -149,13 +153,15 @@
         ModAbadia.Check = True
         DibujarPantalla_19D8()
         ModPantalla.Refrescar()
-        'NumeroHabitacion = NumeroHabitacion + 2
-        'TxNumeroHabitacion.Text = "&H" + Hex$(NumeroHabitacion)
+        NumeroHabitacion = NumeroHabitacion + 1
+        TxNumeroHabitacion.Text = "&H" + Hex$(NumeroHabitacion)
 
     End Sub
 
     Private Sub TmFPS_Tick(sender As Object, e As EventArgs) Handles TmFPS.Tick
         LbFPS.Text = CStr(ModAbadia.FPS)
+        LbFPSSonido.Text = CStr(ModAbadia.FPSSonido)
+        LbTiempo.Text = CStr(ModAbadia.TiempoRestanteMomentoDia_2D86)
     End Sub
 
     Private Sub BtContinuar_Click(sender As Object, e As EventArgs) Handles BtContinuar.Click
@@ -336,5 +342,11 @@
         TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H1A
     End Sub
 
+    Private Sub BtMasTiempo_Click(sender As Object, e As EventArgs) Handles BtMasTiempo.Click
+        ModAbadia.TiempoRestanteMomentoDia_2D86 = ModAbadia.TiempoRestanteMomentoDia_2D86 + &H100
+    End Sub
 
+    Private Sub FrmPrincipal_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+
+    End Sub
 End Class

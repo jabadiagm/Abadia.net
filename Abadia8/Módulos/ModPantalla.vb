@@ -1,6 +1,6 @@
 ﻿Module ModPantalla
 
-    Private Escala As Long 'relación pixel pantalla/pixel juego
+    Private Escala As Integer 'relación pixel pantalla/pixel juego
     Private pbPantalla As PictureBox
     Private ColorBorde As Integer
     Private cBitmap As New Bitmap(320, 200) 'bitmap con colores RGB
@@ -37,7 +37,7 @@
         }
     Private cColores(16) As Color
 
-    Public Sub SeleccionarPaleta(Paleta As Long)
+    Public Sub SeleccionarPaleta(Paleta As Integer)
         Select Case Paleta
             Case Is = 0 ' paleta negra
                 ColorBorde = 0 'negro
@@ -83,18 +83,18 @@
         CopiarBitmapFirmware()
     End Sub
 
-    Public Sub InicializarPantalla(ValorEscala As Long, ObjetoPantalla As PictureBox)
+    Public Sub InicializarPantalla(ValorEscala As Integer, ObjetoPantalla As PictureBox)
         Escala = ValorEscala
         pbPantalla = ObjetoPantalla
-        pbPantalla.Image =cBitmap
-        cGraphics =pbPantalla.CreateGraphics ()
+        pbPantalla.Image = cBitmap
+        cGraphics = pbPantalla.CreateGraphics()
         cGraphics.InterpolationMode = Drawing2D.InterpolationMode.NearestNeighbor
         'pbPantalla.BackColor = 0
         pbPantalla.BackColor = Color.FromArgb(&HFF000080) 'provisional
         SeleccionarPaleta(0)
     End Sub
 
-    Public Sub DibujarRectangulo2(X1 As Long, Y1 As Long, X2 As Long, Y2 As Long, ColorValue As Long)
+    Public Sub DibujarRectangulo2(X1 As Integer, Y1 As Integer, X2 As Integer, Y2 As Integer, ColorValue As Integer)
         'no usar
         Dim NewPen As New Pen(Color.FromArgb(&HFF000000 + ModFunciones.BGR2RGB(ColorValue)))
         Dim NewGraphics As Graphics = Graphics.FromImage(cBitmap)
@@ -107,7 +107,7 @@
         NewGraphics.Dispose()
     End Sub
 
-    Public Sub DibujarRectangulo(X1 As Long, Y1 As Long, X2 As Long, Y2 As Long, NColor As Byte)
+    Public Sub DibujarRectangulo(X1 As Integer, Y1 As Integer, X2 As Integer, Y2 As Integer, NColor As Byte)
         Dim ContadorX As Integer
         Dim ContadorY As Integer
         Dim StepX As Integer = 1
@@ -123,12 +123,12 @@
     End Sub
 
 
-    Public Sub DibujarRectanguloCGA(X1 As Long, Y1 As Long, X2 As Long, Y2 As Long, NColor As Byte)
+    Public Sub DibujarRectanguloCGA(X1 As Integer, Y1 As Integer, X2 As Integer, Y2 As Integer, NColor As Byte)
         'usa los colores de la paleta
         DibujarRectangulo(X1, Y1, X2, Y2, NColor)
     End Sub
 
-    Public Sub DibujarPunto(X As Long, Y As Long, Color_ As Long)
+    Public Sub DibujarPunto(X As Integer, Y As Integer, Color_ As Integer)
         cBitmap.SetPixel(X, Y, Color.FromArgb(&HFF000000 + ModFunciones.BGR2RGB(Color_)))
     End Sub
 
@@ -148,11 +148,11 @@
                 cBitmap.SetPixel(ContadorX, ContadorY, cColores(NColor))
             Next
         Next
-        Refrescar()
+        'Refrescar()
     End Sub
 
 
-    Public Sub PantallaCGA2PC(PunteroPantalla As Long, Color As Byte)
+    Public Sub PantallaCGA2PC(PunteroPantalla As Integer, Color As Byte)
         'convierte la información de cga para dibujar en PC
         Dim Y As Integer
         Dim X As Integer
@@ -161,7 +161,8 @@
         Dim Resto As Integer '0-7
         Dim Contador As Integer
         Cociente = Int((PunteroPantalla And &H7FF) / &H50)
-        Resto = shr(PunteroPantalla, 11) And &H7&
+        'Resto = shr(PunteroPantalla, 11) And &H7&
+        Resto = (PunteroPantalla >> 11) And &H7&
         Y = Cociente * 8 + Resto
         X = ((PunteroPantalla And &H7FF&) - Cociente * &H50) * 4 'posición del pixel más a la izquierda
         'If X = 0 Then Stop
@@ -201,7 +202,7 @@
         cGraphics.DrawImage(cBitmap, 0, 0, 640, 400) '1x
     End Sub
 
-    Public Sub DefinirModo(Modo As Long)
+    Public Sub DefinirModo(Modo As Integer)
         'modo0: 160x100, 16 colores
         'modo1: 320x200, 4 colores
         '###pendiente

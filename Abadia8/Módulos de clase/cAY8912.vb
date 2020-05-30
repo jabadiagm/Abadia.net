@@ -1,5 +1,4 @@
-﻿Imports Prueba3
-
+﻿
 Public Class cAY8912
     Implements Reproducible
     'AY-3-3912 con la frecuencia de un Amstrad

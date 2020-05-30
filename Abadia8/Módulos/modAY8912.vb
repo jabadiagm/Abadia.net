@@ -58,8 +58,8 @@
     End Structure
 
     Public AY_OutNoise As Integer
-    Public VolA As Long, VolB As Long, VolC As Long
-    Private lOut1 As Long, lOut2 As Long, lOut3 As Long
+    Public VolA As Integer, VolB As Integer, VolC As Integer
+    Private lOut1 As Integer, lOut2 As Integer, lOut3 As Integer
     Public AY_Left As Integer
     Public AY_NextEvent As Integer
     Public Buffer_Length As Integer
@@ -494,7 +494,7 @@
     End Function
 
     Public Function GetPSGWave() As Byte
-        Static WCount As Long
+        Static WCount As Integer
         Dim PSG As Integer
         WCount = WCount + 1
         If WCount = 800 Then
