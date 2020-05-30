@@ -57,7 +57,7 @@ Public Class cCheckEnvironment
         Tipo.Init("ANI", &H319F&, &H60, "Animación de Personajes")
         ListaTipos.Append(Tipo)
         Tipo = New cTipoTabla
-        Tipo.Init("BSP", &H9500&, &H780, "Buffer de Sprites")
+        Tipo.Init("BSP", &H9500&, &H800, "Buffer de Sprites")
         ListaTipos.Append(Tipo)
         Tipo = New cTipoTabla
         Tipo.Init("GRA", &HA300&, &H859, "Gráficos de Guillermo, Adso y Puertas")

@@ -6,9 +6,9 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{BA29FB3E-C0E1-4F90-A501-D91B1C5B0E2E}</ProjectGuid>
     <OutputType>WinExe</OutputType>
-    <StartupObject>Abadia4.My.MyApplication</StartupObject>
-    <RootNamespace>Abadia4</RootNamespace>
-    <AssemblyName>Abadia4</AssemblyName>
+    <StartupObject>Abadia5.My.MyApplication</StartupObject>
+    <RootNamespace>Abadia5</RootNamespace>
+    <AssemblyName>Abadia5</AssemblyName>
     <FileAlignment>512</FileAlignment>
     <MyType>WindowsForms</MyType>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
@@ -22,7 +22,7 @@
     <DefineDebug>true</DefineDebug>
     <DefineTrace>true</DefineTrace>
     <OutputPath>bin\Debug\</OutputPath>
-    <DocumentationFile>Abadia4.xml</DocumentationFile>
+    <DocumentationFile>Abadia5.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
@@ -33,7 +33,7 @@
     <DefineTrace>true</DefineTrace>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
-    <DocumentationFile>Abadia4.xml</DocumentationFile>
+    <DocumentationFile>Abadia5.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
@@ -130,6 +130,7 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Formularios\FrmPrincipal.resx">
       <DependentUpon>FrmPrincipal.vb</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="My Project\Resources.resx">
       <Generator>VbMyResourcesResXFileCodeGenerator</Generator>

@@ -81,6 +81,12 @@
         Leer16 = shl(Bytes(Posicion + 1), 8) + Bytes(Posicion)
     End Function
 
+    Public Function Leer16Inv(Bytes() As Byte, Posicion As Long) As Long
+        'lee un valor de 16 bits de una cadena de bytes, en dirección inversa
+        Leer16Inv = shl(Bytes(Posicion), 8) + Bytes(Posicion + 1)
+    End Function
+
+
     Public Function Leer16Signo(Bytes() As Byte, Posicion As Long) As Long
         'lee un valor de 16 bits con signo de una cadena de bytes
         Dim Valor As Long
@@ -148,7 +154,7 @@
     End Sub
 
     Function Long2Byte(Valor As Long) As Byte
-        'pasa un entero largo de 32 bits a un byte. si el valor ewstá fuera de límites, da un error
+        'pasa un entero largo de 32 bits a un byte. si el valor está fuera de límites, da un error
         'un byte sólo puede contener enteros entre 0 y 255
         If Valor < -128 Or Valor > 255 Then Stop
         If Valor >= 0 Then
@@ -158,9 +164,29 @@
         End If
     End Function
 
+    Function Int2Byte(Valor As Integer) As Byte
+        'pasa un entero corto de 16 bits a un byte. si el valor está fuera de límites, da un error
+        'un byte sólo puede contener enteros entre 0 y 255
+        If Valor < -128 Or Valor > 255 Then Stop
+        If Valor >= 0 Then
+            Int2Byte = CByte(Valor)
+        Else
+            Int2Byte = CByte(256 + Valor)
+        End If
+    End Function
+
     Function Byte2Long(Valor As Byte) As Long
         'pasa un byte a entero largo de 32 bits
         Byte2Long = CLng(Valor)
+    End Function
+
+    Function SignedByte2Int(Valor As Byte) As Integer
+        'pasa un byte con signo entero
+        If Valor < &H80 Then
+            SignedByte2Int = CInt(Valor)
+        Else
+            SignedByte2Int = CInt(Valor) - 256
+        End If
     End Function
 
     Function LeerByteLong(Valor As Long, NumeroByte As Byte) As Byte
@@ -318,19 +344,99 @@ CatchError:
         DataArray(Pointer) = DataArray(Pointer) Or Weights(NBit)
     End Sub
 
+    Public Sub SetBit(ByRef Data As Byte, NBit As Byte)
+        Static Weights() As Byte = {1, 2, 4, 8, 16, 32, 64, 128}
+        Data = Data Or Weights(NBit)
+    End Sub
+
     Public Sub ClearBitArray(DataArray() As Byte, Pointer As Integer, NBit As Byte)
         Static Weights() As Byte = {&HFE, &HFD, &HFB, &HF7, &HEF, &HDF, &HBF, &H7F}
         DataArray(Pointer) = DataArray(Pointer) And Weights(NBit)
     End Sub
 
-    Public Function ReadBitArray(DataArray() As Byte, Pointer As Integer, NBit As Byte) As Boolean
+    Public Function LeerBitArray(DataArray() As Byte, Pointer As Integer, NBit As Byte) As Boolean
         Static Weights() As Byte = {1, 2, 4, 8, 16, 32, 64, 128}
         If DataArray(Pointer) And Weights(NBit) Then
-            ReadBitArray = True
+            LeerBitArray = True
         Else
-            ReadBitArray = False
+            LeerBitArray = False
         End If
     End Function
 
+    Public Function LeerBitByte(ByVal Valor As Byte, ByVal NBit As Byte) As Boolean
+        Static Weights() As Byte = {1, 2, 4, 8, 16, 32, 64, 128}
+        If Valor And Weights(NBit) Then
+            LeerBitByte = True
+        Else
+            LeerBitByte = False
+        End If
+    End Function
+
+    Public Sub IncByteArray(DataArray() As Byte, Pointer As Integer)
+        DataArray(Pointer) = DataArray(Pointer) + 1
+    End Sub
+
+    Public Sub DecByteArray(DataArray() As Byte, Pointer As Integer)
+        DataArray(Pointer) = DataArray(Pointer) - 1
+    End Sub
+
+    Public Sub Integer2Nibbles(ByVal Value As Integer, ByRef HighNibble As Byte, ByRef LowNibble As Byte)
+        LowNibble = CByte(Value And &H000000FF)
+        HighNibble = CByte((Value And &H0000FF00) >> 8)
+    End Sub
+
+    Public Function Nibbles2Integer(ByVal HighNibble As Byte, ByVal LowNibble As Byte) As Integer
+        Nibbles2Integer = HighNibble << 8 Or LowNibble
+    End Function
+
+    Public Function Z80Sub(Operando1 As Byte, Operando2 As Byte) As Byte
+        'devuelve operanco1-operando2 tomando los operandos como números
+        'con signo, y devolviendo la representación de un entero
+        Dim Op1 As Integer
+        Dim Op2 As Integer
+        Dim Res As Integer
+        If Operando1 < 128 Then
+            Op1 = Operando1
+        Else
+            Op1 = Operando1 - 256
+        End If
+        If Operando2 < 128 Then
+            Op2 = Operando2
+        Else
+            Op2 = Operando2 - 256
+        End If
+        Res = Op1 - Op2
+        If Res >= 0 Then
+            Z80Sub = CByte(Res And &H000000FF)
+        Else
+            Z80Sub = CByte((Res + 256) And &H000000FF)
+        End If
+    End Function
+
+    Public Function Z80Inc(Valor As Byte) As Byte
+        'incrementa un byte como lo haría el Z80
+        Dim ValorInt As Integer
+        If Valor < 128 Then
+            ValorInt = Valor
+        Else
+            ValorInt = Valor - 256
+        End If
+        ValorInt = ValorInt + 1
+        If ValorInt >= 0 Then
+            Z80Inc = CByte(ValorInt And &H000000FF)
+        Else
+            Z80Inc = CByte((ValorInt + 256) And &H000000FF)
+        End If
+
+    End Function
+
+    Public Function Z80Neg(Valor As Byte) As Byte
+        'devuelve el negativo del número. si es 0, devuelve 0
+        If Valor = 0 Then
+            Z80Neg = 0
+        Else
+            Z80Neg = (Valor Xor &HFF) + 1
+        End If
+    End Function
 
 End Module

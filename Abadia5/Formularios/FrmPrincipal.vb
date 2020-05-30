@@ -1,38 +1,14 @@
 ﻿Public Class FrmPrincipal
-    Private Sub WebBrowser1_DocumentCompleted(sender As Object, e As WebBrowserDocumentCompletedEventArgs)
-
-    End Sub
-
-    Private Sub FrmPrincipal_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-
-    End Sub
-    Public Sub Retardo(Tiempo As Long)
-        'hace una pausa de la duración indicada en "tiempo" (ms)
-        Dim Contador As Integer
-        TmTemporizador.Interval = Tiempo
-        TmTemporizador.Enabled = True
-        Do While TmTemporizador.Enabled = True
-            Contador = Contador + 1
-            If Contador = 10 Then
-                Application.DoEvents()
-                Contador = 0
-            End If
-        Loop
-    End Sub
-
-
-
 
 
     Private Sub FrmPrincipal_Shown(sender As Object, e As EventArgs) Handles Me.Shown
         Static Activado As Boolean
         If Not Activado Then
             'ModAbadia.PararAbadia()
-            InicializarPantalla(2, PbPantalla)
+            ModAbadia.Start(PbPantalla)
             Activado = True
-            InicializarJuego_249A()
         End If
-'ModPantalla.Refrescar ()
+        'ModPantalla.Refrescar ()
     End Sub
 
     Private Sub FrmPrincipal_KeyDown(sender As Object, e As KeyEventArgs) Handles Me.KeyDown
@@ -52,6 +28,7 @@
 
     Private Sub BtParar_Click(sender As Object, e As EventArgs) Handles BtParar.Click
         ModAbadia.PararAbadia()
+        If ModAbadia.Parado Then MsgBox("Parado")
     End Sub
 
     Private Sub BtDebug_Click(sender As Object, e As EventArgs) Handles BtDebug.Click
@@ -89,27 +66,59 @@
         TextBox1.Text = TextBox1.Text + Texto
     End Sub
 
-    Private Sub TmTemporizador_Tick(sender As Object, e As EventArgs) Handles TmTemporizador.Tick
-        TmTemporizador.Enabled = False
-    End Sub
 
     Private Sub FrmPrincipal_FormClosing(sender As Object, e As FormClosingEventArgs) Handles Me.FormClosing
         End
     End Sub
 
     Private Sub Button1_Click_1(sender As Object, e As EventArgs) Handles Button1.Click
-        Dim nose() As Byte = {255, 1, 2, 3, 4, 5, 6, 7}
-        Dim nose2 As Boolean
-        nose2 = ModFunciones.ReadBitArray(nose, 1, 0)
-        nose2 = ModFunciones.ReadBitArray(nose, 1, 1)
+        TmTick.Enabled = True
+        Exit Sub
+        Static contador As Byte = 0
+        ReproduciendoFrase_2DA1 = False
+        contador = contador + 1
+        EscribirFraseMarcador_5026(&H12)
+    End Sub
 
-        ModFunciones.ClearBitArray(nose, 0, 7)
-        ModFunciones.ClearBitArray(nose, 0, 6)
-        ModFunciones.ClearBitArray(nose, 0, 5)
-        ModFunciones.ClearBitArray(nose, 0, 4)
-        ModFunciones.ClearBitArray(nose, 0, 3)
-        ModFunciones.ClearBitArray(nose, 0, 2)
-        ModFunciones.ClearBitArray(nose, 0, 1)
-        ModFunciones.ClearBitArray(nose, 0, 0)
+    Private Sub FrmPrincipal_KeyUp(sender As Object, e As KeyEventArgs) Handles Me.KeyUp
+        Select Case e.KeyCode
+            Case Is = 32
+                ModTeclado.KeyUp(EnumTecla.TeclaEspacio)
+            Case Is = 37
+                ModTeclado.KeyUp(EnumTecla.TeclaIzquierda)
+            Case Is = 38
+                ModTeclado.KeyUp(EnumTecla.TeclaArriba)
+            Case Is = 39
+                ModTeclado.KeyUp(EnumTecla.TeclaDerecha)
+            Case Is = 40
+                ModTeclado.KeyUp(EnumTecla.TeclaAbajo)
+        End Select
+
+    End Sub
+
+    Private Sub TmTick_Tick(sender As Object, e As EventArgs)
+        ModAbadia.Tick()
+    End Sub
+
+    Private Sub BtPantalla_Click(sender As Object, e As EventArgs) Handles BtPantalla.Click
+        Dim NumeroHabitacion As Long
+        'On Error Resume Next
+        Pintar = True
+        NumeroHabitacion = CInt(TxNumeroHabitacion.Text)
+        ModPantalla.DibujarRectangulo(0, 0, 319, 160, 0)
+        PunteroPantallaActual_156A = BuscarHabitacionProvisional(NumeroHabitacion)
+        HabitacionOscura_156C = False
+        DibujarPantalla_19D8()
+        'NumeroHabitacion = NumeroHabitacion + 2
+        'TxNumeroHabitacion.Text = "&H" + Hex$(NumeroHabitacion)
+
+    End Sub
+
+    Private Sub FrmPrincipal_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+
+    End Sub
+
+    Private Sub TmFPS_Tick(sender As Object, e As EventArgs) Handles TmFPS.Tick
+        LbFPS.Text = CStr(ModAbadia.FPS)
     End Sub
 End Class

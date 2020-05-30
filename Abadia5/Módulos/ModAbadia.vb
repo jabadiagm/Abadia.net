@@ -2,6 +2,15 @@
 Imports System.Reflection
 Module ModAbadia
     'Dim bug As Boolean
+    Dim PilaDebug(210) As Integer
+    Public WithEvents TmTick As New Timer
+    Public Reloj As New Stopwatch 'reloj para retardos
+    Public RelojFPS As New Stopwatch 'reloj para al cálculo de frames por segundo
+    Public SiguienteTickTiempoms As Integer = 100
+    Public SiguienteTickNombreFuncion As String = "BuclePrincipal_25B7"
+    Public FPS As Integer 'fotogramas por segundo
+
+    Private WithEvents TmRetardo As New Timer()
 
     Dim Entradas(6) As Boolean
 
@@ -18,46 +27,56 @@ Module ModAbadia
     Private CheckEscaleras As Byte
     Private CheckRuta As String
 
-    Dim TablaBufferAlturas_01C0(&H23F) As Byte '576 bytes (24x24) = (4 + 16 + 4)x2  RAM
-    Dim TablaBloquesPantallas_156D(&HBF) As Byte
-    Dim DatosAlturaEspejoCerrado_34DB(4) As Byte  'datos de altura si el espejo está cerrado
-    Dim TablaRutinasConstruccionBloques_1FE0(&H37) As Byte 'no se usa
-    Dim VariablesBloques_1FCD(&H12) As Byte
+    Public TablaBufferAlturas_01C0(&H23F) As Byte '576 bytes (24x24) = (4 + 16 + 4)x2  RAM
+    Public TablaPosicionesAlternativas_0593() As Byte = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, &HFF} 'buffer de posiciones alternativas. Cada posición ocupa 3 bytes: x, y, z+orientación. sin byte final  RAM
+    Public TablaConexionesHabitaciones_05CD(&H12F) As Byte 'tablas con las conexiones de las habitaciones de las plantas
+    Public TablaDestinos_0C8A(&H0F) As Byte 'tabla para marcar las posiciones a las que debe ir el personaje para cambiar de habitación ROM
+    Public TablaTonosNotasVoces_1388(&H01E1) As Byte  '1388-1569. tono base de las notas para las voces, envolventes y cambios de volumen para las voces, datos de iniciación de la voz para el canal 3. RAM
+    Dim TablaBloquesPantallas_156D(&HBF) As Byte 'ROM
     'Dim DatosTilesBloques_1693(&H92) As Byte
     Dim TablaCaracteristicasMaterial_1693(&H924) As Byte
-
+    Dim VariablesBloques_1FCD(&H12) As Byte
+    Dim TablaRutinasConstruccionBloques_1FE0(&H37) As Byte 'no se usa
     Dim TablaHabitaciones_2255(&HFF) As Byte '(realmente empieza en 0x2265 porque en Y = 0 no hay nada)
     Dim TablaAvancePersonaje4Tiles_284D(31) As Byte
     Dim TablaAvancePersonaje1Tile_286D(31) As Byte
-
     Dim TablaDatosPersonajes_2BAE(&H3D) As Byte 'tabla con datos para mover los personajes
-    Dim TablaVariablesAuxiliares_2D8D(&H4B) As Byte 'variables auxiliares de algunas rutinas
+    Public BufferAuxiliar_2D68() As Byte = {&H01, &H23, &H3E, &H20, &H12, &H13, &H78, &H04, &HB9, &H38} 'buffer auxiliar con copia de los datos del personaje
+    Dim TablaVariablesAuxiliares_2D8D(&H37) As Byte '2d8d-2dd8. variables auxiliares de algunas rutinas
+    Public BufferAuxiliar_2DC5(&HF) As Integer 'buffer auxiliar para el cálculo de las alturas a los movimientos usado en 27cb
     Dim TablaPermisosPuertas_2DD9(18) As Byte 'copiado en 0x122-0x131. puertas a las que pueden entrar los personajes
     Dim CopiaTablaPermisosPuertas_2DD9(18) As Byte
-    Dim TablaObjetosPersonajes_2DEC(&H2A) As Byte 'copiado en 0x132-0x154. objetos de los personajes
+    Dim TablaObjetosPersonajes_2DEC(&H2A) As Byte '2dec-2e16. RAM. copiado en 0x132-0x154. objetos de los personajes
     Dim CopiaTablaObjetosPersonajes_2DEC(&H2A) As Byte
-    Dim TablaSprites_2E17(&H1CC) As Byte 'sprites de los personajes, puertas y objetos
+    Public TablaSprites_2E17(&H1CC) As Byte 'sprites de los personajes, puertas y objetos
     Dim TablaDatosPuertas_2FE4(&H23) As Byte 'datos de las puertas del juego. 5 bytes por entrada
     Dim CopiaTablaDatosPuertas_2FE4(&H23) As Byte
     Dim TablaPosicionObjetos_3008(&H2D) As Byte 'posición de los objetos del juego 5 bytes por entrada
     Dim CopiaTablaPosicionObjetos_3008(&H2D) As Byte
-    Dim TablaCaracteristicasPersonajes_3036(&H59) As Byte
+    Public TablaCaracteristicasPersonajes_3036(&H59) As Byte
     Dim TablaPunterosCarasMonjes_3097(&H7) As Byte
     Dim TablaDesplazamientoAnimacion_309F(&HFF) As Byte 'tabla para el cálculo del desplazamiento según la animación de una entidad del juego
     Dim TablaAnimacionPersonajes_319F(&H5F) As Byte
+    Dim DatosAlturaEspejoCerrado_34DB(4) As Byte  'datos de altura si el espejo está cerrado
+    Public TablaSimbolos_38E2() As Byte = {&HC0, &HBF, &HBB, &HBD, &HBC}
     Dim TablaAccesoHabitaciones_3C67(&H1D) As Byte
-    Dim TablaVariablesLogica_3C85(&H20) As Byte
-    Dim TablaPosicionesPredefinidasMalaquias_3CA8(&H1D) As Byte
-    Dim TablaPosicionesPredefinidasAbad_3CC6(&H20) As Byte
-    Dim TablaPosicionesPredefinidasBerengario_3CE7(&H17) As Byte 'berengario/bernardo gui/encapuchado/jorge
-    Dim TablaPosicionesPredefinidasSeverino_3CFF(&H11) As Byte 'severino/jorge
-    Dim TablaPosicionesPredefinidasAdso_3D11(&HB) As Byte
-    Dim TablaPunterosVariablesScript_3D1D(&H81) As Byte 'tabla de asociación de constantes a direcciones de memoria importantes para el programa (usado por el sistema de script)
+    Public TablaVariablesLogica_3C85(&H97) As Byte '3c85-3d1c
+    'Dim TablaVariablesLogica_3C85(&H20) As Byte
+    'Dim TablaPosicionesPredefinidasMalaquias_3CA8(&H1D) As Byte
+    'Dim TablaPosicionesPredefinidasAbad_3CC6(&H20) As Byte
+    'Dim TablaPosicionesPredefinidasBerengario_3CE7(&H17) As Byte 'berengario/bernardo gui/encapuchado/jorge
+    'Dim TablaPosicionesPredefinidasSeverino_3CFF(&H11) As Byte 'severino/jorge
+    'Dim TablaPosicionesPredefinidasAdso_3D11(&HB) As Byte
+    Dim TablaPunterosVariablesScript_3D1D(&H81) As Byte 'tabla de asociación de constantes a direcciones de memoria importantes para el programa (usado por el sistema de script) ROM
+    Public TablaDistanciaPersonajes_3D9F(&H0F) As Byte 'tabla de valores para el computo de la distancia entre personajes, indexada según la orientación del personaje.
     Dim DatosHabitaciones_4000(&H2329) As Byte
+    Public TablaComandos_440C(&H1C) As Byte 'tabla de longitudes de comandos según la orientación+tabla de comandos para girar+tabla de comandos si el personaje sube en altura+tabla de comandos si el personaje baja en altura+tabla de comandos si el personaje no cambia de altura
+    Public TablaOrientacionesAdsoGuillermo_461F(&H1F) As Byte 'tabla de orientaciones a probar para moverse en un determinado sentido
     Dim TablaPunterosTrajesMonjes_48C8(&H1F) As Byte
     Dim TablaPatronRellenoLuz_48E8(&H1F) As Byte
     Dim TablaAlturasPantallas_4A00(&HA1F) As Byte
     Dim TablaEtapasDia_4F7A(&H72) As Byte '4F7A:tabla de duración de las etapas del día para cada día y periodo del día 4FA7:tabla usada para rellenar el número del día en el marcador 4FBC:tabla de los nombres de los momentos del día
+    Public TablaNotasOctavasFrases_5659(&H37) As Byte 'tabla de octavas y notas para las frases del juego. ROM
     Dim DatosMarcador_6328(&H7FF) As Byte 'datos del marcador (de 0x6328 a 0x6b27)
     Dim DatosCaracteresPergamino_6947(&H9B8) As Byte
     Dim PunterosCaracteresPergamino_680C(&HB9) As Byte
@@ -66,58 +85,84 @@ Module ModAbadia
     Dim TextoPergaminoPresentacion_7300(&H589) As Byte
     Dim DatosGraficosPergamino_788A(&H5FF) As Byte
     Dim BufferTiles_8D80(&H77F) As Byte
-    Dim BufferSprites_9500(&H77F) As Byte
+    Dim BufferSprites_9500(&H7FF) As Byte
+    Public TablaBufferAlturas_96F4(&H23F) As Byte '576 bytes (24x24) = (4 + 16 + 4)x2  RAM
     Dim TablasAndOr_9D00(&H3FF) As Byte
     Dim TablaFlipX_A100(&HFF) As Byte
+    Public BufferComandosMonjes_A200(&HFF) As Byte 'buffer de comandos de los movimientos de los monjes y adso
     Dim TablaGraficosObjetos_A300(&H858) As Byte 'gráficos de guillermo, adso y las puertas
     Dim DatosMonjes_AB59(&H8A6) As Byte 'gráficos de los movimientos de los monjes ab59-ae2d normal, ae2e-b102 flipx, 0xb103-0xb3ff caras y trajes
-    Dim BufferComandosMonjes_A200(&HFF) As Byte 'buffer de comandos de los movimientos de los monjes y adso
     'Dim TablaCarasTrajesMonjes_B103(&H2FC) As Byte 'caras y trajes de los monjes
+    Public TablaCaracteresPalabrasFrases_B400(&H0BFF) As Byte 'ROM b400-bfff
     Dim TablaPresentacion_C000(&H3FCF) As Byte 'pantalla de presentación del juego con el monje
     Dim PantallaCGA(&H3FFF) As Byte
 
 
-    Dim ContadorAnimacionGuillermo_0990 As Byte 'contador de la animación de guillermo
+    Public PunteroAlternativaActual_05A3 As Integer 'puntero a la alternativa que está probando buscando caminos
+    Dim ContadorAnimacionGuillermo_0990 As Byte 'contador de la animación de guillermo ###pendiente: quitar? sólo se usa en 098a
     Dim PintarPantalla_0DFD As Boolean 'usada en las rutinas de las puertas indicando que pinta la pantalla
     Dim RedibujarPuerta_0DFF As Boolean 'indica que se redibuje el sprite
     Dim TempoMusica_1086 As Byte
     Public HabitacionOscura_156C As Boolean 'lee si es una habitación iluminada
-    Public PunteroPantallaActual_156A As Long 'dirección de los datos de inicio de la pantalla actual
-    Dim PunteroPlantaActual_23EF As Long 'dirección del mapa de la planta
+    Public PunteroPantallaActual_156A As Integer 'dirección de los datos de inicio de la pantalla actual
+    Dim PunteroPlantaActual_23EF As Integer = &H2255 'dirección del mapa de la planta
     Dim OrientacionPantalla_2481 As Byte
     Dim VelocidadPasosGuillermo_2618 As Byte
-    Dim MinimaPosicionYVisible_279D As Byte 'mínima posición y visible en pantalla
-    Dim MinimaPosicionXVisible_27A9 As Byte 'mínima posición x visible en pantalla
-    Dim MinimaAlturaVisible_27BA As Byte 'mínima altura visible en pantalla
+    Public MinimaPosicionYVisible_279D As Byte 'mínima posición y visible en pantalla
+    Public MinimaPosicionXVisible_27A9 As Byte 'mínima posición x visible en pantalla
+    Public MinimaAlturaVisible_27BA As Byte 'mínima altura visible en pantalla
     Dim EstadoGuillermo_288F As Byte
     Dim AjustePosicionYSpriteGuillermo_28B1 As Integer
-    Dim PunteroRutinaFlipPersonaje_2A59 As Long 'rutina a la que llamar si hay que flipear los gráficos
-    Dim PunteroTablaAnimacionesPersonaje_2A84 As Long 'dirección de la tabla de animaciones para el personaje
+    Public PunteroRutinaFlipPersonaje_2A59 As Integer 'rutina a la que llamar si hay que flipear los gráficos
+    Public PunteroTablaAnimacionesPersonaje_2A84 As Integer 'dirección de la tabla de animaciones para el personaje
     Dim LimiteInferiorVisibleX_2AE1 As Byte 'limite inferior visible de X
     Dim LimiteInferiorVisibleY_2AEB As Byte 'limite inferior visible de y
     Dim AlturaBasePlantaActual_2AF9 As Byte 'altura base de la planta
-    Dim RutinaCambioCoordenadas_2B01 As Long 'rutina que cambia el sistema de coordenadas dependiendo de la orientación de la pantalla
+    Dim RutinaCambioCoordenadas_2B01 As Integer 'rutina que cambia el sistema de coordenadas dependiendo de la orientación de la pantalla
     Dim ModificarPosicionSpritePantalla_2B2F As Boolean 'true para modificar la posición del sprite en pantalla dentro de &H2ADD
     Dim ContadorInterrupcion_2D4B As Byte 'contador que se incrementa en la interrupción
-    Dim PosicionXPersonajeActual_2D75 As Byte 'posición en x del personaje que se muestra en pantalla
-    Dim PosicionYPersonajeActual_2D76 As Byte 'posición en y del personaje que se muestra en pantalla
-    Dim PosicionZPersonajeActual_2D77 As Byte 'posición en z del personaje que se muestra en pantalla
+    'datos del personaje al que sigue la cámara
+    Public PosicionXPersonajeActual_2D75 As Byte 'posición en x del personaje que se muestra en pantalla
+    Public PosicionYPersonajeActual_2D76 As Byte 'posición en y del personaje que se muestra en pantalla
+    Public PosicionZPersonajeActual_2D77 As Byte = 0 'posición en z del personaje que se muestra en pantalla
     Dim NumeroDia_2D80 As Byte 'número de día (del 1 al 7)
     Dim MomentoDia_2D81 As Byte 'momento del día 0=noche, 1=prime,2=tercia,4=nona,5=vísperas,6=completas
     Dim HabitacionEspejoCerrada_2D8C As Boolean 'si vale true indica que no se ha abierto el espejo
+    Public PunteroCaracteresPantalla_2D97 As Integer 'dirección para poner caracteres en pantalla
+    Public CaracteresPendientesFrase_2D9B As Byte 'caracteres que quedan por decir en la frase actual
+    Public PunteroPalabraMarcador_2D9C As Integer 'dirección al texto que se está poniendo en el marcador
+    Public PunteroFraseActual_2D9E As Integer 'dirección de los datos de la frase que está siendo reproducida
+    Public PalabraTerminada_2DA0 As Boolean 'indica que ha terminado la palabra
+    Public ReproduciendoFrase_2DA1 As Boolean 'indica si está reproduciendo una frase
+    Public ReproduciendoFrase_2DA2 As Boolean 'indica si está reproduciendo una frase
     Dim ScrollCambioMomentoDia_2DA5 As Byte 'posiciones para realizar el scroll del cambio del momento del día
+    Dim CaminoEncontrado_2DA9 As Boolean 'indica que  se ha encontrado un camino en este paso por el bucle principal
+    Public ContadorMovimientosFrustrados_2DAA As Byte
     Dim PuertaRequiereFlip_2DAF As Boolean 'si la puerta necesita gráficos flipeados o no
+    Public PosicionOrigen_2DB2 As Integer 'posición de origen durante el cálculo de caminos
+    Public PosicionDestino_2DB4 As Integer 'posición de destino durante el cálculo de caminos
+    Public ResultadoBusqueda_2DB6 As Byte
     Dim CambioPantalla_2DB8 As Boolean 'indica que ha habido un cambio de pantalla
-    Dim AlturaBasePlantaActual_2DBA As Byte 'altura base de la planta en la que está el personaje de la rejilla ###en 2af9 hay otra
+    Public AlturaBasePlantaActual_2DBA As Byte 'altura base de la planta en la que está el personaje de la rejilla ###en 2af9 hay otra
     Dim NumeroRomanoHabitacionEspejo_2DBC As Byte 'si es != 0, contiene el número romano generado para el enigma de la habitación del espejo
     Dim NumeroPantallaActual_2DBD As Byte 'pantalla del personaje al que sigue la cámara
     Dim MovimientoRealizado_2DC1 As Boolean 'indica que ha habido movimiento
-    Dim GuillermoMuerto_3C97 As Boolean
-    Dim PunteroDatosAlturaHabitacionEspejo_34D9 As Long
-    Dim PunteroHabitacionEspejo_34E0 As Long
-    Dim PersonajeSeguidoPorCamara_3C8F As Byte 'personaje al que sigue la cámara
+    Public ObjetosMalaquias_2DFA As Byte
+    Dim PunteroDatosAlturaHabitacionEspejo_34D9 As Integer
+    Dim PunteroHabitacionEspejo_34E0 As Integer
+    Const TiempoUsoLampara_3C87 = &H3C87 'contador de uso de la lámpara
+    Const LamparaEncendida_3C8B = &H3C8B 'indica que la lámpara se está usando
+    Const PersonajeSeguidoPorCamara_3C8F = &H3C8F 'personaje al que sigue la cámara
+    Const LamparaEnCocina_3C91 = &H3C91
+    Const GuillermoMuerto_3C97 = &H3C97 '1 si guillermo está muerto
+    Const ContadorRespuestaSN_3C99 = &H3C99 'contador del tiempo de respuesta de guillermo a la pregunta de adso de dormir
+    Const PersonajeNoquiereMoverse_3C9C = &H3C9C 'el personaje no tiene que ir a ninguna parte
+    Const ValorAleatorio_3C9D = &H3C9D 'valor aleatorio obtenido de los movimientos de adso
+    Const DondeVaAdso_3d13 = &H3D13
 
     Dim MalaquiasAscendiendo_4384 As Boolean 'indica que malaquías está ascendiendo mientras se está muriendo
+    Public PunteroTablaConexiones_440A As Integer = &H05CD 'dirección de la tabla de conexiones de la planta en la que está el personaje
+
     Dim SpriteLuzAdsoX_4B89 As Byte 'posición x del sprite de adso dentro del tile
     Dim SpriteLuzAdsoX_4BB5 As Byte '4 - (posición x del sprite de adso & 0x03)
     Dim SpriteLuzTipoRelleno_4B6B As Byte 'bytes a rellenar (tile/ tile y medio)
@@ -125,10 +170,14 @@ Module ModAbadia
     Dim SpriteLuzFlip_4BA0 As Boolean 'true si los gráficos de adso están flipeados
 
     Dim SpritesPilaProcesados_4D85 As Boolean 'false si no ha terminado de procesar los sprites de la pila. true: limpia el bit 7 de (ix+0) del buffer de tiles (si es una posición válida del buffer)
-    Dim PunteroPantalla As Long 'posición actual dentro de la pantalla mientras se procesa
+    Dim PosicionPergaminoY_680A As Integer
+    Dim PosicionPergaminoX_680B As Integer
+
+    Dim PunteroPantalla As Integer 'posición actual dentro de la pantalla mientras se procesa
+    Dim PunteroPilaCamino As Integer
     Dim InvertirDireccionesGeneracionBloques As Boolean
-    Dim Pila(100) As Long
-    Dim PunteroPila As Long
+    Dim Pila(100) As Integer
+    Dim PunteroPila As Integer
     Enum EnumIncremento
         IncSumarX
         IncRestarX
@@ -138,17 +187,20 @@ Module ModAbadia
     '
     'Variables que necesitan un valor inicial
     Dim Obsequium_2D7F As Byte
-    Dim PunteroProximaHoraDia_2D82 As Long  'puntero a la próxima hora del día
-    Dim PunteroTablaDesplazamientoAnimacion_2D84 As Long 'dirección de la tabla para el cálculo del desplazamiento según la animación de una entidad del juego para la orientación de la pantalla actual
-    Dim TiempoRestanteMomentoDia_2D86 As Long 'cantidad de tiempo a esperar para que avance el momento del día (siempre y cuando sea distinto de cero)
-    Dim PunteroDatosPersonajeActual_2D88 As Long 'puntero a los datos del personaje actual que se sigue la cámara
-    Dim PunteroBufferAlturas_2D8A As Long 'puntero al buffer de alturas de la pantalla actual (buffer de 576 (24*24) bytes)
+    Dim PunteroProximaHoraDia_2D82 As Integer  'puntero a la próxima hora del día
+    Dim PunteroTablaDesplazamientoAnimacion_2D84 As Integer 'dirección de la tabla para el cálculo del desplazamiento según la animación de una entidad del juego para la orientación de la pantalla actual
+    Dim TiempoRestanteMomentoDia_2D86 As Integer 'cantidad de tiempo a esperar para que avance el momento del día (siempre y cuando sea distinto de cero)
+    Dim PunteroDatosPersonajeActual_2D88 As Integer 'puntero a los datos del personaje actual que se sigue la cámara
+    Public PunteroBufferAlturas_2D8A As Integer 'puntero al buffer de alturas de la pantalla actual (buffer de 576 (24*24) bytes)
 
     Dim PuertasAbribles_3CA6 As Byte
     Dim InvestigacionNoTerminada_3CA7 As Boolean
 
     Public Sub PararAbadia()
-        Parar = True
+        TmTick.Enabled = False
+        Reloj.Stop()
+        RelojFPS.Stop()
+        Parado = True
     End Sub
 
     Public Sub CheckDefinir(ByVal NumeroPantalla As Byte, ByVal Orientacion As Byte, ByVal X As Byte, ByVal Y As Byte, ByVal Z As Byte, ByVal Escaleras As Byte, ByVal RutaCheck As String)
@@ -181,28 +233,28 @@ Module ModAbadia
         Dim Abadia8(16383) As Byte
         Try
             Conjunto = [Assembly].GetExecutingAssembly()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia4.ABADIA0.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia5.ABADIA0.BIN")
             StrArchivo.Read(Abadia0, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia4.ABADIA1.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia5.ABADIA1.BIN")
             StrArchivo.Read(Abadia1, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia4.ABADIA2.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia5.ABADIA2.BIN")
             StrArchivo.Read(Abadia2, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia4.ABADIA3.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia5.ABADIA3.BIN")
             StrArchivo.Read(Abadia3, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia4.ABADIA5.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia5.ABADIA5.BIN")
             StrArchivo.Read(Abadia5, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia4.ABADIA6.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia5.ABADIA6.BIN")
             StrArchivo.Read(Abadia6, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia4.ABADIA7.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia5.ABADIA7.BIN")
             StrArchivo.Read(Abadia7, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia4.ABADIA8.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia5.ABADIA8.BIN")
             StrArchivo.Read(Abadia8, 0, 16384)
             StrArchivo.Dispose()
 
@@ -218,6 +270,9 @@ Module ModAbadia
         CargarTablaArchivo(Abadia0, TablaPresentacion_C000, 0)
         'abadia1.bin
         'CargarArchivo("D:\datos\vbasic\Abadia\Abadia2\abadia1.bin", Archivo)
+        CargarTablaArchivo(Abadia1, TablaConexionesHabitaciones_05CD, &H05CD)
+        CargarTablaArchivo(Abadia1, TablaDestinos_0C8A, &H0C8A)
+        CargarTablaArchivo(Abadia1, TablaTonosNotasVoces_1388, &H1388)
         CargarTablaArchivo(Abadia1, TablaBloquesPantallas_156D, &H156D)
         CargarTablaArchivo(Abadia1, TablaRutinasConstruccionBloques_1FE0, &H1FE0)
         'CargarTablaArchivo ( Archivo, DatosTilesBloques_1693, &H1693
@@ -227,6 +282,7 @@ Module ModAbadia
         CargarTablaArchivo(Abadia1, TablaAvancePersonaje4Tiles_284D, &H284D)
         CargarTablaArchivo(Abadia1, TablaAvancePersonaje1Tile_286D, &H286D)
         CargarTablaArchivo(Abadia1, TablaDatosPersonajes_2BAE, &H2BAE)
+        CargarTablaArchivo(Abadia1, TablaVariablesAuxiliares_2D8D, &H2D8D)
         CargarTablaArchivo(Abadia1, TablaPermisosPuertas_2DD9, &H2DD9)
         CargarTablaArchivo(Abadia1, TablaObjetosPersonajes_2DEC, &H2DEC)
         CargarTablaArchivo(Abadia1, TablaSprites_2E17, &H2E17)
@@ -239,18 +295,22 @@ Module ModAbadia
         CargarTablaArchivo(Abadia1, DatosAlturaEspejoCerrado_34DB, &H34DB)
         CargarTablaArchivo(Abadia1, TablaAccesoHabitaciones_3C67, &H3C67)
         CargarTablaArchivo(Abadia1, TablaVariablesLogica_3C85, &H3C85)
-        CargarTablaArchivo(Abadia1, TablaPosicionesPredefinidasMalaquias_3CA8, &H3CA8)
-        CargarTablaArchivo(Abadia1, TablaPosicionesPredefinidasAbad_3CC6, &H3CC6)
-        CargarTablaArchivo(Abadia1, TablaPosicionesPredefinidasBerengario_3CE7, &H3CE7)
-        CargarTablaArchivo(Abadia1, TablaPosicionesPredefinidasSeverino_3CFF, &H3CFF)
-        CargarTablaArchivo(Abadia1, TablaPosicionesPredefinidasAdso_3D11, &H3D11)
+        'CargarTablaArchivo(Abadia1, TablaPosicionesPredefinidasMalaquias_3CA8, &H3CA8)
+        'CargarTablaArchivo(Abadia1, TablaPosicionesPredefinidasAbad_3CC6, &H3CC6)
+        'CargarTablaArchivo(Abadia1, TablaPosicionesPredefinidasBerengario_3CE7, &H3CE7)
+        'CargarTablaArchivo(Abadia1, TablaPosicionesPredefinidasSeverino_3CFF, &H3CFF)
+        'CargarTablaArchivo(Abadia1, TablaPosicionesPredefinidasAdso_3D11, &H3D11)
         CargarTablaArchivo(Abadia1, TablaPunterosVariablesScript_3D1D, &H3D1D)
+        CargarTablaArchivo(Abadia1, TablaDistanciaPersonajes_3D9F, &H3D9F)
 
         'abadia2.bin
         'CargarArchivo("D:\datos\vbasic\Abadia\Abadia2\abadia2.bin", Archivo)
+        CargarTablaArchivo(Abadia2, TablaComandos_440C, &H040C)
+        CargarTablaArchivo(Abadia2, TablaOrientacionesAdsoGuillermo_461F, &H061F)
         CargarTablaArchivo(Abadia2, TablaPunterosTrajesMonjes_48C8, &H8C8&)
         CargarTablaArchivo(Abadia2, TablaPatronRellenoLuz_48E8, &H8E8&)
         CargarTablaArchivo(Abadia2, TablaEtapasDia_4F7A, &HF7A&)
+        CargarTablaArchivo(Abadia2, TablaNotasOctavasFrases_5659, &H1659)
         CargarTablaArchivo(Abadia2, PunterosCaracteresPergamino_680C, &H280C)
         CargarTablaArchivo(Abadia2, DatosCaracteresPergamino_6947, &H2947)
         CargarTablaArchivo(Abadia2, TextoPergaminoPresentacion_7300, &H3300)
@@ -263,6 +323,7 @@ Module ModAbadia
         CargarTablaArchivo(Abadia3, BufferSprites_9500, &H1500)
         CargarTablaArchivo(Abadia3, TablaGraficosObjetos_A300, &H2300)
         CargarTablaArchivo(Abadia3, DatosMonjes_AB59, &H2B59)
+        CargarTablaArchivo(Abadia3, TablaCaracteresPalabrasFrases_B400, &H3400)
         'CargarTablaArchivo ( Archivo, TablaCarasTrajesMonjes_B103, &H3103)
 
         'abadia7.bin -> alturas de las pantallas
@@ -278,21 +339,17 @@ Module ModAbadia
 
     End Sub
 
-    Private Sub InicializarVariablesROM()
-        PunteroPlantaActual_23EF = &H2255
-        PosicionZPersonajeActual_2D77 = 0
-    End Sub
 
-    Public Sub CargarTablaArchivo(ByRef Archivo() As Byte, ByRef Tabla() As Byte, ByVal Puntero As Long)
+    Public Sub CargarTablaArchivo(ByRef Archivo() As Byte, ByRef Tabla() As Byte, ByVal Puntero As Integer)
         'rellena la tabla con los datos del archivo desde la posición indicada
-        Dim Contador As Long
+        Dim Contador As Integer
         For Contador = 0 To UBound(Tabla)
             Tabla(Contador) = Archivo(Puntero + Contador)
         Next
     End Sub
 
     Sub CopiarTabla(ByRef TablaOrigen() As Byte, ByRef TablaDestino() As Byte)
-        Dim Contador As Long
+        Dim Contador As Integer
         For Contador = 0 To UBound(TablaOrigen)
             TablaDestino(Contador) = TablaOrigen(Contador)
         Next
@@ -318,13 +375,15 @@ Module ModAbadia
 
     Public Sub LimpiarRejilla_1A70(ByVal ColorFondo As Byte)
         'limpia la rejilla y rellena en pantalla un rectángulo de 256x160 a partir de (32, 0) con el color indicado
-        Dim Contador As Long
-        Dim Linea As Long
-        Dim Columna As Long
-        Dim PunteroPantalla As Long
+        Dim Contador As Integer
         For Contador = 0 To UBound(BufferTiles_8D80)
             BufferTiles_8D80(Contador) = 0 'limpia 0x8d80-0x94ff
         Next
+        'rellena un rectángulo de 160 de alto por 256 de ancho a partir de la posición (32, 0) con a
+        PintarAreaJuego_1A7D(ColorFondo)
+    End Sub
+
+    Public Sub PintarAreaJuego_1A7D(ByVal ColorFondo As Byte)
         'rellena un rectángulo de 160 de alto por 256 de ancho a partir de la posición (32, 0) con ColorFondo
         PunteroPantalla = &H8&    'posición (32, 0)
         For Linea = 1 To 160
@@ -337,9 +396,9 @@ Module ModAbadia
         ModPantalla.Refrescar()
     End Sub
 
-    Function DireccionSiguienteLinea_3A4D_68F2(ByVal PunteroPantalla As Long) As Long
+    Function DireccionSiguienteLinea_3A4D_68F2(ByVal PunteroPantalla As Integer) As Integer
         'devuelve la dirección de la siguiente línea de pantalla
-        Dim Puntero As Long
+        Dim Puntero As Integer
         Puntero = PunteroPantalla + &H800 'pasa al siguiente banco
         If Puntero > &H3FFF& Then
             Puntero = PunteroPantalla And &H7FF&
@@ -354,7 +413,7 @@ Module ModAbadia
     Public Sub GenerarEscenario_1A0A()
         'genera el escenerio con los datos de abadia8 y lo proyecta a la rejilla
         'lee la entrada de abadia8 con un bloque de construcción de la pantalla y llama a 0x1bbc
-        Dim Bloque As Long
+        Dim Bloque As Integer
         Dim Byte1 As Byte
         Dim Byte2 As Byte
         Dim Byte3 As Byte
@@ -363,12 +422,12 @@ Module ModAbadia
         Dim nX As Byte 'longitud del elemento en x
         Dim Y As Byte 'pos en y del elemento (sistema de coordenadas del buffer de tiles)
         Dim nY As Byte 'longitud del elemento en y
-        Dim PunteroCaracteristicasBloque As Long 'puntero a las caracterísitcas del bloque
-        Dim PunteroTilesBloque As Long 'puntero del material a los tiles que forman el bloque
-        Dim PunteroRutinasBloque As Long 'puntero al resto de características del material
+        Dim PunteroCaracteristicasBloque As Integer 'puntero a las caracterísitcas del bloque
+        Dim PunteroTilesBloque As Integer 'puntero del material a los tiles que forman el bloque
+        Dim PunteroRutinasBloque As Integer 'puntero al resto de características del material
         Dim salir As Boolean
         Dim BloqueHex As String
-        Dim Eva As Long
+        Dim Eva As Integer
         'PunteroPantalla = 2445
 
         Do 'provisional
@@ -421,15 +480,15 @@ Module ModAbadia
 
     Public Sub DibujarPantalla_4EB2()
         'dibuja en pantalla el contenido de la rejilla desde el centro hacia afuera
-        Dim PunteroPantalla As Long
-        Dim PunteroRejilla As Long
-        Dim NAbajo As Long 'nº de posiciones a dibujar hacia abajo
-        Dim NArriba As Long 'nº de posiciones a dibujar hacia arriba
-        Dim NDerecha As Long 'nº de posiciones a dibujar hacia la derecha
-        Dim NIzquierda As Long  'nº de posiciones a dibujar hacia la izquierda
-        Dim NTiles As Long 'nº de posiciones a dibujar
-        Dim DistanciaRejilla As Long 'distancia entre elementos consecutivos en la rejilla. cambia si se dibuja en vertical o en horizontal
-        Dim DistanciaPantalla As Long 'distancia entre elementos consecutivos en la pantalla. cambia si se dibuja en vertical o en horizontal
+        Dim PunteroPantalla As Integer
+        Dim PunteroRejilla As Integer
+        Dim NAbajo As Integer 'nº de posiciones a dibujar hacia abajo
+        Dim NArriba As Integer 'nº de posiciones a dibujar hacia arriba
+        Dim NDerecha As Integer 'nº de posiciones a dibujar hacia la derecha
+        Dim NIzquierda As Integer  'nº de posiciones a dibujar hacia la izquierda
+        Dim NTiles As Integer 'nº de posiciones a dibujar
+        Dim DistanciaRejilla As Integer 'distancia entre elementos consecutivos en la rejilla. cambia si se dibuja en vertical o en horizontal
+        Dim DistanciaPantalla As Integer 'distancia entre elementos consecutivos en la pantalla. cambia si se dibuja en vertical o en horizontal
         PunteroPantalla = &H2A4&  '(144, 64) coordenadas de pantalla
         PunteroRejilla = &H90AA& '(7, 8) coordenadas de rejilla
         NAbajo = 4
@@ -462,18 +521,19 @@ Module ModAbadia
             DistanciaPantalla = -4 'valor para volver a la anterior posicion x de la pantalla
             DibujarTiles_4F18(NTiles, DistanciaRejilla, DistanciaPantalla, PunteroRejilla, PunteroPantalla) ' dibuja posiciones horizontales de la rejilla en la memoria de video
             ModPantalla.Refrescar()
+            If Not Depuracion.QuitarRetardos Then Retardo(10)
         Loop 'repite hasta que se termine
 
     End Sub
 
-    Sub DibujarTiles_4F18(ByVal NTiles As Long, ByVal DistanciaRejilla As Long, ByVal DistanciaPantalla As Long, ByRef PunteroRejilla As Long, ByRef PunteroPantalla As Long)
+    Sub DibujarTiles_4F18(ByVal NTiles As Integer, ByVal DistanciaRejilla As Integer, ByVal DistanciaPantalla As Integer, ByRef PunteroRejilla As Integer, ByRef PunteroPantalla As Integer)
         'dibuja NTiles posiciones horizontales o verticales de la rejilla en la memoria de video
         'NTiles = número de posiciones a dibujar
         'DistanciaRejilla = tamaño entre posiciones de la rejilla
         'DistanciaPantalla = tamaño entre posiciones en la memoria de vídeo
         'PunteroRejilla = posición en el buffer
         'PunteroPantalla = posición en la memoria de vídeo
-        Dim Contador As Long
+        Dim Contador As Integer
         Dim NumeroTile As Byte
         For Contador = 1 To NTiles 'número de posiciones a dibujar
             NumeroTile = BufferTiles_8D80(PunteroRejilla + 2 - &H8D80&) 'lee el número de gráfico a dibujar (fondo)
@@ -489,18 +549,18 @@ Module ModAbadia
         Next
     End Sub
 
-    Public Sub DibujarTile_4F3D(ByVal NumeroTile As Byte, ByVal PunteroPantalla As Long)
+    Public Sub DibujarTile_4F3D(ByVal NumeroTile As Byte, ByVal PunteroPantalla As Integer)
         'copia el gráfico NumeroTile (16x8) en la memoria de video (PunteroPantalla), combinandolo con lo que había
         'NumeroTile = bits 7-0: número de gráfico. El bit 7 = indica qué color sirve de máscara (el 2 o el 1)
         'PunteroPantalla = posición en la memoria de video
-        Dim PunteroTile As Long 'apunta al gráfico correspondiente
-        Dim PunteroAndOr As Long 'valor de la tabla AND/OR
+        Dim PunteroTile As Integer 'apunta al gráfico correspondiente
+        Dim PunteroAndOr As Integer 'valor de la tabla AND/OR
         Dim ValorAND As Byte
         Dim ValorOR As Byte
         Dim ValorGrafico As Byte
         Dim ValorPantalla As Byte
-        Dim Linea As Long
-        Dim Columna As Long
+        Dim Linea As Integer
+        Dim Columna As Integer
         PunteroTile = 32 * NumeroTile 'dirección del gráfico
         If (NumeroTile And &H80) <> 0 Then 'dependiendo del bit 7 escoge una tabla AND y OR
             PunteroAndOr = &H200
@@ -519,10 +579,10 @@ Module ModAbadia
         Next
     End Sub
 
-    Public Function BuscarHabitacionProvisional(ByVal NumeroPantalla As Long) As Long
+    Public Function BuscarHabitacionProvisional(ByVal NumeroPantalla As Integer) As Integer
         'devuelve el puntero al primer byte de la habitación indicada
-        Dim Contador As Long
-        Dim Puntero As Long
+        Dim Contador As Integer
+        Dim Puntero As Integer
         Puntero = 0
         Do
             If Contador >= NumeroPantalla Then
@@ -535,9 +595,9 @@ Module ModAbadia
     End Function
 
 
-    Public Sub ConstruirBloque_1BBC(ByVal X As Byte, ByVal nX As Byte, ByVal Y As Byte, ByVal nY As Byte, ByVal Altura As Byte, ByVal PunteroTilesBloque As Long, ByVal PunteroRutinasBloque As Long, ActualizarVariablesTiles As Boolean)
+    Public Sub ConstruirBloque_1BBC(ByVal X As Byte, ByVal nX As Byte, ByVal Y As Byte, ByVal nY As Byte, ByVal Altura As Byte, ByVal PunteroTilesBloque As Integer, ByVal PunteroRutinasBloque As Integer, ActualizarVariablesTiles As Boolean)
         'inicia el buffer para la construcción del bloque actual y evalua los parámetros de construcción del bloque
-        Dim Contador As Long
+        Dim Contador As Integer
         If ActualizarVariablesTiles Then
             For Contador = 0 To 11
                 VariablesBloques_1FCD(Contador + 2) = TablaCaracteristicasMaterial_1693(PunteroTilesBloque - &H1693 + Contador) '1FCF = buffer de destino
@@ -549,8 +609,8 @@ Module ModAbadia
 
 
     Public Sub TransformarPosicionBloqueCoordenadasRejilla_1FB8(ByVal X As Byte, ByVal Y As Byte, ByVal Altura As Byte)
-        Dim Xr As Long
-        Dim Yr As Long
+        Dim Xr As Integer
+        Dim Yr As Integer
         'si la entrada es de 4 bytes, transforma la posición del bloque a coordenadas de la rejilla
         ' las ecuaciones de cambio de sistema de coordenadas son:
         ' mapa de tiles -> rejilla
@@ -561,8 +621,8 @@ Module ModAbadia
         ' Ymapa = Yrejilla + Xmapa - 16
         ' de esta forma los datos de la rejilla se almacenan en el mapa de tiles de forma que la conversión a la pantalla es directa
         If Altura = &HFF Then Exit Sub
-        Xr = CLng(Y) + CLng(X) + CLng(Altura / 2) - 15
-        Yr = CLng(Y) - CLng(X) + CLng(Altura / 2) + 16
+        Xr = CInt(Y) + CInt(X) + CInt(Altura / 2) - 15
+        Yr = CInt(Y) - CInt(X) + CInt(Altura / 2) + 16
         If Xr < 0 Then
             Xr = Xr + 256
         End If
@@ -576,14 +636,14 @@ Module ModAbadia
 
     End Sub
 
-    Public Sub GenerarBloque_2018(ByVal X As Byte, ByVal nX As Byte, ByVal Y As Byte, ByVal nY As Byte, ByVal PunteroRutinasBloque As Long)
+    Public Sub GenerarBloque_2018(ByVal X As Byte, ByVal nX As Byte, ByVal Y As Byte, ByVal nY As Byte, ByVal PunteroRutinasBloque As Integer)
         'inicia el proceso de interpretación los bytes de construcción de bloques
         VariablesBloques_1FCD(&H1FDB - &H1FCD) = nX
         VariablesBloques_1FCD(&H1FDC - &H1FCD) = nY
         EvaluarDatosBloque_201E(X, nX, Y, nY, PunteroRutinasBloque)
     End Sub
 
-    Sub EvaluarDatosBloque_201E(ByVal X As Byte, ByVal nX As Byte, ByVal Y As Byte, ByVal nY As Byte, ByVal PunteroRutinasBloque As Long)
+    Sub EvaluarDatosBloque_201E(ByVal X As Byte, ByVal nX As Byte, ByVal Y As Byte, ByVal nY As Byte, ByVal PunteroRutinasBloque As Integer)
         'evalúa los datos de construcción del bloque
         'x = pos inicial del bloque en y (sistema de coordenadas del buffer de tiles)
         'y = pos inicial del bloque en x (sistema de coordenadas del buffer de tiles)
@@ -680,7 +740,7 @@ Module ModAbadia
         End If
     End Sub
 
-    Sub Rutina_F7_2141(ByVal nX As Byte, ByRef PunteroRutinasBloque As Long)
+    Sub Rutina_F7_2141(ByVal nX As Byte, ByRef PunteroRutinasBloque As Integer)
         'modifica la posición del buffer de construcción del bloque (indicada en el primer byte)
         'con una expresión calculada (indicada por los siguientes de bytes)
         '0x61 = 0x1fcf datos de materiales 1
@@ -702,10 +762,10 @@ Module ModAbadia
         '0x71 = 0x1fdf posición y del bloque en la rejilla
         Dim Registro As Byte
         Dim Valor As Byte
-        Dim PunteroRegistro As Long
+        Dim PunteroRegistro As Integer
         Dim Resultado As Integer
         Dim ValorAnterior
-        Dim PunteroRegistroGuardado As Long
+        Dim PunteroRegistroGuardado As Integer
         Registro = TablaCaracteristicasMaterial_1693(PunteroRutinasBloque - &H1693)
         LeerPosicionBufferConstruccionBloque_2214(PunteroRutinasBloque, PunteroRegistro) 'lee una posición del buffer de construcción del bloque y guarda en PunteroRegistro la dirección accedida
         PunteroRegistroGuardado = PunteroRegistro 'guarda la dirección del buffer obtenida en la rutina anterior
@@ -722,7 +782,7 @@ Module ModAbadia
         'nX = CByte(Resultado)
     End Sub
 
-    Function LeerPosicionBufferConstruccionBloque_2214(ByRef PunteroRutinasBloque As Long, ByRef PunteroRegistro As Long) As Byte
+    Function LeerPosicionBufferConstruccionBloque_2214(ByRef PunteroRutinasBloque As Integer, ByRef PunteroRegistro As Integer) As Byte
         'lee un byte de los datos de construcción del bloque, avanzando el puntero.
         'Si leyó un dato del buffer de construcción del bloque,
         'a la salida, PunteroRegistro apuntará a dicho registro
@@ -736,7 +796,7 @@ Module ModAbadia
 
     End Function
 
-    Function LeerRegistroBufferConstruccionBloque_2219(ByVal Registro As Byte, ByRef PunteroRegistro As Long, ByRef PunteroRutinasBloque As Long) As Byte
+    Function LeerRegistroBufferConstruccionBloque_2219(ByVal Registro As Byte, ByRef PunteroRegistro As Integer, ByRef PunteroRutinasBloque As Integer) As Byte
         'lee un byte de los datos de construcción del bloque, avanzando el puntero.
         'Si leyó un dato del buffer de construcción del bloque,
         'a la salida, PunteroRegistro apuntará a dicho registro
@@ -761,7 +821,7 @@ Module ModAbadia
         End If
     End Function
 
-    Function EvaluarExpresionContruccionBloque_2166(ByVal Operando1 As Integer, ByRef PunteroRutinasBloque As Long, ByVal PunteroRegistro As Long) As Integer
+    Function EvaluarExpresionContruccionBloque_2166(ByVal Operando1 As Integer, ByRef PunteroRutinasBloque As Integer, ByVal PunteroRegistro As Integer) As Integer
         'modifica c con sumas de valores o registros y cambios de signo
         'leidos de los datos de la construcción del bloque
         Dim Valor As Byte
@@ -782,7 +842,7 @@ Module ModAbadia
         EvaluarExpresionContruccionBloque_2166 = EvaluarExpresionContruccionBloque_2166(Operando1 + Operando2, PunteroRutinasBloque, PunteroRegistro)
     End Function
 
-    Sub Rutina_E4_21AA(ByVal X As Byte, ByVal nX As Byte, ByVal Y As Byte, ByVal nY As Byte, ByRef PunteroRutinasBloque As Long)
+    Sub Rutina_E4_21AA(ByVal X As Byte, ByVal nX As Byte, ByVal Y As Byte, ByVal nY As Byte, ByRef PunteroRutinasBloque As Integer)
         'interpreta otro bloque sin modificar los valores de los tiles a usar, y cambiando el sentido de las x
         VariablesBloques_1FCD(&H1FCE - &H1FCD) = 1
         'InvertirDireccionesGeneracionBloques = True 'marca que se realizó un cambio en las operaciones que trabajan con coordenadas x en los tiles
@@ -795,21 +855,21 @@ Module ModAbadia
         InvertirDireccionesGeneracionBloques = True
     End Sub
 
-    Sub Rutina_EA_21A1(ByVal X As Byte, ByVal nX As Byte, ByVal Y As Byte, ByVal nY As Byte, ByVal PunteroRutinasBloque As Long)
-        Dim AnteriorPunteroRutinasBloque As Long
+    Sub Rutina_EA_21A1(ByVal X As Byte, ByVal nX As Byte, ByVal Y As Byte, ByVal nY As Byte, ByVal PunteroRutinasBloque As Integer)
+        Dim AnteriorPunteroRutinasBloque As Integer
         AnteriorPunteroRutinasBloque = PunteroRutinasBloque
         PunteroRutinasBloque = Leer16(TablaCaracteristicasMaterial_1693, PunteroRutinasBloque - &H1693)
         EvaluarDatosBloque_201E(X, nX, Y, nY, PunteroRutinasBloque)
         PunteroRutinasBloque = AnteriorPunteroRutinasBloque
     End Sub
 
-    Sub Rutina_EC_21B4(ByVal X As Byte, ByVal nX As Byte, ByVal Y As Byte, ByVal nY As Byte, ByRef PunteroRutinasBloque As Long, ByVal ActualizarVariablesTiles As Boolean)
+    Sub Rutina_EC_21B4(ByVal X As Byte, ByVal nX As Byte, ByVal Y As Byte, ByVal nY As Byte, ByRef PunteroRutinasBloque As Integer, ByVal ActualizarVariablesTiles As Boolean)
         'interpreta otro bloque modificando (o nó) los valores de los tiles a usar
         Dim InvertirDireccionesGeneracionBloquesAntiguo As Boolean
-        Dim PunteroCaracteristicasBloque As Long
-        Dim PunteroTilesBloque As Long
-        Dim PunteroRutinasBloqueAnterior As Long
-        Dim Valor As Long
+        Dim PunteroCaracteristicasBloque As Integer
+        Dim PunteroTilesBloque As Integer
+        Dim PunteroRutinasBloqueAnterior As Integer
+        Dim Valor As Integer
         Dim Altura As Byte
 
         'On Error Resume Next
@@ -821,16 +881,16 @@ Module ModAbadia
         PunteroRutinasBloque = PunteroCaracteristicasBloque + 2
 
         InvertirDireccionesGeneracionBloquesAntiguo = InvertirDireccionesGeneracionBloques 'obtiene las instrucciones que se usan para tratar las x
-        Push(CLng(X))
-        Push(CLng(Y))
-        Push(CLng(VariablesBloques_1FCD(&H1FDE - &H1FCD))) 'obtiene las posiciones en el sistema de coordenadas de la rejilla y los guarda en pila
-        Push(CLng(VariablesBloques_1FCD(&H1FDF - &H1FCD))) 'obtiene las posiciones en el sistema de coordenadas de la rejilla y los guarda en pila
-        Push(CLng(VariablesBloques_1FCD(&H1FDB - &H1FCD))) 'obtiene los parámetros para la construcción del bloque y los guarda en pila
+        Push(CInt(X))
+        Push(CInt(Y))
+        Push(CInt(VariablesBloques_1FCD(&H1FDE - &H1FCD))) 'obtiene las posiciones en el sistema de coordenadas de la rejilla y los guarda en pila
+        Push(CInt(VariablesBloques_1FCD(&H1FDF - &H1FCD))) 'obtiene las posiciones en el sistema de coordenadas de la rejilla y los guarda en pila
+        Push(CInt(VariablesBloques_1FCD(&H1FDB - &H1FCD))) 'obtiene los parámetros para la construcción del bloque y los guarda en pila
         nX = VariablesBloques_1FCD(&H1FDB - &H1FCD)
         nY = VariablesBloques_1FCD(&H1FDC - &H1FCD)
-        Push(CLng(VariablesBloques_1FCD(&H1FDC - &H1FCD)))  'obtiene los parámetros para la construcción del bloque y los guarda en pila
+        Push(CInt(VariablesBloques_1FCD(&H1FDC - &H1FCD)))  'obtiene los parámetros para la construcción del bloque y los guarda en pila
         Altura = VariablesBloques_1FCD(&H1FDD - &H1FCD)
-        Push(CLng(Altura)) 'obtiene el parámetro dependiente del byte 4 y lo guarda en pila
+        Push(CInt(Altura)) 'obtiene el parámetro dependiente del byte 4 y lo guarda en pila
         ConstruirBloque_1BBC(X, nX, Y, nY, Altura, PunteroTilesBloque, PunteroRutinasBloque, ActualizarVariablesTiles)
         PunteroRutinasBloque = PunteroRutinasBloqueAnterior 'restaura la dirección de los datos de la rutina actual
         VariablesBloques_1FCD(&H1FDD - &H1FCD) = CByte(Pop())
@@ -843,34 +903,34 @@ Module ModAbadia
         InvertirDireccionesGeneracionBloques = InvertirDireccionesGeneracionBloquesAntiguo
     End Sub
 
-    Sub Rutina_EF_2071(ByVal PunteroRutinasBloque As Long)
+    Sub Rutina_EF_2071(ByVal PunteroRutinasBloque As Integer)
         'incrementa la longitud del bloque en x
         IncrementarRegistroConstruccionBloque_2087(&H6E, 1, PunteroRutinasBloque)
     End Sub
 
-    Sub Rutina_F0_2077(ByVal PunteroRutinasBloque As Long)
+    Sub Rutina_F0_2077(ByVal PunteroRutinasBloque As Integer)
         'incrementa la longitud del bloque en y
         IncrementarRegistroConstruccionBloque_2087(&H6D, 1, PunteroRutinasBloque)
     End Sub
 
-    Sub Rutina_F1_2066(ByRef X As Byte, ByVal PunteroRutinasBloque As Long)
+    Sub Rutina_F1_2066(ByRef X As Byte, ByVal PunteroRutinasBloque As Integer)
         'modifica la posición en x con la expresión leida
         Dim Valor As Byte
         Dim Resultado As Integer
-        Dim PunteroRegistro As Long
+        Dim PunteroRegistro As Integer
         Valor = LeerPosicionBufferConstruccionBloque_2214(PunteroRutinasBloque, PunteroRegistro) ' lee un valor inmediato o un registro
         Resultado = EvaluarExpresionContruccionBloque_2166(CInt(Valor), PunteroRutinasBloque, PunteroRegistro)
         X = CByte(X + Resultado)
     End Sub
 
-    Sub Rutina_F2_205B(ByRef Y As Byte, ByVal PunteroRutinasBloque As Long)
+    Sub Rutina_F2_205B(ByRef Y As Byte, ByVal PunteroRutinasBloque As Integer)
         'modifica la posición en y con la expresión leida
         Dim Valor As Byte
         Dim Resultado As Integer
-        Dim PunteroRegistro As Long
+        Dim PunteroRegistro As Integer
         Valor = LeerPosicionBufferConstruccionBloque_2214(PunteroRutinasBloque, PunteroRegistro) ' lee un valor inmediato o un registro
         Resultado = EvaluarExpresionContruccionBloque_2166(CInt(Valor), PunteroRutinasBloque, PunteroRegistro)
-        If CLng(Y + Resultado) >= 256 Then
+        If CInt(Y + Resultado) >= 256 Then
             Y = CByte(Y + Resultado - 256)
         Else
             Y = CByte(Y + Resultado)
@@ -917,7 +977,7 @@ Module ModAbadia
         End If
     End Sub
 
-    Sub Rutina_F8_20F5(ByRef X As Byte, ByRef Y As Byte, ByVal PunteroRutinasBloque As Long)
+    Sub Rutina_F8_20F5(ByRef X As Byte, ByRef Y As Byte, ByVal PunteroRutinasBloque As Integer)
         'pinta el tile indicado por X,Y con el siguiente byte leido y cambia la posición de X,Y (x++) ó x-- si hay inversión
         If Not InvertirDireccionesGeneracionBloques Then
             PintarTileBuffer_20FC(X, Y, EnumIncremento.IncSumarX, PunteroRutinasBloque)
@@ -926,16 +986,16 @@ Module ModAbadia
         End If
     End Sub
 
-    Sub Rutina_F9_20E7(ByRef X As Byte, ByRef Y As Byte, ByRef PunteroRutinasBloque As Long)
+    Sub Rutina_F9_20E7(ByRef X As Byte, ByRef Y As Byte, ByRef PunteroRutinasBloque As Integer)
         'pinta el tile indicado por X,Y con el siguiente byte leido y cambia la posición de X,Y (y--)
         PintarTileBuffer_20FC(X, Y, EnumIncremento.IncRestarY, PunteroRutinasBloque)
     End Sub
 
-    Sub Rutina_FA_20D7(ByRef PunteroRutinasBloque As Long)
+    Sub Rutina_FA_20D7(ByRef PunteroRutinasBloque As Integer)
         'recupera la longitud y si no es 0, vuelve a saltar a procesar las instrucciones desde la dirección que se guardó.
         'En otro caso, limpia la pila y continúa
-        Dim Longitud As Long
-        Dim PunteroRutinasBloquePila As Long
+        Dim Longitud As Integer
+        Dim PunteroRutinasBloquePila As Integer
         Longitud = Pop() 'recupera de la pila la longitud del bloque (bien sea en x o en y)
         Longitud = Longitud - 1 'decrementa la longitud
         If Longitud = 0 Then 'si se ha terminado la longitud, saca el otro valor de la pila y salta
@@ -955,48 +1015,48 @@ Module ModAbadia
 
     Sub Rutina_FC_20CF(ByVal X As Byte, ByVal Y As Byte)
         'guarda en la pila la posición actual en el buffer de tiles
-        Push(CLng(X))
-        Push(CLng(Y))
+        Push(CInt(X))
+        Push(CInt(Y))
     End Sub
 
-    Sub Rutina_FE_2091(ByRef PunteroRutinasBloque As Long)
+    Sub Rutina_FE_2091(ByRef PunteroRutinasBloque As Integer)
         'guarda en la pila la longitud del bloque en x? y la posición actual de los datos de construcción del bloque
         Dim Registro As Byte
-        Dim PunteroRegistro As Long
+        Dim PunteroRegistro As Integer
         Registro = LeerRegistroBufferConstruccionBloque_2219(&H6D, PunteroRegistro, PunteroRutinasBloque)
         If Registro <> 0 Then 'si es != 0, sigue procesando el material, en otro caso salta símbolos hasta que se acaben los datos de construcción
             Push(PunteroRutinasBloque)
-            Push(CLng(Registro))
+            Push(CInt(Registro))
             Exit Sub
         End If
         'si el bucle no se ejecuta, se salta los comandos intermedios
         SaltarComandosIntermedios_20A5(PunteroRutinasBloque)
     End Sub
 
-    Sub Rutina_FD_209E(ByRef PunteroRutinasBloque As Long)
+    Sub Rutina_FD_209E(ByRef PunteroRutinasBloque As Integer)
         'guarda en la pila la longitud del bloque en y? y la posición actual de los datos de construcción del bloque
         Dim Registro As Byte
-        Dim PunteroRegistro As Long
+        Dim PunteroRegistro As Integer
         Registro = LeerRegistroBufferConstruccionBloque_2219(&H6E, PunteroRegistro, PunteroRutinasBloque)
         If Registro <> 0 Then 'si es != 0, sigue procesando el material, en otro caso salta símbolos hasta que se acaben los datos de construcción
             Push(PunteroRutinasBloque)
-            Push(CLng(Registro))
+            Push(CInt(Registro))
             Exit Sub
         End If
         'si el bucle no se ejecuta, se salta los comandos intermedios
         SaltarComandosIntermedios_20A5(PunteroRutinasBloque)
     End Sub
 
-    Sub IncrementarRegistroConstruccionBloque_2087(ByVal Registro As Byte, ByVal Incremento As Integer, ByVal PunteroRutinasBloque As Long)
+    Sub IncrementarRegistroConstruccionBloque_2087(ByVal Registro As Byte, ByVal Incremento As Integer, ByVal PunteroRutinasBloque As Integer)
         'modifica el registro del buffer de construcción del bloque, sumándole el valor indicado
-        Dim PunteroRegistro As Long
+        Dim PunteroRegistro As Integer
         LeerRegistroBufferConstruccionBloque_2219(Registro, PunteroRegistro, PunteroRutinasBloque)
         VariablesBloques_1FCD(Registro - &H61 + 2) = VariablesBloques_1FCD(Registro - &H61 + 2) + Incremento '0x61=índice en el buffer de construcción del bloque
     End Sub
 
-    Sub SaltarComandosIntermedios_20A5(ByRef PunteroRutinasBloque As Long)
+    Sub SaltarComandosIntermedios_20A5(ByRef PunteroRutinasBloque As Integer)
         'si el bucle while no se ejecuta, se salta los comandos intermedios
-        Dim NBucles As Long 'contador de bucles
+        Dim NBucles As Integer 'contador de bucles
         Dim Valor As Byte
         NBucles = 1 'inicialmente estamos dentro de un while
         Do
@@ -1015,24 +1075,20 @@ Module ModAbadia
         Loop
     End Sub
 
-    Sub Push(ByVal Valor As Long)
+    Sub Push(ByVal Valor As Integer)
         Pila(PunteroPila) = Valor
         PunteroPila = PunteroPila + 1
         If PunteroPila > UBound(Pila) Then Stop
     End Sub
 
-    Function Pop() As Long
+    Function Pop() As Integer
         If PunteroPila = 0 Then Stop
         PunteroPila = PunteroPila - 1
         Pop = Pila(PunteroPila)
         Pila(PunteroPila) = 0
     End Function
 
-
-
-
-
-    Sub PintarTileBuffer_20FC(ByRef X As Byte, ByRef Y As Byte, ByVal Incremento As EnumIncremento, ByRef PunteroRutinasBloqueIX As Long)
+    Sub PintarTileBuffer_20FC(ByRef X As Byte, ByRef Y As Byte, ByVal Incremento As EnumIncremento, ByRef PunteroRutinasBloqueIX As Integer)
         'lee un byte del buffer de construcción del bloque que indica el número de tile, lee el siguiente byte y lo pinta en X,Y, modificando X,Y
         'si el siguiente byte >= 0xc8, pinta y sale
         'si el siguiente byte leido es 0x80 dibuja el tile en X,Y, actualiza las coordenadas y sigue procesando
@@ -1041,8 +1097,8 @@ Module ModAbadia
         'si es otra cosa = 0x00, mira a ver si salta un byte y sale
         Dim Valor1 As Byte
         Dim Valor2 As Byte
-        Dim PunteroRegistro As Long
-        Dim Nveces As Long
+        Dim PunteroRegistro As Integer
+        Dim Nveces As Integer
         Valor1 = LeerPosicionBufferConstruccionBloque_2214(PunteroRutinasBloqueIX, PunteroRegistro) 'lee una posición del buffer de construcción del bloque o un operando
         Valor2 = TablaCaracteristicasMaterial_1693(PunteroRutinasBloqueIX - &H1693) 'lee el siguiente byte de los datos de construcción
         If Valor2 >= &HC8 Then 'si es >= 0xc8, pinta, cambia X,Y según la operación y saleX,Y es visible, y si es así, actualiza el buffer de tiles
@@ -1142,15 +1198,15 @@ Module ModAbadia
         End If
     End Function
 
-    Sub PintarTileBuffer_1633(ByVal X As Byte, ByVal Y As Byte, ByVal Tile As Byte, ByVal PunteroRutinasBloqueIX As Long)
+    Sub PintarTileBuffer_1633(ByVal X As Byte, ByVal Y As Byte, ByVal Tile As Byte, ByVal PunteroRutinasBloqueIX As Integer)
         'comprueba si el tile indicado por X,Y es visible, y si es así, actualiza el tile mostrado en esta posición y los datos de profundidad asociados
         'Y = pos en y usando el sistema de coordenadas del buffer de tiles
         'X = pos en x usando el sistema de coordenadas del buffer de tiles
         'Tile = número de tile a poner
         'PunteroRutinasBloque = puntero a los datos de construcción del bloque
-        Dim Xr As Long 'coordenadas de la rejilla
-        Dim Yr As Long
-        Dim PunteroBufferTiles As Long
+        Dim Xr As Integer 'coordenadas de la rejilla
+        Dim Yr As Integer
+        Dim PunteroBufferTiles As Integer
         Dim ProfundidadAnteriorX As Byte
         Dim ProfundidadAnteriorY As Byte
         Dim TileAnterior As Byte
@@ -1192,13 +1248,13 @@ Module ModAbadia
     Public Sub GenerarTablasAndOr_3AD1()
         'genera 4 tablas de 0x100 bytes para el manejo de pixels mediante operaciones AND y OR
         'TablasAndOr
-        Dim Puntero As Long
-        Dim Contador As Long
-        Dim a As Long
-        Dim b As Long
-        Dim c As Long
-        Dim d As Long
-        Dim e As Long
+        Dim Puntero As Integer
+        Dim Contador As Integer
+        Dim a As Integer
+        Dim b As Integer
+        Dim c As Integer
+        Dim d As Integer
+        Dim e As Integer
         For Contador = 0 To 255
             a = Contador            'ld   a,c      ; a = b7 b6 b5 b4 b3 b2 b1 b0
             a = a And &HF0&         'and  $F0      ; a = b7 b6 b5 b4 0 0 0 0
@@ -1267,13 +1323,23 @@ Module ModAbadia
 
     Public Sub InicializarJuego_249A()
         Depuracion.Init()
+
+
         'inicio real del programa
         DeshabilitarInterrupcion()
         CargarDatos()
-        InicializarVariablesROM()
+
+        If Not Check Then
+            TmTick.Interval = 20
+            TmTick.Enabled = True
+            Reloj.Start()
+            RelojFPS.Start()
+        End If
+
         If Not Depuracion.SaltarPresentacion Then
             DibujarPresentacion()
         Else
+            SiguienteTick(5000, "BuclePrincipal_25B7")
             InicializarJuego_249A_b()
         End If
 
@@ -1290,24 +1356,32 @@ Module ModAbadia
             'InicializarInterrupcion 'coloca el código a ejecutar al producirse una interrupción ###pendiente
             'InicializarTablaSonido_103F() ' inicializa la tabla del sonido y habilita las interrupciones ###pendiente
             DeshabilitarInterrupcion()
-            If Not Depuracion.SaltarPergamino Then DibujarPergaminoIntroduccion_659D() 'dibuja el Pergamino y cuenta la introducción. De aquí vuelve al pulsar espacio
-            DeshabilitarInterrupcion()
-            'ApagarSonido_1376 'apaga el sonido '###pendiente
-            ModPantalla.SeleccionarPaleta(0)  'pone los colores de la paleta a negro
-            Limpiar40LineasInferioresPantalla_2712()
-            CopiarVariables_37B6() 'copia cosas de muchos sitios en 0x0103-0x01a9 (pq??z)
-            RellenarTablaFlipX_3A61()
-            CerrarEspejo_3A7E()
-            GenerarTablasAndOr_3AD1()
-            InicializarPartida_2509()
+            If Not Depuracion.SaltarPergamino Then
+                DibujarPergaminoIntroduccion_659D() 'dibuja el Pergamino y cuenta la introducción. De aquí vuelve al pulsar espacio
+            Else
+                InicializarJuego_249A_c()
+            End If
 
         End If
     End Sub
 
+    Public Sub InicializarJuego_249A_c()
+        'tercera parte de la inicialización. separado para poder usar los retardos
+        DeshabilitarInterrupcion()
+        'ApagarSonido_1376 'apaga el sonido '###pendiente
+        ModPantalla.SeleccionarPaleta(0)  'pone los colores de la paleta a negro
+        Limpiar40LineasInferioresPantalla_2712()
+        CopiarVariables_37B6() 'copia cosas de muchos sitios en 0x0103-0x01a9 (pq??z)
+        RellenarTablaFlipX_3A61()
+        CerrarEspejo_3A7E()
+        GenerarTablasAndOr_3AD1()
+        InicializarPartida_2509()
+    End Sub
+
     Sub Limpiar40LineasInferioresPantalla_2712()
-        Dim Banco As Long
-        Dim PunteroPantalla As Long
-        Dim Contador As Long
+        Dim Banco As Integer
+        Dim PunteroPantalla As Integer
+        Dim Contador As Integer
         PunteroPantalla = &H640 'apunta a memoria de video
         For Banco = 1 To 8 'repite el proceso para 8 bancos
             For Contador = 0 To &H18F '5 líneas
@@ -1325,21 +1399,14 @@ Module ModAbadia
         DibujarPergamino_65AF() 'dibuja el pergamino
         ModPantalla.SeleccionarPaleta(1) 'coloca la paleta del pergamino
         DibujarTextosPergamino_6725() 'dibuja los textos en el Pergamino mientras no se pulse el espacio
-
-
-
-
-
-
-
     End Sub
 
 
     Sub DibujarPergamino_65AF()
-        Dim Contador As Long
-        Dim Linea As Long
-        Dim Relleno As Long
-        Dim Puntero As Long
+        Dim Contador As Integer
+        Dim Linea As Integer
+        Dim Relleno As Integer
+        Dim Puntero As Integer
         For Contador = 0 To &H3FFF& 'limpia la memoria de video
             PantallaCGA(Contador) = 0
         Next
@@ -1378,12 +1445,12 @@ Module ModAbadia
 
     End Sub
 
-    Function CalcularDesplazamientoPantalla_68C7(ByVal X As Long, ByVal Y As Long) As Long
+    Function CalcularDesplazamientoPantalla_68C7(ByVal X As Integer, ByVal Y As Integer) As Integer
         'dados X,Y (coordenadas en pixels), calcula el desplazamiento correspondiente en pantalla
         'el valor calculado se hace partiendo de la coordenada x multiplo de 4 más cercana y sumandole 32 pixels a la derecha
-        Dim Valor1 As Long
-        Dim Valor2 As Long
-        Dim Valor3 As Long
+        Dim Valor1 As Integer
+        Dim Valor2 As Integer
+        Dim Valor3 As Integer
         Valor1 = ModFunciones.shr(X, 2) 'l / 4 (cada 4 pixels = 1 byte)
         Valor2 = Y And &HF8& 'obtiene el valor para calcular el desplazamiento dentro del banco de VRAM
         Valor2 = Valor2 * 10 'dentro de cada banco, la línea a la que se quiera ir puede calcularse como (y & 0xf8)*10
@@ -1394,11 +1461,11 @@ Module ModAbadia
         CalcularDesplazamientoPantalla_68C7 = Valor3 + 8 'ajusta para que salga 32 pixels más a la derecha
     End Function
 
-    Sub DibujarParteSuperiorInferiorPergamino_661B(ByVal PunteroPantalla As Long, ByVal PunteroDatos As Long)
+    Sub DibujarParteSuperiorInferiorPergamino_661B(ByVal PunteroPantalla As Integer, ByVal PunteroDatos As Integer)
         'rellena la parte superior (o inferior del pergamino)
-        Dim Linea As Long
-        Dim Contador As Long
-        Dim PunteroPantallaAnterior As Long
+        Dim Linea As Integer
+        Dim Contador As Integer
+        Dim PunteroPantallaAnterior As Integer
         PunteroPantallaAnterior = PunteroPantalla
         For Contador = 1 To 48 '48 bytes (= 192 pixels a rellenar)
             For Linea = 0 To 7 '8 líneas de alto
@@ -1411,10 +1478,10 @@ Module ModAbadia
         Next
     End Sub
 
-    Sub DibujarParteDerechaIzquierdaPergamino_662E(ByVal PunteroPantalla As Long, ByVal PunteroDatos As Long)
+    Sub DibujarParteDerechaIzquierdaPergamino_662E(ByVal PunteroPantalla As Integer, ByVal PunteroDatos As Integer)
         'rellena la parte superior (o inferior del pergamino)
-        Dim Linea As Long
-        Dim Contador As Long
+        Dim Linea As Integer
+        Dim Contador As Integer
         For Contador = 1 To 192 '192 líneas
             PantallaCGA(PunteroPantalla) = DatosGraficosPergamino_788A(PunteroDatos)
             PantallaCGA2PC(PunteroPantalla, DatosGraficosPergamino_788A(PunteroDatos))
@@ -1426,14 +1493,14 @@ Module ModAbadia
     End Sub
 
 
-    Sub DibujarTextosPergamino_6725()
+    Sub DibujarTextosPergamino_6725_Anterior()
         'dibuja los textos en el Pergamino mientras no se pulse el espacio
-        Dim PunteroDatosPergamino As Long
+        Dim PunteroDatosPergamino As Integer
         Dim Caracter As Byte 'caracter a imprimir
-        Dim PosicionPergaminoY_680A As Long
-        Dim PosicionPergaminoX_680B As Long
+        Dim PosicionPergaminoY_680A As Integer
+        Dim PosicionPergaminoX_680B As Integer
         Dim ColorLetra_67C0 As Byte
-        Dim PunteroCaracter As Long
+        Dim PunteroCaracter As Integer
         PosicionPergaminoY_680A = 16
         PosicionPergaminoX_680B = 44
         Do
@@ -1445,11 +1512,11 @@ Module ModAbadia
                 PunteroDatosPergamino = PunteroDatosPergamino + 1 'apunta al siguiente carácter
                 Select Case Caracter
                     Case Is = &HD 'salto de línea
-                        ImprimirRetornoCarroPergamino_67DE(PosicionPergaminoX_680B, PosicionPergaminoY_680A)
+                        'ImprimirRetornoCarroPergamino_67DE(PosicionPergaminoX_680B, PosicionPergaminoY_680A)
                     Case Is = &H20 'espacio
                         ImprimirEspacioPergamino_67CD(&HA, PosicionPergaminoX_680B)'espera un poco y avanza la posición en 10 pixels
                     Case Is = &HA  'avanzar una página. dibuja el triángulo
-                        PasarPaginaPergamino_67F0(PosicionPergaminoX_680B, PosicionPergaminoY_680A)
+                        'PasarPaginaPergamino_67F0(PosicionPergaminoX_680B, PosicionPergaminoY_680A)
                     Case Else
                         If (Caracter And &H60) = &H40 Then
                             ColorLetra_67C0 = &HFF 'mayúsculas en rojo
@@ -1459,48 +1526,122 @@ Module ModAbadia
                         PunteroCaracter = Caracter - &H20 'solo tiene caracteres a partir de 0x20
                         PunteroCaracter = 2 * PunteroCaracter 'cada entrada ocupa 2 bytes
                         PunteroCaracter = PunterosCaracteresPergamino_680C(PunteroCaracter) + 256 * PunterosCaracteresPergamino_680C(PunteroCaracter + 1)
-                        DibujarCaracterPergamino_6781(Caracter, PosicionPergaminoX_680B, PosicionPergaminoY_680A, PunteroCaracter, ColorLetra_67C0)
+                        'DibujarCaracterPergamino_6781(Caracter, PosicionPergaminoX_680B, PosicionPergaminoY_680A, PunteroCaracter, ColorLetra_67C0)
                 End Select
             End If
             Application.DoEvents()
         Loop
     End Sub
 
-    Sub Retardo_67C6(ByVal Ciclos As Long)
+    Sub DibujarTextosPergamino_6725()
+        'dibuja los textos en el Pergamino mientras no se pulse el espacio
+        Static PunteroDatosPergamino As Integer
+        Dim Caracter As Byte 'caracter a imprimir
+
+        Dim ColorLetra_67C0 As Byte
+        Dim PunteroCaracter As Integer
+        Static Estado As Byte = 0
+        If Estado = 0 Then
+            PosicionPergaminoY_680A = 16
+            PosicionPergaminoX_680B = 44
+            Estado = 1
+            SiguienteTick(100, "DibujarTextosPergamino_6725")
+            Exit Sub
+        Else
+            'LeerEstadoTeclas_32BC ###pendiente 'lee el estado de las teclas
+            If TeclaPulsadaNivel_3482(&H2F) Then
+                'reinicia las variables estáticas
+                PunteroDatosPergamino = 0
+                PosicionPergaminoY_680A = 16
+                PosicionPergaminoX_680B = 44
+                Estado = 0
+                SiguienteTick(100, "InicializarJuego_249A_c") '###pendiente 'comprueba si se pulsó el espacio
+                Exit Sub
+            End If
+            Caracter = TextoPergaminoPresentacion_7300(PunteroDatosPergamino) 'lee el caracter a imprimir
+            'si ha encontrado el carácter de fin de pergamino (&H1A), espera a que se pulse espacio para terminar
+            If Caracter <> &H1A Then
+                PunteroDatosPergamino = PunteroDatosPergamino + 1 'apunta al siguiente carácter
+                Select Case Caracter
+                    Case Is = &HD 'salto de línea
+                        ImprimirRetornoCarroPergamino_67DE()
+                    Case Is = &H20 'espacio
+                        ImprimirEspacioPergamino_67CD(&HA, PosicionPergaminoX_680B)'espera un poco y avanza la posición en 10 pixels
+                    Case Is = &HA  'avanzar una página. dibuja el triángulo
+                        PasarPaginaPergamino_67F0()
+                    Case Else
+                        If (Caracter And &H60) = &H40 Then
+                            ColorLetra_67C0 = &HFF 'mayúsculas en rojo
+                        Else
+                            ColorLetra_67C0 = &HF 'minúsculas en negro
+                        End If
+                        PunteroCaracter = Caracter - &H20 'solo tiene caracteres a partir de 0x20
+                        PunteroCaracter = 2 * PunteroCaracter 'cada entrada ocupa 2 bytes
+                        PunteroCaracter = PunterosCaracteresPergamino_680C(PunteroCaracter) + 256 * PunterosCaracteresPergamino_680C(PunteroCaracter + 1)
+                        DibujarCaracterPergamino_6781(PunteroCaracter, ColorLetra_67C0)
+                End Select
+            End If
+
+
+
+
+
+        End If
+    End Sub
+
+    Sub Retardo_67C6(ByVal Ciclos As Integer)
         'retardo hasta que Ciclos = 0x0000. Cada iteración son 32 ciclos (aprox 10 microsegundos, puesto
         'que aunque el Z80 funciona a 4 MHz, la arquitectura del CPC tiene una sincronización para los
         'el video que hace que funcione de forma efectiva entorno a los 3.2 MHz)
-        Dim Milisegundos As Long
+        Dim Milisegundos As Integer
         'Do
         '    Ciclos = Ciclos - 1
         '    DoEvents
         'Loop While Ciclos > 0
         Milisegundos = 0.01 * Ciclos
-        FrmPrincipal.Retardo(Milisegundos)
+        Retardo(Milisegundos)
     End Sub
 
-    Sub ImprimirRetornoCarroPergamino_67DE(ByRef X As Long, ByRef Y As Long)
+    Sub ImprimirRetornoCarroPergamino_67DE_anterior(ByRef X As Integer, ByRef Y As Integer)
         Retardo_67C6(&HEA60&) 'espera un rato (aprox. 600 ms)
         'calcula la posición de la siguiente línea
         X = &H2C
         Y = Y + &H10
-        If Y > &HA4 Then PasarPaginaPergamino_67F0(X, Y) 'se ha llegado a fin de hoja?
+        If Y > &HA4 Then
+            'PasarPaginaPergamino_67F0(X, Y) 'se ha llegado a fin de hoja?
+        End If
+    End Sub
+
+    Sub ImprimirRetornoCarroPergamino_67DE()
+        Static Estado As Byte = 0
+        If Estado = 0 Then
+            SiguienteTick(600, "ImprimirRetornoCarroPergamino_67DE") 'espera un rato (aprox. 600 ms)
+            Estado = 1
+            Exit Sub
+        Else
+            Estado = 0
+        End If
+        'calcula la posición de la siguiente línea
+        PosicionPergaminoX_680B = &H2C
+        PosicionPergaminoY_680A = PosicionPergaminoY_680A + &H10
+        SiguienteTick(20, "DibujarTextosPergamino_6725")
+        If PosicionPergaminoY_680A > &HA4 Then PasarPaginaPergamino_67F0() 'se ha llegado a fin de hoja?
     End Sub
 
 
-    Sub DibujarTrianguloRectanguloPergamino_6906(ByVal PixelX As Long, ByVal PixelY As Long, ByVal Lado As Long)
+    Sub DibujarTrianguloRectanguloPergamino_6906(ByVal PixelX As Integer, ByVal PixelY As Integer, ByVal Lado As Integer)
         'dibuja un triángulo rectángulo con los catetos paralelos a los ejes de coordenadas y de longitud Lado
-        Dim PunteroPantalla As Long
+        Dim PunteroPantalla As Integer
         Dim RellenoTriangular_6943(3) As Byte
-        Dim Relleno As Long
-        'Dim d As Long
-        Dim Aux As Long
-        Dim Distancia As Long 'separación en bytes entre la parte derecha y la izquierda del triángulo
-        Dim ContadorLado As Long
-        Dim Linea As Long
-        Dim PunteroRelleno As Long
+        Dim Relleno As Integer
+        'Dim d As integer
+        Dim Aux As Integer
+        Dim Distancia As Integer 'separación en bytes entre la parte derecha y la izquierda del triángulo
+        Dim ContadorLado As Integer
+        Dim Linea As Integer
+        Dim PunteroRelleno As Integer
         Dim Valor_6932 As Byte
-        Dim PunteroPantallaAnterior As Long
+        Dim PunteroPantallaAnterior As Integer
         RellenoTriangular_6943(0) = &HF0
         RellenoTriangular_6943(1) = &HE0
         RellenoTriangular_6943(2) = &HC0
@@ -1534,7 +1675,7 @@ Module ModAbadia
         Next
     End Sub
 
-    Sub DibujarTrianguloRectanguloPergamino_Parte2(ByVal Valor As Byte, ByRef PunteroPantalla As Long, ByVal PunteroPantallaAnterior As Long, ByVal Incremento As Long)
+    Sub DibujarTrianguloRectanguloPergamino_Parte2(ByVal Valor As Byte, ByRef PunteroPantalla As Integer, ByVal PunteroPantallaAnterior As Integer, ByVal Incremento As Integer)
         PunteroPantalla = PunteroPantalla + Incremento
         PantallaCGA(PunteroPantalla) = Valor
         PantallaCGA2PC(PunteroPantalla, Valor)
@@ -1545,22 +1686,37 @@ Module ModAbadia
         PunteroPantalla = DireccionSiguienteLinea_3A4D_68F2(PunteroPantalla)
     End Sub
 
-    Sub PasarPaginaPergamino_67F0(ByRef X As Long, ByRef Y As Long)
+    Sub PasarPaginaPergamino_67F0_anterior(ByRef X As Integer, ByRef Y As Integer)
         X = &H2C 'reinicia la posición al principio de la línea
         Y = &H10 'reinicia la posición al principio de la línea
         Retardo_67C6(3 * 65536) '(aprox. 655 ms), repite 3 veces los retardos
         PasarPaginaPergamino_6697() 'pasa de hoja
     End Sub
 
-    Sub PasarPaginaPergamino_6697()
-        Dim Linea As Long
-        Dim X As Long
-        Dim Y As Long
-        Dim TamañoTriangulo As Long
-        Dim PunteroPantalla As Long
-        Dim PunteroDatos As Long
-        Dim Contador As Long
-        Dim PunteroPantallaAnterior As Long
+    Sub PasarPaginaPergamino_67F0()
+        Static Estado As Byte = 0
+        If Estado = 0 Then
+            Estado = 1
+            SiguienteTick(3 * 655, "PasarPaginaPergamino_67F0") '(aprox. 655 ms), repite 3 veces los retardos
+            Exit Sub
+        Else
+            Estado = 0
+        End If
+        PosicionPergaminoX_680B = &H2C 'reinicia la posición al principio de la línea
+        PosicionPergaminoY_680A = &H10 'reinicia la posición al principio de la línea
+        PasarPaginaPergamino_6697() 'pasa de hoja
+    End Sub
+
+
+    Sub PasarPaginaPergamino_6697_anterior()
+        Dim Linea As Integer
+        Dim X As Integer
+        Dim Y As Integer
+        Dim TamañoTriangulo As Integer
+        Dim PunteroPantalla As Integer
+        Dim PunteroDatos As Integer
+        Dim Contador As Integer
+        Dim PunteroPantallaAnterior As Integer
         X = 211 - 4 * Linea '(00, 211) -> posición de inicio
         Y = 0
         TamañoTriangulo = 3
@@ -1598,14 +1754,95 @@ Module ModAbadia
         ModPantalla.Refrescar()
     End Sub
 
-    Sub LimpiarParteSuperiorDerechaPergamino_663E(ByVal PixelX As Long, ByVal PixelY As Long, ByVal LadoTriangulo As Long)
-        Dim PunteroDatos As Long
-        Dim PunteroPantalla As Long
-        Dim PunteroPantallaAnterior As Long
+    Sub PasarPaginaPergamino_6697()
+        Static Linea As Integer
+        Static X As Integer
+        Static Y As Integer
+        Static TamañoTriangulo As Integer
+        Dim PunteroPantalla As Integer
+        Dim PunteroDatos As Integer
+        Static Contador As Integer
+        Static Estado As Byte = 0
+        Select Case Estado
+            Case = 0
+                X = 211 - 4 * Linea '(00, 211) -> posición de inicio
+                Y = 0
+                TamañoTriangulo = 3
+                Linea = 0
+                Contador = 0
+                Estado = 1
+                PasarPaginaPergamino_6697()
+            Case = 1
+                DibujarTrianguloRectanguloPergamino_6906(X, Y, TamañoTriangulo) 'dibuja un triángulo rectángulo de lado TamañoTriangulo
+                If Linea Mod 2 = 0 Then ModPantalla.Refrescar()
+                Estado = 2
+                SiguienteTick(20, "PasarPaginaPergamino_6697") 'pequeño retardo (20 ms)
+            Case = 2
+                'limpia la parte superior y derecha del borde del pergamino que ha sido borrada
+                LimpiarParteSuperiorDerechaPergamino_663E(X, Y, TamañoTriangulo)
+                X = X - 4
+                TamañoTriangulo = TamañoTriangulo + 1
+                If Linea Mod 2 = 0 Then ModPantalla.Refrescar()
+                Linea = Linea + 1
+                If Linea > &H2C Then 'repite para 45 líneas
+                    Estado = 3
+                Else
+                    Estado = 1
+                End If
+                PasarPaginaPergamino_6697()
+            Case = 3
+                LimpiarParteSuperiorDerechaPergamino_663E(X, Y, TamañoTriangulo)
+                X = 32 '(32, 4) -> posición de inicio
+                Y = 4
+                TamañoTriangulo = &H2F
+                Contador = 0
+                Estado = 4
+                PasarPaginaPergamino_6697()
+            Case = 4
+                DibujarTrianguloRectanguloPergamino_6906(X, Y, TamañoTriangulo) 'dibuja un triángulo rectángulo de lado TamañoTriangulo
+                If Contador Mod 2 = 0 Then ModPantalla.Refrescar()
+                Estado = 5
+                SiguienteTick(20, "PasarPaginaPergamino_6697") 'pequeño retardo (20 ms)
+            Case = 5
+                PunteroPantalla = CalcularDesplazamientoPantalla_68C7(X, Y) ' - 4)
+                PunteroDatos = 2 * Y + &H7B8A - &H788A 'desplazamiento de los datos borrados de la parte izquierda del pergamino
+                For Linea = 0 To 3 '4 líneas de alto
+                    PantallaCGA(PunteroPantalla) = DatosGraficosPergamino_788A(PunteroDatos + 2 * Linea)
+                    PantallaCGA2PC(PunteroPantalla, DatosGraficosPergamino_788A(PunteroDatos + 2 * Linea))
+                    PantallaCGA(PunteroPantalla + 1) = DatosGraficosPergamino_788A(PunteroDatos + 2 * Linea + 1)
+                    PantallaCGA2PC(PunteroPantalla + 1, DatosGraficosPergamino_788A(PunteroDatos + 2 * Linea + 1))
+                    PunteroPantalla = DireccionSiguienteLinea_3A4D_68F2(PunteroPantalla)
+                Next
+                LimpiarParteInferiorPergamino_6705(TamañoTriangulo)
+                Y = Y + 4
+                TamañoTriangulo = TamañoTriangulo - 1
+                Contador = Contador + 1
+                If Contador > &H2D Then 'repite 46 veces
+                    Estado = 6
+                Else
+                    Estado = 4
+                End If
+                PasarPaginaPergamino_6697()
+            Case = 6
+                LimpiarParteInferiorPergamino_6705(TamañoTriangulo)
+                LimpiarParteInferiorPergamino_6705(0)
+                ModPantalla.Refrescar()
+                Estado = 0
+                SiguienteTick(20, "DibujarTextosPergamino_6725")
+        End Select
+
+
+    End Sub
+
+
+    Sub LimpiarParteSuperiorDerechaPergamino_663E(ByVal PixelX As Integer, ByVal PixelY As Integer, ByVal LadoTriangulo As Integer)
+        Dim PunteroDatos As Integer
+        Dim PunteroPantalla As Integer
+        Dim PunteroPantallaAnterior As Integer
         Dim NumeroPixel As Byte 'número de pixel después del triángulo en la parte superior del pergamino
-        Dim Linea As Long
-        Dim XBorde As Long 'coordenadas del borde derecho a restaurar
-        Dim YBorde As Long
+        Dim Linea As Integer
+        Dim XBorde As Integer 'coordenadas del borde derecho a restaurar
+        Dim YBorde As Integer
         NumeroPixel = &H30 - LadoTriangulo 'halla la parte del pergamino que falta por procesar
         NumeroPixel = NumeroPixel * 4 'pasa a pixels
         PunteroDatos = NumeroPixel * 2
@@ -1636,13 +1873,13 @@ Module ModAbadia
         Next 'completa las 8 líneas
     End Sub
 
-    Sub LimpiarParteInferiorPergamino_6705(ByVal TamañoTriangulo As Long)
+    Sub LimpiarParteInferiorPergamino_6705(ByVal TamañoTriangulo As Integer)
         'restaura la parte inferior del pergamino modificada por lado TamañoTriangulo
-        Dim PunteroDatos As Long
-        Dim PunteroPantalla As Long
-        Dim X As Long
-        Dim Y As Long
-        Dim Contador As Long
+        Dim PunteroDatos As Integer
+        Dim PunteroPantalla As Integer
+        Dim X As Integer
+        Dim Y As Integer
+        Dim Contador As Integer
         X = &H20 + 4 * TamañoTriangulo
         Y = &HB8 'y = 184
         PunteroPantalla = CalcularDesplazamientoPantalla_68C7(X, Y) 'calcula el desplazamiento de las coordenadas en pantalla
@@ -1655,25 +1892,31 @@ Module ModAbadia
 
     End Sub
 
-    Sub ImprimirEspacioPergamino_67CD(ByVal Hueco As Byte, ByRef X As Long)
+    Sub ImprimirEspacioPergamino_67CD_anterior(ByVal Hueco As Byte, ByRef X As Integer)
         'añade un hueco del tamaño indicado, en píxeles
         Retardo_67C6(&HBB8) 'espera un poco (aprox. 30 ms)
         X = X + Hueco
     End Sub
 
-    Sub DibujarCaracterPergamino_6781(ByVal Caracter As Byte, ByRef X As Long, ByRef Y As Long, ByVal PunteroCaracter As Long, ByVal Color As Byte)
+    Sub ImprimirEspacioPergamino_67CD(ByVal Hueco As Byte, ByRef X As Integer)
+        'añade un hueco del tamaño indicado, en píxeles
+        X = X + Hueco
+        SiguienteTick(30, "DibujarTextosPergamino_6725") 'espera un poco (aprox. 30 ms)
+    End Sub
+
+    Sub DibujarCaracterPergamino_6781_anterior(ByVal Caracter As Byte, ByRef X As Integer, ByRef Y As Integer, ByVal PunteroCaracter As Integer, ByVal Color As Byte)
         'dibuja un carácter en el pergamino
         Dim Valor As Byte 'dato del carácter
-        Dim AvanceX As Long
-        Dim AvanceY As Long
-        Dim PunteroPantalla As Long
-        Dim Pixel As Long
+        Dim AvanceX As Integer
+        Dim AvanceY As Integer
+        Dim PunteroPantalla As Integer
+        Dim Pixel As Integer
         Dim InversaMascaraAND As Byte
         Dim MascaraOr As Byte
         Dim MascaraAnd As Byte
         Dim PunteroHex As String
         Dim ValorHex As String
-        Dim Contador As Long
+        Dim Contador As Integer
         Do
             If Not Depuracion.QuitarRetardos Then Retardo_67C6(&H320) 'pequeño retardo (aprox. 8 ms)
             Valor = DatosCaracteresPergamino_6947(PunteroCaracter - &H6947)
@@ -1702,10 +1945,64 @@ Module ModAbadia
         Loop
     End Sub
 
+    Sub DibujarCaracterPergamino_6781(Optional ByVal PunteroCaracter_ As Integer = 0, Optional ByVal Color_ As Byte = 0)
+        'dibuja un carácter en el pergamino
+        Dim Valor As Byte 'dato del carácter
+        Dim AvanceX As Integer
+        Dim AvanceY As Integer
+        Dim PunteroPantalla As Integer
+        Dim Pixel As Integer
+        Dim InversaMascaraAND As Byte
+        Dim MascaraOr As Byte
+        Dim MascaraAnd As Byte
+        Static Estado As Byte = 0
+        Static PunteroCaracter As Integer
+        Static Color As Byte
+        Select Case Estado
+            Case = 0
+                PunteroCaracter = PunteroCaracter_
+                Color = Color_
+                Estado = 1
+            Case = 1
+                Estado = 2
+            Case = 2
+                Estado = 3
+            Case = 3
+                Estado = 4
+            Case = 4
+                Estado = 5
+            Case = 5
+                Estado = 1
+
+        End Select
+        Valor = DatosCaracteresPergamino_6947(PunteroCaracter - &H6947)
+        PunteroCaracter = PunteroCaracter + 1
+        If (Valor And &HF0) = &HF0 Then 'si es el último byte del carácter
+            Estado = 0
+            ImprimirEspacioPergamino_67CD(Valor And &HF, PosicionPergaminoX_680B) 'imprime un espacio y sale al bucle para imprimir más caracteres
+            Exit Sub
+        End If
+        AvanceX = Valor And &HF 'avanza la posición x según los 4 bits menos significativos del byte leido de dibujo del caracter
+        AvanceY = ModFunciones.shr(Valor, 4) And &HF& 'avanza la posición y según los 4 bits más significativos del byte leido de dibujo del caracter
+        PunteroPantalla = CalcularDesplazamientoPantalla_68C7(PosicionPergaminoX_680B + AvanceX, PosicionPergaminoY_680A + AvanceY) 'calcula el desplazamiento de las coordenadas en pantalla
+        Pixel = (PosicionPergaminoX_680B + AvanceX) And &H3&        'se queda con los 2 bits menos significativos de la posición para saber que pixel pintar
+        MascaraAnd = ModFunciones.ror8(&H88, Pixel)
+        InversaMascaraAND = MascaraAnd Xor &HFF&
+        MascaraOr = InversaMascaraAND And PantallaCGA(PunteroPantalla) 'obtiene el valor del resto de pixels de la pantalla
+        PantallaCGA(PunteroPantalla) = (Color And MascaraAnd) Or MascaraOr 'combina con los pixels de pantalla. actualiza la memoria de video con el nuevo pixel
+        PantallaCGA2PC(PunteroPantalla, (Color And MascaraAnd) Or MascaraOr)
+        'ModPantalla.Refrescar()
+        If Estado <= 4 Or Depuracion.QuitarRetardos Then
+            DibujarCaracterPergamino_6781()
+        Else
+            SiguienteTick(8, "DibujarCaracterPergamino_6781") 'pequeño retardo (aprox. 8 ms)
+        End If
+    End Sub
+
     Sub RellenarTablaFlipX_3A61()
         'crea una tabla para hacer flip en x a 4 pixels
-        Dim Contador As Long
-        Dim Contador2 As Long
+        Dim Contador As Integer
+        Dim Contador2 As Integer
         Dim NibbleSuperior As Byte
         Dim NibbleInferior As Byte
         Dim AcarreoI As Byte 'acarreo por la izquierda
@@ -1741,17 +2038,16 @@ Module ModAbadia
     Sub CerrarEspejo_3A7E()
         'obtiene la dirección en donde está la altura del espejo, obtiene la dirección del bloque
         'que forma el espejo y si estaba abierto, lo cierra
-        Dim PunteroEspejo As Long
+        Dim PunteroEspejo As Integer
         Dim Puntero
         Dim Valor As Byte
-        Dim Contador As Long
+        Dim Contador As Integer
         PunteroEspejo = &H5086 'apunta a datos de altura de la planta 2
         Do
             Valor = TablaAlturasPantallas_4A00(PunteroEspejo - &H4A00)
             If Valor = &HFF Then Exit Do '0xff indica el final
             If (Valor And &H8) <> 0 Then PunteroEspejo = PunteroEspejo + 1 'incrementa la dirección 4 o 5 bytes dependiendo del bit 3
             PunteroEspejo = PunteroEspejo + 4
-            Application.DoEvents()
         Loop
         PunteroDatosAlturaHabitacionEspejo_34D9 = PunteroEspejo 'guarda el puntero de fin de tabla (que apunta a los datos de la habitación del espejo)
         PunteroEspejo = &H4000 'apunta a los datos de bloques de la pantallas
@@ -1775,7 +2071,7 @@ Module ModAbadia
     End Sub
 
     Sub InicializarPartida_2509()
-        Dim Contador As Long
+        Dim Contador As Integer
         ModTeclado.Inicializar()
         'aquí ya se ha completado la inicialización de datos para el juego
         'ahora realiza la inicialización para poder empezar a jugar una partida
@@ -1806,12 +2102,14 @@ Module ModAbadia
         GirarGraficosRespectoX_3552(DatosMonjes_AB59, &HAE2E - &HAB59, 5, &H91) 'gráficos de 5 bytes de ancho, 0x91 bloques de 5 bytes (= 0x2d5)
         InicializarEspejo_34B0() 'inicia la habitación del espejo y las variables relacionadas con el espejo
         InicializarDiaMomento_54D2() 'inicia el día y el momento del día en el que se está
+        '257A
         'habilita los comandos cuando procese el comportamiento
-        BufferComandosMonjes_A200(&HA2C0 - &HA200) = &H11 'inicia el comando de adso
-        BufferComandosMonjes_A200(&HA200 - &HA200) = &H11 'inicia el comando de malaquías
-        BufferComandosMonjes_A200(&HA230 - &HA200) = &H11 'inicia el comando del abad
-        BufferComandosMonjes_A200(&HA260 - &HA200) = &H11 'inicia el comando de berengario
-        BufferComandosMonjes_A200(&HA290 - &HA200) = &H11 'inicia el comando de severino
+        BufferComandosMonjes_A200(&HA2C0 - &HA200) = &H10 'inicia el comando de adso
+        BufferComandosMonjes_A200(&HA200 - &HA200) = &H10 'inicia el comando de malaquías
+        BufferComandosMonjes_A200(&HA230 - &HA200) = &H10 'inicia el comando del abad
+        BufferComandosMonjes_A200(&HA260 - &HA200) = &H10 'inicia el comando de berengario
+        BufferComandosMonjes_A200(&HA290 - &HA200) = &H10 'inicia el comando de severino
+        '258B
         ContadorInterrupcion_2D4B = 0 'resetea el contador de la interrupción
         PintarPantalla_0DFD = True 'añadido para que corresponda con lo que hace realmente
         'For Contador = 0 To UBound(BufferSprites_9500)
@@ -1869,15 +2167,17 @@ Module ModAbadia
 
     Sub InicializarVariables_381E()
         'inicia la memoria
-        Dim Contador As Long
-        Dim Puntero As Long
+        Dim Contador As Integer
+        Dim Puntero As Integer
         Dim Valor As Byte
-        For Contador = 0 To UBound(TablaVariablesLogica_3C85)
+        For Contador = 0 To &H20 - 1 'limpia 0x3c85-0x3ca4 (los datos de la lógica)
             TablaVariablesLogica_3C85(Contador) = 0
         Next
         For Contador = 0 To UBound(TablaVariablesAuxiliares_2D8D)
             TablaVariablesAuxiliares_2D8D(Contador) = 0
         Next
+        '###pendiente: ver qué se hace con esta tabla: TablaVariablesAuxiliares_2D8D. por ahora son variables sueltas,
+        'y habra que inicializarlas
         RestaurarVariables_37B9() 'copia cosas de 0x0103-0x01a9 a muchos sitios (nota: al inicializar se hizo la operación inversa)
         Puntero = &H2E17 'apunta a la tabla con datos de los sprites
         Contador = &H14 'cada sprite ocupa 20 bytes
@@ -1902,9 +2202,9 @@ Module ModAbadia
 
     Sub DibujarAreaJuego_275C()
         'dibuja un rectángulo de 256 de ancho en las 160 líneas superiores de pantalla
-        Dim PunteroPantalla As Long
-        Dim Contador As Long
-        Dim Contador2 As Long
+        Dim PunteroPantalla As Integer
+        Dim Contador As Integer
+        Dim Contador2 As Integer
         PunteroPantalla = 0
         For Contador = 1 To &HA0 '160 líneas
             For Contador2 = 0 To 7 'rellena 8 bytes con 0xff (32 pixels)
@@ -1926,12 +2226,12 @@ Module ModAbadia
     End Sub
 
     Sub DibujarMarcador_272C()
-        Dim PunteroDatos As Long
-        Dim PunteroPantalla As Long
-        Dim PunteroPantallaAnterior As Long
-        Dim Contador As Long
-        Dim Contador2 As Long
-        Dim Contador3 As Long
+        Dim PunteroDatos As Integer
+        Dim PunteroPantalla As Integer
+        Dim PunteroPantallaAnterior As Integer
+        Dim Contador As Integer
+        Dim Contador2 As Integer
+        Dim Contador3 As Integer
         PunteroDatos = &H6328 'apunta a datos del marcador (de 0x6328 a 0x6b27)
         PunteroPantalla = &H648 'apunta a la dirección en memoria donde se coloca el marcador (32, 160)
         For Contador = 0 To 3
@@ -1954,16 +2254,16 @@ Module ModAbadia
     End Sub
 
 
-    Sub GirarGraficosRespectoX_3552(ByRef Tabla() As Byte, ByVal PunteroTablaHL As Long, ByVal AnchoC As Byte, ByVal NGraficosB As Byte)
+    Sub GirarGraficosRespectoX_3552(ByRef Tabla() As Byte, ByVal PunteroTablaHL As Integer, ByVal AnchoC As Byte, ByVal NGraficosB As Byte)
         'gira con respecto a x una serie de datos gráficos que se le pasan en Tabla
         'el ancho de los gráficos se pasa en Ancho y en NGraficos un número para calcular cuantos gráficos girar
-        Dim Bloque As Long 'contador de líneas
-        Dim Contador As Long 'contador dentro de la línea
-        Dim NumeroCambios As Long
+        Dim Bloque As Integer 'contador de líneas
+        Dim Contador As Integer 'contador dentro de la línea
+        Dim NumeroCambios As Integer
         Dim Valor1 As Byte
         Dim Valor2 As Byte
-        Dim PunteroValor1 As Long
-        Dim PunteroValor2 As Long
+        Dim PunteroValor1 As Integer
+        Dim PunteroValor2 As Integer
         Dim HL As String
         HL = Hex$(PunteroTablaHL)
         NumeroCambios = Int(AnchoC + 1) / 2
@@ -1992,7 +2292,7 @@ Module ModAbadia
     End Sub
 
     Sub InicializarEspejo_34B9()
-        Dim Contador As Long
+        Dim Contador As Integer
         DeshabilitarInterrupcion()
 
         For Contador = 0 To 4
@@ -2044,9 +2344,9 @@ Module ModAbadia
         'genera el escenerio con los datos de abadia8 y lo proyecta a la rejilla
         'lee la entrada de abadia8 con un bloque de construcción de la pantalla y llama a 0x1bbc
 
-        Dim PunteroCaracteristicasBloque As Long 'puntero a las caracterísitcas del bloque
-        Dim PunteroTilesBloque As Long 'puntero del material a los tiles que forman el bloque
-        Dim PunteroRutinasBloque As Long 'puntero al resto de características del material
+        Dim PunteroCaracteristicasBloque As Integer 'puntero a las caracterísitcas del bloque
+        Dim PunteroTilesBloque As Integer 'puntero del material a los tiles que forman el bloque
+        Dim PunteroRutinasBloque As Integer 'puntero al resto de características del material
         Dim BloqueHex As String
         'PunteroPantalla = 2445
 
@@ -2068,6 +2368,7 @@ Module ModAbadia
     End Sub
 
 
+
     Sub CopiarVariables_37B6()
         CopiarTabla(TablaPermisosPuertas_2DD9, CopiaTablaPermisosPuertas_2DD9) 'puertas a las que pueden entrar los personajes
         CopiarTabla(TablaObjetosPersonajes_2DEC, CopiaTablaObjetosPersonajes_2DEC) 'objetos de los personajes
@@ -2079,21 +2380,21 @@ Module ModAbadia
     Sub RestaurarVariables_37B9()
         PuertasAbribles_3CA6 = &HEF ' máscara para las puertas donde cada bit indica que puerta se comprueba si se abre
         InvestigacionNoTerminada_3CA7 = True
-        TablaPosicionesPredefinidasMalaquias_3CA8(0) = &HFA
-        TablaPosicionesPredefinidasMalaquias_3CA8(1) = 0
-        TablaPosicionesPredefinidasMalaquias_3CA8(2) = 0
-        TablaPosicionesPredefinidasAbad_3CC6(0) = &HFA
-        TablaPosicionesPredefinidasAbad_3CC6(1) = 0
-        TablaPosicionesPredefinidasAbad_3CC6(2) = 0
-        TablaPosicionesPredefinidasBerengario_3CE7(0) = &HFA
-        TablaPosicionesPredefinidasBerengario_3CE7(1) = 0
-        TablaPosicionesPredefinidasBerengario_3CE7(2) = 0
-        TablaPosicionesPredefinidasSeverino_3CFF(0) = &HFA
-        TablaPosicionesPredefinidasSeverino_3CFF(1) = 0
-        TablaPosicionesPredefinidasSeverino_3CFF(2) = 0
-        TablaPosicionesPredefinidasAdso_3D11(0) = &HFF
-        TablaPosicionesPredefinidasAdso_3D11(1) = 0
-        TablaPosicionesPredefinidasAdso_3D11(2) = 0
+        TablaVariablesLogica_3C85(&H3CA8 - &H3C85) = &HFA 'TablaPosicionesPredefinidasMalaquias_3CA8(0) = &HFA
+        TablaVariablesLogica_3C85(&H3CA8 + 1 - &H3C85) = 0 'TablaPosicionesPredefinidasMalaquias_3CA8(1) = 0
+        TablaVariablesLogica_3C85(&H3CA8 + 2 - &H3C85) = 0 'TablaPosicionesPredefinidasMalaquias_3CA8(2) = 0
+        TablaVariablesLogica_3C85(&H3CC6 - &H3C85) = &HFA 'TablaPosicionesPredefinidasAbad_3CC6(0) = &HFA
+        TablaVariablesLogica_3C85(&H3CC6 + 1 - &H3C85) = 0 'TablaPosicionesPredefinidasAbad_3CC6(1) = 0
+        TablaVariablesLogica_3C85(&H3CC6 + 2 - &H3C85) = 0 'TablaPosicionesPredefinidasAbad_3CC6(2) = 0
+        TablaVariablesLogica_3C85(&H3CE7 - &H3C85) = &HFA 'TablaPosicionesPredefinidasBerengario_3CE7(0) = &HFA
+        TablaVariablesLogica_3C85(&H3CE7 + 1 - &H3C85) = 0 'TablaPosicionesPredefinidasBerengario_3CE7(1) = 0
+        TablaVariablesLogica_3C85(&H3CE7 + 2 - &H3C85) = 0 'TablaPosicionesPredefinidasBerengario_3CE7(2) = 0
+        TablaVariablesLogica_3C85(&H3CFF - &H3C85) = &HFA 'TablaPosicionesPredefinidasSeverino_3CFF(0) = &HFA
+        TablaVariablesLogica_3C85(&H3CFF + 1 - &H3C85) = 0 'TablaPosicionesPredefinidasSeverino_3CFF(1) = 0
+        TablaVariablesLogica_3C85(&H3CFF + 2 - &H3C85) = 0 'TablaPosicionesPredefinidasSeverino_3CFF(2) = 0
+        TablaVariablesLogica_3C85(&H3D11 - &H3C85) = &HFA 'TablaPosicionesPredefinidasAdso_3D11(0) = &HFF
+        TablaVariablesLogica_3C85(&H3D11 + 1 - &H3C85) = 0 'TablaPosicionesPredefinidasAdso_3D11(1) = 0
+        TablaVariablesLogica_3C85(&H3D11 + 2 - &H3C85) = 0 'TablaPosicionesPredefinidasAdso_3D11(2) = 0
         Obsequium_2D7F = &H1F
         NumeroDia_2D80 = 1
         MomentoDia_2D81 = 4
@@ -2136,16 +2437,16 @@ Module ModAbadia
 
     Sub ActualizarMarcador_51DA(ByVal Objetos As Byte, ByVal Mascara As Byte)
         'comprueba si se tienen los objetos que se le pasan (se comprueban los indicados por la máscara), y si se tienen se dibujan
-        Dim PunteroPosicionesObjetos As Long
-        Dim PunteroSpritesObjetos As Long
-        Dim PunteroPantalla As Long
-        Dim PunteroPantallaAnterior As Long
-        Dim PunteroGraficosObjeto As Long
-        Dim Contador As Long
-        Dim Alto As Long
-        Dim Ancho As Long
-        Dim ContadorAncho As Long
-        Dim ContadorAlto As Long
+        Dim PunteroPosicionesObjetos As Integer
+        Dim PunteroSpritesObjetos As Integer
+        Dim PunteroPantalla As Integer
+        Dim PunteroPantallaAnterior As Integer
+        Dim PunteroGraficosObjeto As Integer
+        Dim Contador As Integer
+        Dim Alto As Integer
+        Dim Ancho As Integer
+        Dim ContadorAncho As Integer
+        Dim ContadorAlto As Integer
         PunteroPosicionesObjetos = &H3008 'apunta a las posiciones sobre los objetos del juego
         PunteroSpritesObjetos = &H2F1B
         PunteroPantalla = &H6F9& 'apunta a la memoria de video del primer hueco (100, 176)
@@ -2193,8 +2494,8 @@ Module ModAbadia
     Sub ActualizarDiaMarcador_5559(ByVal Dia As Byte)
         'actualiza el día, reflejándolo en el marcador
         NumeroDia_2D80 = Dia 'actualiza el día
-        Dim PunteroDia As Long
-        Dim PunteroPantalla As Long
+        Dim PunteroDia As Integer
+        Dim PunteroPantalla As Integer
         PunteroDia = &H4FA7 + (Dia - 1) * 3 'indexa en la tabla de los días. ajusta el índice a 0. cada entrada en la tabla ocupa 3 bytes
         PunteroPantalla = &HEE51 - &HC000 'apunta a pantalla (68, 165)
         DibujarNumeroDia_5583(PunteroDia, PunteroPantalla) 'coloca el primer número de día en el marcador
@@ -2208,13 +2509,13 @@ Module ModAbadia
         ScrollCambioMomentoDia_2DA5 = 9 '9 posiciones para realizar el scroll del cambio del momento del día
         ColocarDiaHora_550A() 'pone en 0x2d86 un valor dependiente del día y la hora
     End Sub
-    Sub DibujarNumeroDia_5583(ByRef PunteroDia As Long, ByRef PunteroPantalla As Long)
+    Sub DibujarNumeroDia_5583(ByRef PunteroDia As Integer, ByRef PunteroPantalla As Integer)
         'pone un número de día
         Dim Sumar As Boolean
         Dim Valor As Byte
-        Dim PunteroGraficos As Long
-        Dim Contador As Long
-        Dim PunteroPantallaAnterior As Long
+        Dim PunteroGraficos As Integer
+        Dim Contador As Integer
+        Dim PunteroPantallaAnterior As Integer
         PunteroPantallaAnterior = PunteroPantalla
         Sumar = True
         Valor = TablaEtapasDia_4F7A(PunteroDia - &H4F7A) 'lee un byte de los datos que forman el número del día
@@ -2249,7 +2550,7 @@ Module ModAbadia
 
     Sub ColocarDiaHora_550A()
         'pone en 0x2d86 un valor dependiente del día y la hora
-        Dim PunteroDuracionEtapaDia As Long
+        Dim PunteroDuracionEtapaDia As Integer
         PunteroDuracionEtapaDia = &H4F7A + 7 * NumeroDia_2D80 + MomentoDia_2D81
         TiempoRestanteMomentoDia_2D86 = Leer16(TablaEtapasDia_4F7A, PunteroDuracionEtapaDia - &H4F7A)
     End Sub
@@ -2288,18 +2589,21 @@ Module ModAbadia
         Dim TablaRellenoObsequium(3) As Byte 'tabla con pixels para rellenar los 4 últimos pixels de la barra de obsequium
         Dim PunteroRelleno As Byte 'apunta a una tabla de pixels para los 4 últimos pixels de la vida
         Dim Valor As Byte
-        Dim PunteroPantalla As Long
+        Dim PunteroPantalla As Integer
         TablaRellenoObsequium(0) = &HFF
         TablaRellenoObsequium(1) = &H7F
         TablaRellenoObsequium(2) = &H3F
         TablaRellenoObsequium(3) = &H1F
         Obsequium_2D7F = Obsequium_2D7F - Decremento 'lee la energía y le resta las unidades leidas
         If Obsequium_2D7F < 0 Then 'aquí llega si ya no queda energía
-            If Not GuillermoMuerto_3C97 Then
-                TablaPosicionesPredefinidasAbad_3CC6(&H3CC7 - &H3CC6) = &HB 'cambia el estado del abad para que le eche de la abadía
+            '55DD
+            If Not TablaVariablesLogica_3C85(GuillermoMuerto_3C97 - &H3C85) Then 'si guillermo está vivo
+                'cambia el estado del abad para que le eche de la abadía
+                TablaVariablesLogica_3C85(&H3CC7 - &H3C85) = &H0B ' TablaPosicionesPredefinidasAbad_3CC6(&H3CC7 - &H3CC6) = &HB 
             End If
             Obsequium_2D7F = 0 ' actualiza el contador de energía
         End If
+        '55E9
         PunteroRelleno = Obsequium_2D7F And &H3
         Valor = TablaRellenoObsequium(PunteroRelleno) 'indexa en la tabla según los 2 bits menos significativos
         PunteroPantalla = &HF1C&  'apunta a pantalla (252, 177)
@@ -2308,12 +2612,12 @@ Module ModAbadia
         DibujarBarraObsequium_560E(7 - Int(Obsequium_2D7F / 4), &HFF, PunteroPantalla) 'obtiene la vida que ha perdido y rellena de negro
     End Sub
 
-    Sub DibujarBarraObsequium_560E(ByVal Ancho As Byte, ByVal Relleno As Byte, ByRef PunteroPantalla As Long)
+    Sub DibujarBarraObsequium_560E(ByVal Ancho As Byte, ByVal Relleno As Byte, ByRef PunteroPantalla As Integer)
         'dibuja un rectángulo de Ancho bytes de ancho y 6 líneas de alto (graba valor de relleno)
         If Ancho = 0 Then Exit Sub
-        Dim Contador As Long
-        Dim Contador2 As Long
-        Dim PunteroPantallaAnterior As Long
+        Dim Contador As Integer
+        Dim Contador2 As Integer
+        Dim PunteroPantallaAnterior As Integer
         For Contador = 1 To Ancho
             PunteroPantallaAnterior = PunteroPantalla
             For Contador2 = 1 To 6 '6 líneas de alto
@@ -2328,9 +2632,9 @@ Module ModAbadia
 
     Sub LimpiarZonaFrasesMarcador_5001()
         'limpia la parte del marcador donde se muestran las frases
-        Dim Contador As Long
-        Dim Contador2 As Long
-        Dim PunteroPantalla As Long
+        Dim Contador As Integer
+        Dim Contador2 As Integer
+        Dim PunteroPantalla As Integer
         PunteroPantalla = &H2658 'apunta a pantalla (96, 164)
         For Contador = 1 To 8 '8 líneas de alto
             For Contador2 = 0 To &H1F 'repite hasta rellenar 128 pixels de esta línea
@@ -2343,11 +2647,12 @@ Module ModAbadia
     End Sub
 
     Sub BuclePrincipal_25B7()
-        Dim Contador As Long
-        Dim PunteroPersonajeHL As Long
-
-
-
+        Dim Contador As Integer
+        Dim PunteroPersonajeHL As Integer
+        Dim NBuclesRetardo As Byte
+        Dim EstadoTeclado As String = ""
+        Dim Guardar As Boolean = False
+        Static Inicializado As Boolean = False
 
         'el bucle principal del juego empieza aquí
 
@@ -2369,153 +2674,126 @@ Module ModAbadia
         'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H69
         'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H1A
 
-        'bug de tiles
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H2
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H41
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H7D
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H4
-
         'bug de biblioteca
         'TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H3
         'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H45
         'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H28
         'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H20
 
-        'bug de puertas
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H2
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H72
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H8C
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H0
 
-        '44
+        'bug buffer auxiliar
         'TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H0
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H28
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H27
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &HF
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 5 - &H3036) = &H0
+        'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H58
+        'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H69
+        'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H7
+        'TablaCaracteristicasPersonajes_3036(&H3036 + 5 - &H3036) = &H80
 
-
-        'cambia de sitio al abad
-        'TablaCaracteristicasPersonajes_3036(&H3063 + 2 - &H3036) = &H88
-        'TablaCaracteristicasPersonajes_3036(&H3063 + 3 - &H3036) = &HA6
-        'TablaCaracteristicasPersonajes_3036(&H3063 + 4 - &H3036) = &H0
-        'TablaSprites_2E17(&H2E53 - &H2E17) = TablaSprites_2E17(&H2E2B - &H2E17)
-
-        'bug &H2d
+        'prueba 0b0e
         'TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H1
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &HC2
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H3F
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H2
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 5 - &H3036) = &H0
-
-        'bug &H14
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H2
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H7A
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H8A
+        'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H88
+        'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H95
         'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H0
         'TablaCaracteristicasPersonajes_3036(&H3036 + 5 - &H3036) = &H0
 
-        'bug &H40
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H3
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H34
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H5C
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &HF
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 5 - &H3036) = &H0
+        'bug escaleras 11-09-2018
+        'If Not Inicializado Then
+        '    TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H1
+        '    TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H88
+        '    TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H91
+        '    TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H0
+        '    TablaCaracteristicasPersonajes_3036(&H3036 + 5 - &H3036) = &H0
+        '    Inicializado = True
+        'End If
 
-        'bug &H33
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H1
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &HC1
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H5E
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H0
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 5 - &H3036) = &H0
+        If Not Inicializado Then
+            'el abad una posición a la derecha para dejar paso
+            'TablaCaracteristicasPersonajes_3036(&H3063 + 2 - &H3036) = &H89
+            'guillermo
+            'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H37
+            'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H38
+            'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H0F
+            'adso
+            'TablaCaracteristicasPersonajes_3036(&H3045 + 2 - &H3036) = &H3A
+            'TablaCaracteristicasPersonajes_3036(&H3045 + 3 - &H3036) = &H38
+            'TablaCaracteristicasPersonajes_3036(&H3045 + 4 - &H3036) = &H0F
+            Inicializado = True
+        End If
 
-        'escaleras grandes
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H2
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H4E
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H7C
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H0
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 5 - &H3036) = &H0
 
+        FrmPrincipal.Label1.Text = "ON"
+        Application.DoEvents()
+        If ModTeclado.TeclaPulsadaNivel(EnumTecla.TeclaArriba) Then EstadoTeclado = EstadoTeclado + "UP"
+        If ModTeclado.TeclaPulsadaNivel(EnumTecla.TeclaIzquierda) Then EstadoTeclado = EstadoTeclado + "<-"
+        If ModTeclado.TeclaPulsadaNivel(EnumTecla.TeclaDerecha) Then EstadoTeclado = EstadoTeclado + "->"
+        FrmPrincipal.LbEstadoTeclado.Text = EstadoTeclado
 
         Parado = False
-        Do
-            ContadorAnimacionGuillermo_0990 = TablaCaracteristicasPersonajes_3036(&H3036 - &H3036) 'obtiene el contador de la animación de guillermo
+        'Do
+        ContadorAnimacionGuillermo_0990 = TablaCaracteristicasPersonajes_3036(&H3036 - &H3036) 'obtiene el contador de la animación de guillermo
+        '25e4
+        ComprobarCambioPantalla_2355() 'comprueba si el personaje que se muestra ha cambiado de pantalla y si es así hace muchas cosas
+        '25E7
+        If CambioPantalla_2DB8 Then
+            DibujarPantalla_19D8() 'si hay que redibujar la pantalla
+            PintarPantalla_0DFD = True 'modifica una instrucción de las rutinas de las puertas indicando que pinta la pantalla
+        Else
+            PintarPantalla_0DFD = False
+        End If
+        PunteroPersonajeHL = &H2BAE 'hl apunta a la tabla de guillermo
+        '25fe
+        ActualizarDatosPersonaje_291D(PunteroPersonajeHL) 'comprueba si guillermo puede moverse a donde quiere y actualiza su sprite y el buffer de alturas
 
+        If Depuracion.PersonajesAdso Then EjecutarComportamientoAdso_087B()
+        '2604
+        CambioPantalla_2DB8 = False 'indica que no hay que redibujar la pantalla
+        CaminoEncontrado_2DA9 = False 'indica que no se ha encontrado ningún camino
+        '260b
+        ModificarCaracteristicasSpriteLuz_26A3() 'modifica las características del sprite de la luz si puede ser usada por adso
+        '2627
+        DibujarSprites_2674() 'dibuja los sprites
 
+        FrmPrincipal.TxOrientacion.Text = Hex$(TablaCaracteristicasPersonajes_3036(1))
+        FrmPrincipal.TxX.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(2))
+        FrmPrincipal.TxY.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(3))
+        FrmPrincipal.TxZ.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(4))
+        FrmPrincipal.TxEscaleras.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(5))
+        FrmPrincipal.Label1.Text = "OFF"
+        Application.DoEvents()
 
-
-            '25e4
-            ComprobarCambioPantalla_2355() 'comprueba si el personaje que se muestra ha cambiado de pantalla y si es así hace muchas cosas
-
-            'modFunciones.GuardarArchivo "Buffer0", BufferAlturas
-            'modFunciones.GuardarArchivo "Sprites0", TablaSprites_2E17
-            'modFunciones.GuardarArchivo "Puertas0", TablaDatosPuertas_2FE4
-            'modFunciones.GuardarArchivo "Objetos0", TablaPosicionObjetos_3008
-            'modFunciones.GuardarArchivo "Perso0", TablaCaracteristicasPersonajes_3036
-            'modFunciones.GuardarArchivo "PersoAnim0",TablaAnimacionPersonajes_319F
-            'nose = modFunciones.Bytes2AsciiHex(TablaCaracteristicasPersonajes_3036)
-
-            '25E7
-            If CambioPantalla_2DB8 Then
-                DibujarPantalla_19D8() 'si hay que redibujar la pantalla
-                PintarPantalla_0DFD = True 'modifica una instrucción de las rutinas de las puertas indicando que pinta la pantalla
-
+        If Parar Then
+            Parar = False
+            Parado = True
+            MsgBox("Parado")
+            'Exit Do
+        Else
+            If Depuracion.QuitarRetardos Then
+                SiguienteTick(5, "BuclePrincipal_25B7")
             Else
-                PintarPantalla_0DFD = False
+                SiguienteTick(100, "BuclePrincipal_25B7")
             End If
-            'GuardarArchivo "D:\datos\vbasic\Abadia\Abadia2\Buffertiles", BufferTiles_8D80
-
-            PunteroPersonajeHL = &H2BAE 'hl apunta a la tabla de guillermo
-
-            'AvanzarPersonaje_27CB 0, &H3036, nose1, nose2
-            '25fe
-            ActualizarDatosPersonaje_291D(PunteroPersonajeHL) 'comprueba si guillermo puede moverse a donde quiere y actualiza su sprite y el buffer de alturas
-
-
-            '2604
-            CambioPantalla_2DB8 = False 'indica que no hay que redibujar la pantalla
-
-            '260b
-            ModificarCaracteristicasSpriteLuz_26A3() 'modifica las características del sprite de la luz si puede ser usada por adso
-
-            '2627
-            DibujarSprites_2674() 'dibuja los sprites
-            If Not Depuracion.QuitarRetardos Then
-                For Contador = 1 To 10
-                    Application.DoEvents()
-                    Application.DoEvents()
-                    Threading.Thread.Sleep(10)
-                Next
-            End If
-            FrmPrincipal.TxOrientacion.Text = Hex$(TablaCaracteristicasPersonajes_3036(1))
-            FrmPrincipal.TxX.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(2))
-            FrmPrincipal.TxY.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(3))
-            FrmPrincipal.TxZ.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(4))
-            FrmPrincipal.TxEscaleras.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(5))
-            If Parar Then
-                Parar = False
-                MsgBox("Parado")
-                Exit Do
-            End If
-            '2632
-        Loop
-        Parado = True
-        Exit Sub
-
-        ModFunciones.GuardarArchivo("Buffer0", TablaBufferAlturas_01C0) '&H23F
-        ModFunciones.GuardarArchivo("BufferTiles0", BufferTiles_8D80) '&H77f
-        ModFunciones.GuardarArchivo("Sprites0", TablaSprites_2E17) '&H1CC
-        ModFunciones.GuardarArchivo("Puertas0", TablaDatosPuertas_2FE4) '&H23
-        ModFunciones.GuardarArchivo("Objetos0", TablaPosicionObjetos_3008) '&H2D
-        ModFunciones.GuardarArchivo("Perso0", TablaCaracteristicasPersonajes_3036) '&H59
-        ModFunciones.GuardarArchivo("PersoAnim0", TablaAnimacionPersonajes_319F) '&H5F
-        ModFunciones.GuardarArchivo("BufferSprites", BufferSprites_9500) '&H77F
-        ModFunciones.GuardarArchivo("Graficos0", TablaGraficosObjetos_A300) '&H858
-        ModFunciones.GuardarArchivo("CGA0", PantallaCGA) '&H2000
+        End If
+        '2632
+        'Loop
+        'Parado = True
+        'Exit Sub
+        'Guardar = True
+        If Guardar Then
+            ModFunciones.GuardarArchivo("Buffer0", TablaBufferAlturas_01C0) '&H23F
+            ModFunciones.GuardarArchivo("BufferTiles0", BufferTiles_8D80) '&H77f
+            ModFunciones.GuardarArchivo("Sprites0", TablaSprites_2E17) '&H1CC
+            ModFunciones.GuardarArchivo("Puertas0", TablaDatosPuertas_2FE4) '&H23
+            ModFunciones.GuardarArchivo("Objetos0", TablaPosicionObjetos_3008) '&H2D
+            ModFunciones.GuardarArchivo("Perso0", TablaCaracteristicasPersonajes_3036) '&H59
+            ModFunciones.GuardarArchivo("PersoAnim0", TablaAnimacionPersonajes_319F) '&H5F
+            ModFunciones.GuardarArchivo("BufferSprites", BufferSprites_9500) '&H7FF
+            ModFunciones.GuardarArchivo("Graficos0", TablaGraficosObjetos_A300) '&H858
+            ModFunciones.GuardarArchivo("CGA0", PantallaCGA) '&H2000
+            Guardar = False
+        End If
     End Sub
 
     Sub BuclePrincipal_Check()
-        Dim PunteroPersonajeHL As Long
+        Dim PunteroPersonajeHL As Integer
         'el bucle principal del juego empieza aquí
 
         'coloca a Guillermo en posición
@@ -2564,7 +2842,7 @@ Module ModAbadia
         ModFunciones.GuardarArchivo(CheckRuta + CheckPantalla + ".obj", TablaPosicionObjetos_3008) '&H2D
         ModFunciones.GuardarArchivo(CheckRuta + CheckPantalla + ".per", TablaCaracteristicasPersonajes_3036) '&H59
         ModFunciones.GuardarArchivo(CheckRuta + CheckPantalla + ".ani", TablaAnimacionPersonajes_319F) '&H5F
-        ModFunciones.GuardarArchivo(CheckRuta + CheckPantalla + ".bsp", BufferSprites_9500) '&H77F
+        ModFunciones.GuardarArchivo(CheckRuta + CheckPantalla + ".bsp", BufferSprites_9500) '&H7FF
         ModFunciones.GuardarArchivo(CheckRuta + CheckPantalla + ".gra", TablaGraficosObjetos_A300) '&H858
         ModFunciones.GuardarArchivo(CheckRuta + CheckPantalla + ".mon", DatosMonjes_AB59) '&H8A6
         ModFunciones.GuardarArchivo(CheckRuta + CheckPantalla + ".cga", PantallaCGA) '&H2000
@@ -2582,12 +2860,12 @@ Module ModAbadia
         Dim AlturaBase As Byte
         Dim PosX As Byte 'parte alta de la posición en X del personaje actual (en los 4 bits inferiores)
         Dim PosY As Byte 'parte alta de la posición en Y del personaje actual (en los 4 bits inferiores)
-        Dim PunteroHabitacion As Long
+        Dim PunteroHabitacion As Integer
         Dim PantallaActual As Byte
-        Dim PunteroDatosPersonajesHL As Long
-        Dim PunteroSpritePersonajeIX As Long 'dirección del sprite asociado al personaje
-        Dim PunteroDatosPersonajeIY As Long 'dirección a los datos de posición del personaje asociado al sprite
-        Dim PunteroRutinaScriptPersonaje As Long 'dirección de la rutina en la que el personaje piensa
+        Dim PunteroDatosPersonajesHL As Integer
+        Dim PunteroSpritePersonajeIX As Integer 'dirección del sprite asociado al personaje
+        Dim PunteroDatosPersonajeIY As Integer 'dirección a los datos de posición del personaje asociado al sprite
+        Dim PunteroRutinaScriptPersonaje As Integer 'dirección de la rutina en la que el personaje piensa
         Dim ValorBufferAlturas As Byte 'valor a poner en las posiciones que ocupa el personaje en el buffer de alturas
         PosicionX = TablaCaracteristicasPersonajes_3036(PunteroDatosPersonajeActual_2D88 + 2 - &H3036) 'lee la posición en X del personaje actual
         '2361
@@ -2734,9 +3012,9 @@ Module ModAbadia
 
     Sub GuardarDireccionPantalla_2D00(ByVal NumeroPantalla As Byte)
         'guarda en 0x156a-0x156b la dirección de los datos de la pantalla a
-        Dim PunteroDatosPantalla As Long
+        Dim PunteroDatosPantalla As Integer
         Dim TamañoPantalla As Byte
-        Dim Contador As Long
+        Dim Contador As Integer
         NumeroPantallaActual_2DBD = NumeroPantalla 'guarda la pantalla actual
         PunteroDatosPantalla = 0
         If NumeroPantalla <> 0 Then 'si la pantalla actual  está definida (o no es la número 0)
@@ -2748,15 +3026,22 @@ Module ModAbadia
         PunteroPantallaActual_156A = PunteroDatosPantalla
     End Sub
 
-    Sub RellenarBufferAlturas_2D22(ByVal PunteroDatosPersonaje As Long)
+    Sub RellenarBufferAlturas_2D22(ByVal PunteroDatosPersonaje As Integer)
         'rellena el buffer de alturas indicado por 0x2d8a con los datos leidos de abadia7 y recortados para la pantalla del personaje que se le pasa en iy
-        Dim Contador As Long
+        Dim Contador As Integer
         Dim AlturaBase As Byte 'altura base de la planta
-        Dim PunteroAlturasPantalla As Long
+        Dim PunteroAlturasPantalla As Integer
+        Dim BufferAuxiliar As Boolean 'true: se usa el buffer secundario de 96F4
+        If PunteroBufferAlturas_2D8A <> &H01C0 Then BufferAuxiliar = True
         For Contador = 0 To &H23F
-            TablaBufferAlturas_01C0(Contador) = 0 'limpia 576 bytes (24x24) = (4 + 16 + 4)x2
+            If Not BufferAuxiliar Then
+                TablaBufferAlturas_01C0(Contador) = 0 'limpia 576 bytes (24x24) = (4 + 16 + 4)x2
+            Else
+                TablaBufferAlturas_96F4(Contador) = 0 'limpia 576 bytes (24x24) = (4 + 16 + 4)x2
+            End If
         Next
-        AlturaBase = CalcularMinimosVisibles_0B8F(PunteroDatosPersonaje) 'calcula los mínimos valores visibles de pantalla para la posición del personaje
+        'calcula los mínimos valores visibles de pantalla para la posición del personaje
+        AlturaBase = CalcularMinimosVisibles_0B8F(PunteroDatosPersonaje)
         Select Case AlturaBase
             Case Is = 0
                 PunteroAlturasPantalla = &H4A00 'valores de altura de la planta baja
@@ -2769,24 +3054,40 @@ Module ModAbadia
         'GuardarArchivo "BufferAlturas", BufferAlturas
     End Sub
 
-    Function CalcularMinimosVisibles_0B8F(ByVal PunteroDatosPersonaje As Long) As Byte
+    Function CalcularMinimosVisibles_0B8F(ByVal PunteroDatosPersonaje As Integer) As Byte
         'dada la posición de un personaje, calcula los mínimos valores visibles de pantalla y devuelve la altura base de la planta
         Dim PosicionX As Byte
         Dim PosicionY As Byte
         Dim Altura As Byte
-        PosicionX = TablaCaracteristicasPersonajes_3036(PunteroDatosPersonaje + 2 - &H3036) 'lee la posición en x del personaje
+        Dim PersonajeCamara As Boolean = False 'true si el puntero del personaje es &H2d73. este puntero
+        'se refiere a un área de memoria donde se guarda la posición del personaje al que sigue la
+        'cámara.
+        If PunteroDatosPersonaje = &H2D73 Then PersonajeCamara = True 'personaje extra
+        If Not PersonajeCamara Then
+            PosicionX = TablaCaracteristicasPersonajes_3036(PunteroDatosPersonaje + 2 - &H3036) 'lee la posición en x del personaje
+        Else
+            PosicionX = PosicionXPersonajeActual_2D75 'lee la posición en x del personaje al que sigue la cámara
+        End If
         PosicionX = (PosicionX And &HF0) - 4 'se queda con la mínima posición visible en X de la parte más significativa
         MinimaPosicionXVisible_27A9 = PosicionX
-        PosicionY = TablaCaracteristicasPersonajes_3036(PunteroDatosPersonaje + 3 - &H3036) 'lee la posición en y del personaje
+        If Not PersonajeCamara Then
+            PosicionY = TablaCaracteristicasPersonajes_3036(PunteroDatosPersonaje + 3 - &H3036) 'lee la posición en y del personaje
+        Else
+            PosicionY = PosicionYPersonajeActual_2D76 'lee la posición en y del personaje al que sigue la cámara
+        End If
         PosicionY = (PosicionY And &HF0) - 4 'se queda con la mínima posición visible en y de la parte más significativa
         MinimaPosicionYVisible_279D = PosicionY
-        Altura = TablaCaracteristicasPersonajes_3036(PunteroDatosPersonaje + 4 - &H3036) 'lee la altura del personaje
+        If Not PersonajeCamara Then
+            Altura = TablaCaracteristicasPersonajes_3036(PunteroDatosPersonaje + 4 - &H3036) 'lee la altura del personaje
+        Else
+            Altura = PosicionZPersonajeActual_2D77 'lee la posición en z del personaje al que sigue la cámara
+        End If
         MinimaAlturaVisible_27BA = LeerAlturaBasePlanta_2473(Altura) 'dependiendo de la altura, devuelve la altura base de la planta
         AlturaBasePlantaActual_2DBA = MinimaAlturaVisible_27BA
         CalcularMinimosVisibles_0B8F = MinimaAlturaVisible_27BA
     End Function
 
-    Sub RellenarBufferAlturas_3945_3973(ByVal PunteroAlturasPantalla As Long)
+    Sub RellenarBufferAlturas_3945_3973(ByVal PunteroAlturasPantalla As Integer)
         'rellena el buffer de pantalla con los datos leidos de la abadia recortados para la pantalla actual
         'entradas:
         '    byte 0
@@ -2816,9 +3117,11 @@ Module ModAbadia
         Dim nY As Byte 'número de unidades en Y
         Dim Xrecortada As Byte
         Dim Yrecortada As Byte
-        Dim PunteroBufferAlturas As Long
-        Dim Ancho As Long
-        Dim Alto As Long
+        Dim PunteroBufferAlturas As Integer
+        Dim Ancho As Integer
+        Dim Alto As Integer
+        Dim BufferAuxiliar As Boolean 'true: se usa el buffer secundario de 96F4
+        If PunteroBufferAlturas_2D8A <> &H01C0 Then BufferAuxiliar = True
         Do
             Byte0 = TablaAlturasPantallas_4A00(PunteroAlturasPantalla - &H4A00) 'lee un byte
             If Byte0 = &HFF Then Exit Sub 'si ha llegado al final de los datos, sale
@@ -2899,7 +3202,11 @@ Module ModAbadia
                         For Alto = 0 To nY - 1
                             For Ancho = 0 To nX - 1
                                 PunteroBufferAlturas = 24 * (Y + Alto) + X + Ancho 'cada línea ocupa 24 bytes
-                                TablaBufferAlturas_01C0(PunteroBufferAlturas) = Z
+                                If Not BufferAuxiliar Then
+                                    TablaBufferAlturas_01C0(PunteroBufferAlturas) = Z
+                                Else
+                                    TablaBufferAlturas_96F4(PunteroBufferAlturas) = Z
+                                End If
                             Next
                         Next
                     Else 'si es del 1 al 4 recorta (altura cambiante)
@@ -2919,11 +3226,11 @@ Module ModAbadia
         'Z(a)=valor de la altura inicial de bloque
         'nX(c)=número de unidades en X
         'nY(b)=número de unidades en Y
-        Dim Incremento1 As Long
-        Dim Incremento2 As Long
-        Dim Alto As Long
-        Dim Ancho As Long
-        Dim Altura As Long
+        Dim Incremento1 As Integer
+        Dim Incremento2 As Integer
+        Dim Alto As Integer
+        Dim Ancho As Integer
+        Dim Altura As Integer
         Dim AlturaAnterior As Byte
         'On Error Resume Next
         'tabla de instrucciones para modificar un bucle del cálculo de alturas
@@ -2971,10 +3278,12 @@ Module ModAbadia
 
     Sub EscribirAlturaBufferAlturas_391D(ByVal X As Byte, ByVal Y As Byte, ByVal Z As Byte)
         'si la posición X (L) ,Y (H) está dentro del buffer, lo modifica con la altura Z (C)
-        Dim PunteroBufferAlturas As Long
-        Dim XAjustada As Long
-        Dim YAjustada As Long
-        YAjustada = CLng(Y) - MinimaPosicionYVisible_279D 'ajusta la coordenada al principio de lo visible en Y
+        Dim PunteroBufferAlturas As Integer
+        Dim XAjustada As Integer
+        Dim YAjustada As Integer
+        Dim BufferAuxiliar As Boolean 'true: se usa el buffer secundario de 96F4
+        If PunteroBufferAlturas_2D8A <> &H01C0 Then BufferAuxiliar = True
+        YAjustada = CInt(Y) - MinimaPosicionYVisible_279D 'ajusta la coordenada al principio de lo visible en Y
         '3920
         If YAjustada < 0 Then Exit Sub 'si no es visible, sale
         '3921
@@ -2984,14 +3293,18 @@ Module ModAbadia
         '392f
         PunteroBufferAlturas = PunteroBufferAlturas + PunteroBufferAlturas_2D8A
         '3936
-        XAjustada = CLng(X) - MinimaPosicionXVisible_27A9
+        XAjustada = CInt(X) - MinimaPosicionXVisible_27A9
         '3939
         If XAjustada < 0 Then Exit Sub 'si no es visible, sale
         '393a
         If (XAjustada - &H18) >= 0 Then Exit Sub 'si no es visible, sale
         '393d
         PunteroBufferAlturas = PunteroBufferAlturas + XAjustada
-        TablaBufferAlturas_01C0(PunteroBufferAlturas - &H1C0) = Z
+        If Not BufferAuxiliar Then
+            TablaBufferAlturas_01C0(PunteroBufferAlturas - &H1C0) = Z
+        Else
+            TablaBufferAlturas_96F4(PunteroBufferAlturas - &H96F4) = Z
+        End If
         'If Y < MinimaPosicionYVisible_279D Or Y > (&H18 + MinimaPosicionYVisible_279D) Then Exit Sub 'si no es visible, sale
         'If X < MinimaPosicionXVisible_27A9 Or X > (&H18 + MinimaPosicionXVisible_27A9) Then Exit Sub 'si no es visible, sale
         'PunteroBufferAlturas = 24 * Y + X + PunteroBufferAlturas_2D8A
@@ -2999,9 +3312,9 @@ Module ModAbadia
     End Sub
 
     Sub InicializarObjetos_0D23()
-        Dim PunteroRutinaProcesarObjetos As Long
-        Dim PunteroSpritesObjetos As Long
-        Dim PunteroDatosObjetos As Long
+        Dim PunteroRutinaProcesarObjetos As Integer
+        Dim PunteroSpritesObjetos As Integer
+        Dim PunteroDatosObjetos As Integer
         PunteroRutinaProcesarObjetos = &HDBB 'rutina a la que saltar para procesar los objetos del juego
         PunteroSpritesObjetos = &H2F1B 'apunta a los sprites de los objetos del juego
         PunteroDatosObjetos = &H3008 'apunta a los datos de posición de los objetos del juego
@@ -3009,23 +3322,23 @@ Module ModAbadia
     End Sub
 
     Sub InicializarSpritesPuertas_0D30()
-        Dim PunteroRutinaProcesarPuertas As Long
-        Dim PunteroSpritesPuertas As Long
-        Dim PunteroDatosPuertas As Long
+        Dim PunteroRutinaProcesarPuertas As Integer
+        Dim PunteroSpritesPuertas As Integer
+        Dim PunteroDatosPuertas As Integer
         PunteroRutinaProcesarPuertas = &HDD2 'rutina a la que saltar para procesar los sprites de las puertas
         PunteroSpritesPuertas = &H2E8F 'apunta a los sprites de las puertas
         PunteroDatosPuertas = &H2FE4 'apunta a los datos de las puertas
         ProcesarObjetos_0D3B(PunteroRutinaProcesarPuertas, PunteroSpritesPuertas, PunteroDatosPuertas, False)
     End Sub
 
-    Sub ProcesarObjetos_0D3B(ByVal PunteroRutinaProcesarObjetos As Long, ByVal PunteroSpritesObjetosIX As Long, ByVal PunteroDatosObjetosIY As Long, ByVal ProcesarSoloUno As Boolean)
+    Sub ProcesarObjetos_0D3B(ByVal PunteroRutinaProcesarObjetos As Integer, ByVal PunteroSpritesObjetosIX As Integer, ByVal PunteroDatosObjetosIY As Integer, ByVal ProcesarSoloUno As Boolean)
         Dim Valor As Byte
         Dim Visible As Boolean
         Dim X As Byte
         Dim Y As Byte
         Dim Z As Byte
         Dim Yp As Byte
-        Dim PunteroSpritesObjetosIXAnterior As Long
+        Dim PunteroSpritesObjetosIXAnterior As Integer
         Do
             If PunteroDatosObjetosIY < &H3008 Then 'el puntero apunta a la tabla de puertas
                 Valor = TablaDatosPuertas_2FE4(PunteroDatosObjetosIY - &H2FE4) 'lee un byte y si encuentra 0xff termina
@@ -3054,7 +3367,7 @@ Module ModAbadia
         Loop
     End Sub
 
-    Function ObtenerCoordenadasObjeto_0E4C(ByVal PunteroSpritesObjetosIX As Long, ByVal PunteroDatosObjetosIY As Long, ByRef X As Byte, ByRef Y As Byte, ByRef Z As Byte, ByRef Yp As Byte) As Boolean
+    Function ObtenerCoordenadasObjeto_0E4C(ByVal PunteroSpritesObjetosIX As Integer, ByVal PunteroDatosObjetosIY As Integer, ByRef X As Byte, ByRef Y As Byte, ByRef Z As Byte, ByRef Yp As Byte) As Boolean
         'devuelve la posición la entidad en coordenadas de pantalla. Si no es visible sale con False
         'si es visible devuelve en Z la profundidad del sprite y en X,Y devuelve la posición en pantalla del sprite
         Dim Visible As Boolean
@@ -3068,18 +3381,39 @@ Module ModAbadia
         End If
     End Function
 
-    Function LeerDatoObjeto(ByVal PunteroDatosObjeto As Long) As Byte
-        'devuelve un valor de la tabla TablaDatosPuertas_2FE4 ó TablaPosicionObjetos_3008
-        If PunteroDatosObjeto < &H3008 Then 'el objeto es una puerta
-            LeerDatoObjeto = TablaDatosPuertas_2FE4(PunteroDatosObjeto - &H2FE4)
+    Function LeerBytePersonajeObjeto(ByVal PunteroDatosObjeto As Integer) As Byte
+        'devuelve un valor de la tabla TablaPosicionesAlternativas_0593,TablaDatosPuertas_2FE4, 
+        'TablaPosicionObjetos_3008, TablaCaracteristicasPersonajes_3036 ó TablaVariablesLogica_3C85
+        If PunteroDatosObjeto < &H2FE4 Then 'el objeto es una personaje en la tabla de alternativas
+            LeerBytePersonajeObjeto = TablaPosicionesAlternativas_0593(PunteroDatosObjeto - &H0593)
+        ElseIf PunteroDatosObjeto < &H3008 Then 'el objeto es una puerta
+            LeerBytePersonajeObjeto = TablaDatosPuertas_2FE4(PunteroDatosObjeto - &H2FE4)
         ElseIf PunteroDatosObjeto < &H3036 Then 'objetos del juego
-            LeerDatoObjeto = TablaPosicionObjetos_3008(PunteroDatosObjeto - &H3008)
-        Else 'personajes
-            LeerDatoObjeto = TablaCaracteristicasPersonajes_3036(PunteroDatosObjeto - &H3036)
+            LeerBytePersonajeObjeto = TablaPosicionObjetos_3008(PunteroDatosObjeto - &H3008)
+        ElseIf PunteroDatosObjeto < &H3C85 Then 'personajes
+            LeerBytePersonajeObjeto = TablaCaracteristicasPersonajes_3036(PunteroDatosObjeto - &H3036)
+        Else 'Posiciones predefinidas
+            LeerBytePersonajeObjeto = TablaVariablesLogica_3C85(PunteroDatosObjeto - &H3C85)
         End If
     End Function
 
-    Function LeerDatoGrafico(ByVal PunteroDatosGrafico As Long) As Byte
+    Sub EscribirBytePersonajeObjeto(ByVal PunteroDatosObjeto As Integer, ByVal Valor As Byte)
+        'devuelve un valor de la tabla TablaPosicionesAlternativas_0593,TablaDatosPuertas_2FE4, 
+        'TablaPosicionObjetos_3008, TablaCaracteristicasPersonajes_3036 ó TablaVariablesLogica_3C85
+        If PunteroDatosObjeto < &H2FE4 Then 'el objeto es una personaje en la tabla de alternativas
+            TablaPosicionesAlternativas_0593(PunteroDatosObjeto - &H0593) = Valor
+        ElseIf PunteroDatosObjeto < &H3008 Then 'el objeto es una puerta
+            TablaDatosPuertas_2FE4(PunteroDatosObjeto - &H2FE4) = Valor
+        ElseIf PunteroDatosObjeto < &H3036 Then 'objetos del juego
+            TablaPosicionObjetos_3008(PunteroDatosObjeto - &H3008) = Valor
+        ElseIf PunteroDatosObjeto < &H3C85 Then 'personajes
+            TablaCaracteristicasPersonajes_3036(PunteroDatosObjeto - &H3036) = Valor
+        Else 'Posiciones predefinidas
+            TablaVariablesLogica_3C85(PunteroDatosObjeto - &H3C85) = Valor
+        End If
+    End Sub
+
+    Function LeerDatoGrafico(ByVal PunteroDatosGrafico As Integer) As Byte
         'devuelve un valor de la tabla TilesAbadia_6D00, TablaGraficosObjetos_A300 ó DatosMonjes_AB59
         If PunteroDatosGrafico < &HA300& Then 'TilesAbadia_6D00
             LeerDatoGrafico = TilesAbadia_6D00(PunteroDatosGrafico - &H6D00)
@@ -3090,7 +3424,7 @@ Module ModAbadia
         End If
     End Function
 
-    Function LeerByteTablaCualquiera(ByVal Puntero As Long) As Byte
+    Function LeerByteTablaCualquiera(ByVal Puntero As Integer) As Byte
         'lee un byte que puede pertenecer a cualquier tabla. usado en los errores de overflow del programa original
         If PunteroPerteneceTabla(Puntero, TablaBufferAlturas_01C0, &H1C0&) Then
             LeerByteTablaCualquiera = TablaBufferAlturas_01C0(Puntero - &H1C0&)
@@ -3161,21 +3495,21 @@ Module ModAbadia
         If PunteroPerteneceTabla(Puntero, TablaVariablesLogica_3C85, &H3C85&) Then
             LeerByteTablaCualquiera = TablaVariablesLogica_3C85(Puntero - &H3C85&)
         End If
-        If PunteroPerteneceTabla(Puntero, TablaPosicionesPredefinidasMalaquias_3CA8, &H3CA8&) Then
-            LeerByteTablaCualquiera = TablaPosicionesPredefinidasMalaquias_3CA8(Puntero - &H3CA8&)
-        End If
-        If PunteroPerteneceTabla(Puntero, TablaPosicionesPredefinidasAbad_3CC6, &H3CC6&) Then
-            LeerByteTablaCualquiera = TablaPosicionesPredefinidasAbad_3CC6(Puntero - &H3CC6&)
-        End If
-        If PunteroPerteneceTabla(Puntero, TablaPosicionesPredefinidasBerengario_3CE7, &H3CE7&) Then
-            LeerByteTablaCualquiera = TablaPosicionesPredefinidasBerengario_3CE7(Puntero - &H3CE7&)
-        End If
-        If PunteroPerteneceTabla(Puntero, TablaPosicionesPredefinidasSeverino_3CFF, &H3CFF&) Then
-            LeerByteTablaCualquiera = TablaPosicionesPredefinidasSeverino_3CFF(Puntero - &H3CFF&)
-        End If
-        If PunteroPerteneceTabla(Puntero, TablaPosicionesPredefinidasAdso_3D11, &H3D11&) Then
-            LeerByteTablaCualquiera = TablaPosicionesPredefinidasAdso_3D11(Puntero - &H3D11&)
-        End If
+        'If PunteroPerteneceTabla(Puntero, TablaPosicionesPredefinidasMalaquias_3CA8, &H3CA8&) Then
+        'LeerByteTablaCualquiera = TablaPosicionesPredefinidasMalaquias_3CA8(Puntero - &H3CA8&)
+        'End If
+        'If PunteroPerteneceTabla(Puntero, TablaPosicionesPredefinidasAbad_3CC6, &H3CC6&) Then
+        'LeerByteTablaCualquiera = TablaPosicionesPredefinidasAbad_3CC6(Puntero - &H3CC6&)
+        'End If
+        'If PunteroPerteneceTabla(Puntero, TablaPosicionesPredefinidasBerengario_3CE7, &H3CE7&) Then
+        'LeerByteTablaCualquiera = TablaPosicionesPredefinidasBerengario_3CE7(Puntero - &H3CE7&)
+        'End If
+        'If PunteroPerteneceTabla(Puntero, TablaPosicionesPredefinidasSeverino_3CFF, &H3CFF&) Then
+        'LeerByteTablaCualquiera = TablaPosicionesPredefinidasSeverino_3CFF(Puntero - &H3CFF&)
+        'End If
+        'If PunteroPerteneceTabla(Puntero, TablaPosicionesPredefinidasAdso_3D11, &H3D11&) Then
+        'LeerByteTablaCualquiera = TablaPosicionesPredefinidasAdso_3D11(Puntero - &H3D11&)
+        'End If
         If PunteroPerteneceTabla(Puntero, TablaPunterosVariablesScript_3D1D, &H3D1D&) Then
             LeerByteTablaCualquiera = TablaPunterosVariablesScript_3D1D(Puntero - &H3D1D&)
         End If
@@ -3221,6 +3555,10 @@ Module ModAbadia
         If PunteroPerteneceTabla(Puntero, BufferSprites_9500, &H9500&) Then
             LeerByteTablaCualquiera = BufferSprites_9500(Puntero - &H9500&)
         End If
+        'If PunteroPerteneceTabla(Puntero, TablaBufferAlturas_96F4, &H96F4) Then 'esta tabla se solapa con el buffer de sprites
+        ' LeerByteTablaCualquiera = TablaBufferAlturas_96F4(Puntero - &H96F4)
+        ' End If
+
         If PunteroPerteneceTabla(Puntero, TablasAndOr_9D00, &H9D00&) Then
             LeerByteTablaCualquiera = TablasAndOr_9D00(Puntero - &H9D00&)
         End If
@@ -3240,20 +3578,20 @@ Module ModAbadia
 
 
 
-    Function ProcesarObjeto_2ADD(ByVal PunteroSpritesObjetosIX As Long, ByVal PunteroDatosObjetosIY As Long, ByRef X As Byte, ByRef Y As Byte, ByRef Z As Byte, ByRef Yp As Byte) As Boolean
+    Function ProcesarObjeto_2ADD(ByVal PunteroSpritesObjetosIX As Integer, ByVal PunteroDatosObjetosIY As Integer, ByRef X As Byte, ByRef Y As Byte, ByRef Z As Byte, ByRef Yp As Byte) As Boolean
         'comprueba si el sprite está dentro de la zona visible de pantalla.
         'Si no es así, sale. Si está dentro de la zona visible lo transforma
         'a otro sistema de coordenadas. Dependiendo de un parámetro sigue o no.
         'Si sigue actualiza la posición según la orientación
         'si no es visible, sale. Si es visible, sale 2 veces (2 pop de pila)
-        Dim ValorX As Long
-        Dim ValorY As Long
+        Dim ValorX As Integer
+        Dim ValorY As Integer
         Dim ValorZ As Byte
         Dim AlturaBase As Byte
         'If PunteroDatosObjetosIY = &H3036 Then Stop
-        ValorX = CLng(LeerDatoObjeto(PunteroDatosObjetosIY + 2)) - LimiteInferiorVisibleX_2AE1
-        ValorY = CLng(LeerDatoObjeto(PunteroDatosObjetosIY + 3)) - LimiteInferiorVisibleY_2AEB
-        ValorZ = LeerDatoObjeto(PunteroDatosObjetosIY + 4)
+        ValorX = CInt(LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 2)) - LimiteInferiorVisibleX_2AE1
+        ValorY = CInt(LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 3)) - LimiteInferiorVisibleY_2AEB
+        ValorZ = LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 4)
         If ValorX < 0 Or ValorX > &H28 Then 'si el objeto en X es < limite inferior visible de X o el objeto en X es >= limite superior visible de X, sale
             ProcesarObjeto_2ADD = False
             Exit Function
@@ -3290,9 +3628,9 @@ Module ModAbadia
         TablaSprites_2E17(PunteroSpritesObjetosIX + &H13 - &H2E17) = Y 'graba las nuevas coordenadas x e y en el sprite
         '2b09
         'convierte las coordenadas en la rejilla a coordenadas de pantalla
-        Dim Xcalc As Long
-        Dim Ycalc As Long
-        Dim Ypantalla As Long
+        Dim Xcalc As Integer
+        Dim Ycalc As Integer
+        Dim Ypantalla As Integer
         '2b09
         Ycalc = X + Y 'pos x + pos y = coordenada y en pantalla
         '2B0B
@@ -3312,7 +3650,7 @@ Module ModAbadia
         'llega aquí si la y calc está entre 8 y 57
         '2b17
         Ycalc = 4 * (Ycalc + 1)
-        Xcalc = 2 * (CLng(X) - CLng(Y)) + &H50 - &H28
+        Xcalc = 2 * (CInt(X) - CInt(Y)) + &H50 - &H28
         If Xcalc < 0 Then Exit Function
         If Xcalc >= &H50 Then Exit Function
         '2b26
@@ -3333,10 +3671,10 @@ Module ModAbadia
         Dim Subiendo As Boolean 'true si está subiendo escaleras, false si está bajando
         Entrada = 0 'primera entrada
         PruebaEntrada = 0
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 5) And &H80) <> 0 Then Ocupa1Posicion = True
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 0) And 1) = 0 Then MovimientoPar = True 'lee el bit 0 del contador de animación
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 5) And 32) = 0 Then OrientadoEscaleras = True
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 5) And &H10) = 0 Then Subiendo = True
+        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And &H80) <> 0 Then Ocupa1Posicion = True
+        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 0) And 1) = 0 Then MovimientoPar = True 'lee el bit 0 del contador de animación
+        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And 32) = 0 Then OrientadoEscaleras = True
+        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And &H10) = 0 Then Subiendo = True
         If Ocupa1Posicion Then
             PruebaEntrada = PruebaEntrada + 2
             If Not OrientadoEscaleras Then
@@ -3355,30 +3693,30 @@ Module ModAbadia
 
 
 
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 5) And &H80) <> 0 Then
+        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And &H80) <> 0 Then
             GoTo H2B78 'si el personaje ocupa una posición
         Else
             GoTo H2B3A
         End If
 
 H2B3A:
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 0) And 1) = 0 Then 'lee el bit 0 del contador de animación '5?
+        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 0) And 1) = 0 Then 'lee el bit 0 del contador de animación '5?
             GoTo H2B41 'si es 1, avanza a la siguiente entrada
         Else
             Entrada = Entrada + 1
         End If
 
 H2B41:
-        Dim Puntero As Long
+        Dim Puntero As Integer
         Dim Orientacion As Byte
-        Dim Desplazamiento As Long
+        Dim Desplazamiento As Integer
 
         Dim nose As String
         FrmPrincipal.TextBox1.Text = CStr(Entrada)
         Entradas(Entrada) = True
 
         If Entrada <> PruebaEntrada Then Stop
-        Orientacion = ModificarOrientacion_2480(LeerDatoObjeto(PunteroDatosObjetosIY + 1)) 'obtiene la orientación del personaje. modifica la orientación que se le pasa en a con la orientación de la pantalla actual
+        Orientacion = ModificarOrientacion_2480(LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 1)) 'obtiene la orientación del personaje. modifica la orientación que se le pasa en a con la orientación de la pantalla actual
         '2b4b
         Puntero = (shl(Orientacion, 4) And &H30) + 2 * Entrada + PunteroTablaDesplazamientoAnimacion_2D84
         '2b58
@@ -3412,207 +3750,34 @@ H2B41:
 H2B78:
         'aquí llega si el personaje ocupa una posición (porque está en los escalones)
         Entrada = Entrada + 2 'avanza a la tercera entrada
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 5) And 32) <> 0 Then
+        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And 32) <> 0 Then
             GoTo H2B3A
         End If
         Entrada = Entrada + 2 'avanza a la quinta entrada
 
 H2B82:
         'aquí llega si el personaje ocupa una posición y está orientado para subir o bajar las escaleras (ya está apuntando a la 5ª entrada)
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 5) And &H3) <> 0 Then
+        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And &H3) <> 0 Then
             GoTo H2B99  'esto nunca pasa???
         End If
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 0) And &H1) = 0 Then GoTo H2B41
+        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 0) And &H1) = 0 Then GoTo H2B41
         Entrada = Entrada + 1 'avanza una entrada
 
 H2B90:
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 5) And &H10) = 0 Then GoTo H2B41
+        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And &H10) = 0 Then GoTo H2B41
         Entrada = Entrada + 1 'avanza una entrada
         GoTo H2B41
 
 H2B99:
         '??? cuando llega aquí???
         Entrada = Entrada + 3 'avanza a la octava entrada
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 5) And &H40) <> 0 Then GoTo H2BA6
+        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And &H40) <> 0 Then GoTo H2BA6
         Entrada = Entrada + 4 'avanza a la 12ª entrada
 H2BA6:
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 5) And &H3) <> 1 Then GoTo H2B90  'si los bits 0 y 1 de (iy+05) != 1, salta (entrada 12 o 13)
+        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And &H3) <> 1 Then GoTo H2B90  'si los bits 0 y 1 de (iy+05) != 1, salta (entrada 12 o 13)
         Entrada = Entrada + 2 'avanza a la 14ª entrada
         GoTo H2B90
     End Function
-
-    Function ProcesarObjeto_2ADD_2(ByVal PunteroSpritesObjetosIX As Long, ByVal PunteroDatosObjetosIY As Long, ByRef X As Byte, ByRef Y As Byte, ByRef Z As Byte, ByRef Yp As Byte) As Boolean
-        'comprueba si el sprite está dentro de la zona visible de pantalla.
-        'Si no es así, sale. Si está dentro de la zona visible lo transforma
-        'a otro sistema de coordenadas. Dependiendo de un parámetro sigue o no.
-        'Si sigue actualiza la posición según la orientación
-        'si no es visible, sale. Si es visible, sale 2 veces (2 pop de pila)
-        Dim ValorX As Long
-        Dim ValorY As Long
-        Dim ValorZ As Byte
-        Dim AlturaBase As Byte
-        'If PunteroDatosObjetosIY = &H3036 Then Stop
-        ValorX = CLng(LeerDatoObjeto(PunteroDatosObjetosIY + 2)) - LimiteInferiorVisibleX_2AE1
-        ValorY = CLng(LeerDatoObjeto(PunteroDatosObjetosIY + 3)) - LimiteInferiorVisibleY_2AEB
-        ValorZ = LeerDatoObjeto(PunteroDatosObjetosIY + 4)
-        If ValorX < 0 Or ValorX > &H28 Then 'si el objeto en X es < limite inferior visible de X o el objeto en X es >= limite superior visible de X, sale
-            ProcesarObjeto_2ADD_2 = False
-            Exit Function
-        End If
-        If ValorY < 0 Or ValorY > &H28 Then 'si el objeto en Y es < limite inferior visible de Y o el objeto en Y es >= limite superior visible de Y, sale
-            ProcesarObjeto_2ADD_2 = False
-            Exit Function
-        End If
-        '2af4
-        AlturaBase = LeerAlturaBasePlanta_2473(ValorZ) 'dependiendo de la altura, devuelve la altura base de la planta
-        If AlturaBase <> AlturaBasePlantaActual_2AF9 Then 'si el objeto no está en la misma planta, sale
-            ProcesarObjeto_2ADD_2 = False
-            Exit Function
-        End If
-        X = CByte(ValorX) 'coordenada X del objeto en la pantalla
-        Y = CByte(ValorY) 'coordenada Y del objeto en la pantalla
-        Z = ValorZ - AlturaBase 'altura del objeto ajustada para esta pantalla
-        '2b00
-        'al llegar aquí los parámetros son:
-        'X = coordenada X del objeto en la rejilla
-        'Y = coordenada Y del objeto en la rejilla
-        'Z = altura del objeto en la rejilla ajustada para esta planta
-        Select Case RutinaCambioCoordenadas_2B01 'rutina que cambia el sistema de coordenadas dependiendo de la orientación de la pantalla
-            Case Is = &H248A
-                CambiarCoordenadasOrientacion0_248A(X, Y)
-            Case Is = &H2485
-                CambiarCoordenadasOrientacion1_2485(X, Y)
-            Case Is = &H248B
-                CambiarCoordenadasOrientacion2_248B(X, Y)
-            Case Is = &H2494
-                CambiarCoordenadasOrientacion3_2494(X, Y)
-        End Select
-        TablaSprites_2E17(PunteroSpritesObjetosIX + &H12 - &H2E17) = X 'graba las nuevas coordenadas x e y en el sprite
-        TablaSprites_2E17(PunteroSpritesObjetosIX + &H13 - &H2E17) = Y 'graba las nuevas coordenadas x e y en el sprite
-        '2b09
-        'convierte las coordenadas en la rejilla a coordenadas de pantalla
-        Dim Xcalc As Long
-        Dim Ycalc As Long
-        Dim Ypantalla As Long
-        '2b09
-        Ycalc = X + Y 'pos x + pos y = coordenada y en pantalla
-        '2B0B
-        Ypantalla = Ycalc
-        '2B0C
-        Ycalc = Ycalc - Z 'le resta la altura (cuanto más alto es el objeto, menor y tiene en pantalla)
-        '2B0D
-        If Ycalc < 0 Then Exit Function
-        '2B0E
-        Ycalc = Ycalc - 6 'y calc = y calc - 6 (traslada 6 unidades arriba)
-        '2b10
-        If Ycalc < 0 Then Exit Function 'si y calc < 0, sale
-        '2b11
-        If Ycalc < 8 Then Exit Function 'si y calc < 8, sale
-        '2b14
-        If Ycalc >= &H3A Then Exit Function 'si y calc  >= 58, sale
-        'llega aquí si la y calc está entre 8 y 57
-        '2b17
-        Ycalc = 4 * (Ycalc + 1)
-        Xcalc = 2 * (CLng(X) - CLng(Y)) + &H50 - &H28
-        If Xcalc < 0 Then Exit Function
-        If Xcalc >= &H50 Then Exit Function
-        '2b26
-        X = CByte(Xcalc) 'pos x con nuevo sistema de coordenadas
-        Y = CByte(Ycalc) 'pos y con nuevo sistema de coordenadas
-        ProcesarObjeto_2ADD_2 = True 'el objeto es visible
-        Ypantalla = Ypantalla - &H10
-        If Ypantalla < 0 Then Ypantalla = 0 'si la posición en y < 16, pos y = 0
-        Yp = Long2Byte(Ypantalla)
-        If Not ModificarPosicionSpritePantalla_2B2F Then Exit Function
-        'si llega aquí modifica la posición del sprite en pantalla
-        '2B30
-        Dim Entrada As Byte
-        Entrada = 0 'primera entrada
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 5) And &H80) <> 0 Then
-            GoTo H2B78 'si el personaje ocupa una posición
-        Else
-            GoTo H2B3A
-        End If
-
-H2B3A:
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 0) And 1) = 0 Then 'lee el bit 0 del contador de animación '5?
-            GoTo H2B41 'si es 1, avanza a la siguiente entrada
-        Else
-            Entrada = Entrada + 1
-        End If
-
-H2B41:
-        Dim Puntero As Long
-        Dim Orientacion As Byte
-        Dim Desplazamiento As Long
-
-        Dim nose As String
-
-        Entradas(Entrada) = True
-
-        Orientacion = ModificarOrientacion_2480(LeerDatoObjeto(PunteroDatosObjetosIY + 1)) 'obtiene la orientación del personaje. modifica la orientación que se le pasa en a con la orientación de la pantalla actual
-        '2b4b
-        Puntero = (shl(Orientacion, 4) And &H30) + 2 * Entrada + PunteroTablaDesplazamientoAnimacion_2D84
-        '2b58
-        'Desplazamiento = TablaDesplazamientoAnimacion_309F(Puntero - &H309F) 'lee un byte de la tabla
-        Desplazamiento = Leer8Signo(TablaDesplazamientoAnimacion_309F, Puntero - &H309F) 'lee un byte de la tabla
-        '2b59
-        Desplazamiento = Desplazamiento + X 'le suma la x del nuevo sistema de coordenadas
-        '2b5a
-        'Desplazamiento = Desplazamiento - (256 - LeerDatoObjeto(PunteroDatosObjetosIY + 7)) 'le suma un desplazamieno
-        Desplazamiento = Desplazamiento + Leer8Signo(TablaCaracteristicasPersonajes_3036, PunteroDatosObjetosIY + 7 - &H3036) 'le suma un desplazamieno
-        If Desplazamiento >= 0 Then
-            X = Desplazamiento 'actualiza la x
-        Else
-            X = 256 + Desplazamiento 'no deberían aparecer coordenadas negativas. bug del original?
-        End If
-        Puntero = Puntero + 1
-        'Desplazamiento = TablaDesplazamientoAnimacion_309F(Puntero - &H309F) 'lee un byte de la tabla
-        Desplazamiento = Leer8Signo(TablaDesplazamientoAnimacion_309F, Puntero - &H309F) 'lee un byte de la tabla
-        Desplazamiento = Desplazamiento + Y 'le suma la Y del nuevo sistema de coordenadas
-        'Desplazamiento = Desplazamiento - (256 - LeerDatoObjeto(PunteroDatosObjetosIY + 8)) 'le suma un desplazamieno
-        Desplazamiento = Desplazamiento + Leer8Signo(TablaCaracteristicasPersonajes_3036, PunteroDatosObjetosIY + 8 - &H3036) 'le suma un desplazamieno
-        Y = Desplazamiento 'actualiza la Y
-        TablaSprites_2E17(PunteroSpritesObjetosIX + 1 - &H2E17) = X 'graba la posición x del sprite (en bytes)
-        TablaSprites_2E17(PunteroSpritesObjetosIX + 2 - &H2E17) = Y 'graba la posición y del sprite (en pixels)
-        If TablaSprites_2E17(PunteroSpritesObjetosIX + 0 - &H2E17) <> &HFE Then Exit Function
-        'si el sprite no es visible, continua
-        TablaSprites_2E17(PunteroSpritesObjetosIX + 3 - &H2E17) = X 'graba la posición anterior x del sprite (en bytes)
-        TablaSprites_2E17(PunteroSpritesObjetosIX + 4 - &H2E17) = Y 'graba la posición anterior y del sprite (en pixels)
-        Exit Function
-
-H2B78:
-        'aquí llega si el personaje ocupa una posición (porque está en los escalones)
-        Entrada = Entrada + 2 'avanza a la tercera entrada
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 5) And 32) <> 0 Then
-            GoTo H2B3A
-        End If
-        Entrada = Entrada + 2 'avanza a la quinta entrada
-
-H2B82:
-        'aquí llega si el personaje ocupa una posición y está orientado para subir o bajar las escaleras (ya está apuntando a la 5ª entrada)
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 5) And &H3) <> 0 Then
-            GoTo H2B99  'esto nunca pasa???
-        End If
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 0) And &H1) = 0 Then GoTo H2B41
-        Entrada = Entrada + 1 'avanza una entrada
-
-H2B90:
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 5) And &H10) = 0 Then GoTo H2B41
-        Entrada = Entrada + 1 'avanza una entrada
-        GoTo H2B41
-
-H2B99:
-        '??? cuando llega aquí???
-        Entrada = Entrada + 3 'avanza a la octava entrada
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 5) And &H40) <> 0 Then GoTo H2BA6
-        Entrada = Entrada + 4 'avanza a la 12ª entrada
-H2BA6:
-        If (LeerDatoObjeto(PunteroDatosObjetosIY + 5) And &H3) <> 1 Then GoTo H2B90  'si los bits 0 y 1 de (iy+05) != 1, salta (entrada 12 o 13)
-        Entrada = Entrada + 2 'avanza a la 14ª entrada
-        GoTo H2B90
-    End Function
-
 
     Sub CambiarCoordenadasOrientacion0_248A(ByRef X As Byte, ByRef Y As Byte)
         'realiza el cambio de coordenadas si la orientación la cámara es del tipo 0
@@ -3643,8 +3808,8 @@ H2BA6:
 
     Function ModificarOrientacion_2480(ByVal Orientacion As Byte) As Byte
         'modifica la orientación que se le pasa en a con la orientación de la pantalla actual
-        Dim Resultado As Long
-        Resultado = (CLng(Orientacion) - OrientacionPantalla_2481) And &H3
+        Dim Resultado As Integer
+        Resultado = (CInt(Orientacion) - OrientacionPantalla_2481) And &H3
         ModificarOrientacion_2480 = Long2Byte(Resultado)
         'If Orientacion < OrientacionPantalla_2481 Then
         '    ModificarOrientacion_2480 = 3
@@ -3653,7 +3818,7 @@ H2BA6:
         'ModificarOrientacion_2480 = (Orientacion - OrientacionPantalla_2481) And &H3
     End Function
 
-    Sub ProcesarPuertaVisible_0DD2(ByVal PunteroSpriteIX As Long, ByVal PunteroDatosIY As Long, ByVal X As Byte, ByVal Y As Byte, ByVal Z As Byte)
+    Sub ProcesarPuertaVisible_0DD2(ByVal PunteroSpriteIX As Integer, ByVal PunteroDatosIY As Integer, ByVal X As Byte, ByVal Y As Byte, ByVal Z As Byte)
         'rutina llamada cuando las puertas son visibles en la pantalla actual
         'se encarga de modificar la posición del sprite según la orientación, modificar el buffer de alturas para indicar si se puede pasar
         'por la zona de la puerta o no, colocar el gráfico de las puertas y modificar 0x2daf
@@ -3661,13 +3826,15 @@ H2BA6:
         'PunteroDatos apunta a los datos de la puerta
         'X,Y contienen la posición en pantalla del objeto
         'Z tiene la profundidad de la puerta en pantalla
-        Dim DeltaX As Long
-        Dim DeltaY As Long
-        Dim DeltaBuffer As Long
+        Dim DeltaX As Integer
+        Dim DeltaY As Integer
+        Dim DeltaBuffer As Integer
         Dim Orientacion As Byte
-        Dim TablaDesplazamientoOrientacionPuertas_05AD(31) As Long
-        Dim Valor As Long
-        Dim PunteroBufferAlturasIX As Long
+        Dim TablaDesplazamientoOrientacionPuertas_05AD(31) As Integer
+        Dim Valor As Integer
+        Dim PunteroBufferAlturasIX As Integer
+        Dim BufferAuxiliar As Boolean 'true: se usa el buffer secundario de 96F4
+        If PunteroBufferAlturas_2D8A <> &H01C0 Then BufferAuxiliar = True
         'tabla de desplazamientos relacionada con las orientaciones de las puertas
         'cada entrada ocupa 8 bytes
         'byte 0: relacionado con la posición x de pantalla
@@ -3734,12 +3901,18 @@ H2BA6:
         TablaSprites_2E17(PunteroSpriteIX + 8 - &H2E17) = &HAA
         'si el objeto no es visible, sale. En otro caso, devuelve en ix un puntero a la entrada de la tabla de alturas de la posición correspondiente
         If Not LeerDesplazamientoPuerta_0E2C(PunteroBufferAlturasIX, PunteroDatosIY, DeltaBuffer) Then Exit Sub
-        TablaBufferAlturas_01C0(PunteroBufferAlturasIX) = &HF 'marca la altura de esta posición del buffer de alturas
-        TablaBufferAlturas_01C0(PunteroBufferAlturasIX + DeltaBuffer) = &HF 'marca la altura de la siguiente posición del buffer de alturas
-        TablaBufferAlturas_01C0(PunteroBufferAlturasIX + 2 * DeltaBuffer) = &HF 'marca la altura de la siguiente posición del buffer de alturas
+        If Not BufferAuxiliar Then
+            TablaBufferAlturas_01C0(PunteroBufferAlturasIX - &H01C0) = &HF 'marca la altura de esta posición del buffer de alturas
+            TablaBufferAlturas_01C0(PunteroBufferAlturasIX + DeltaBuffer - &H01C0) = &HF 'marca la altura de la siguiente posición del buffer de alturas
+            TablaBufferAlturas_01C0(PunteroBufferAlturasIX + 2 * DeltaBuffer - &H01C0) = &HF 'marca la altura de la siguiente posición del buffer de alturas
+        Else
+            TablaBufferAlturas_96F4(PunteroBufferAlturasIX - &H96F4) = &HF 'marca la altura de esta posición del buffer de alturas
+            TablaBufferAlturas_96F4(PunteroBufferAlturasIX + DeltaBuffer - &H96F4) = &HF 'marca la altura de la siguiente posición del buffer de alturas
+            TablaBufferAlturas_96F4(PunteroBufferAlturasIX + 2 * DeltaBuffer - &H96F4) = &HF 'marca la altura de la siguiente posición del buffer de alturas
+        End If
     End Sub
 
-    Sub DefinirDatosSpriteComoAntiguos_2AB0(ByVal PunteroSpriteIX As Long)
+    Sub DefinirDatosSpriteComoAntiguos_2AB0(ByVal PunteroSpriteIX As Integer)
         'pone la posición y dimensiones actuales como posición y dimensiones antiguas
         'copia la posición actual en x y en y como la posición antigua
         TablaSprites_2E17(PunteroSpriteIX + 3 - &H2E17) = TablaSprites_2E17(PunteroSpriteIX + 1 - &H2E17)
@@ -3749,10 +3922,10 @@ H2BA6:
         TablaSprites_2E17(PunteroSpriteIX + 10 - &H2E17) = TablaSprites_2E17(PunteroSpriteIX + 6 - &H2E17)
     End Sub
 
-    Sub LeerOrientacionPuerta_0E7C(ByVal PunteroSpriteIX As Long, ByRef DeltaX As Long, ByRef DeltaY As Long)
+    Sub LeerOrientacionPuerta_0E7C(ByVal PunteroSpriteIX As Integer, ByRef DeltaX As Integer, ByRef DeltaY As Integer)
         'lee en DeltaX, DeltaY 2 valores relacionados con la orientación y modifica la posición del sprite (en coordenadas locales) según la orientación
         'PunteroSprite apunta al sprite de una puerta
-        Dim TablaDesplazamientoOrientacionPuertas_0E9D(15) As Long
+        Dim TablaDesplazamientoOrientacionPuertas_0E9D(15) As Integer
         Dim Orientacion As Byte
         'tabla relacionada con el desplazamiento de las puertas y la orientación
         'cada entrada ocupa 4 bytes
@@ -3782,16 +3955,16 @@ H2BA6:
         DeltaX = TablaDesplazamientoOrientacionPuertas_0E9D(Orientacion * 4)
         DeltaY = TablaDesplazamientoOrientacionPuertas_0E9D(Orientacion * 4 + 1)
         ' modifica la posición x de la rejilla según la orientación de la cámara con el valor leido
-        TablaSprites_2E17(PunteroSpriteIX + &H12 - &H2E17) = CByte(CLng(TablaSprites_2E17(PunteroSpriteIX + &H12 - &H2E17)) + TablaDesplazamientoOrientacionPuertas_0E9D(Orientacion * 4 + 2))
-        TablaSprites_2E17(PunteroSpriteIX + &H13 - &H2E17) = CByte(CLng(TablaSprites_2E17(PunteroSpriteIX + &H13 - &H2E17)) + TablaDesplazamientoOrientacionPuertas_0E9D(Orientacion * 4 + 3))
+        TablaSprites_2E17(PunteroSpriteIX + &H12 - &H2E17) = CByte(CInt(TablaSprites_2E17(PunteroSpriteIX + &H12 - &H2E17)) + TablaDesplazamientoOrientacionPuertas_0E9D(Orientacion * 4 + 2))
+        TablaSprites_2E17(PunteroSpriteIX + &H13 - &H2E17) = CByte(CInt(TablaSprites_2E17(PunteroSpriteIX + &H13 - &H2E17)) + TablaDesplazamientoOrientacionPuertas_0E9D(Orientacion * 4 + 3))
     End Sub
 
-    Function LeerDesplazamientoPuerta_0E2C(ByRef PunteroBufferAlturasIX As Long, ByVal PunteroDatosIY As Long, ByRef DeltaBuffer As Long) As Boolean
+    Function LeerDesplazamientoPuerta_0E2C(ByRef PunteroBufferAlturasIX As Integer, ByVal PunteroDatosIY As Integer, ByRef DeltaBuffer As Integer) As Boolean
         'lee en DeltaBuffer el desplazamiento para el buffer de alturas, y si la puerta es visible devuelve en PunteroBufferAlturasIX un puntero a la entrada de la tabla de alturas de la posición correspondiente
         'DeltaBuffer=incremento entre posiciones marcadas en el buffer de alturas
         'devuelve true si el elemento ocupa una posición central
         Dim Orientacion As Byte
-        Dim TablaDesplazamientosBufferPuertas(3) As Long
+        Dim TablaDesplazamientosBufferPuertas(3) As Integer
         'tabla de desplazamientos en el buffer de alturas relacionada con la orientación de las puertas
         '0E44:   0001 -> +01
         '        FFE8 -> -24
@@ -3801,7 +3974,7 @@ H2BA6:
         TablaDesplazamientosBufferPuertas(1) = -24
         TablaDesplazamientosBufferPuertas(2) = -1
         TablaDesplazamientosBufferPuertas(3) = 24
-        Orientacion = LeerDatoObjeto(PunteroDatosIY + 0)  'obtiene la orientación de la puerta
+        Orientacion = LeerBytePersonajeObjeto(PunteroDatosIY + 0)  'obtiene la orientación de la puerta
         Orientacion = Orientacion And &H3
         'Orientacion = Orientacion * 2 'cada entrada ocupa 2 bytes
         'DeltaX = TablaDesplazamientosBufferPuertas(Orientacion)
@@ -3810,7 +3983,7 @@ H2BA6:
         LeerDesplazamientoPuerta_0E2C = DeterminarPosicionCentral_0CBE(PunteroDatosIY, PunteroBufferAlturasIX)
     End Function
 
-    Function DeterminarPosicionCentral_0CBE(ByVal PunteroDatosIY As Long, ByRef PunteroBufferAlturasIX As Long) As Boolean
+    Function DeterminarPosicionCentral_0CBE(ByVal PunteroDatosIY As Integer, ByRef PunteroBufferAlturasIX As Integer) As Boolean
         'si la posición no es una de las del centro de la pantalla o la altura del personaje no coincide con la altura base de la planta, sale con false
         'en otro caso, devuelve en PunteroBufferAlturasIX un puntero a la entrada de la tabla de alturas de la posición correspondiente
         'llamado con PunteroDatosIY = dirección de los datos de posición asociados al personaje/objeto
@@ -3818,14 +3991,14 @@ H2BA6:
         Dim AlturaBase As Byte
         Dim X As Byte
         Dim Y As Byte
-        Altura = LeerDatoObjeto(PunteroDatosIY + 4) 'obtiene la altura del personaje
+        Altura = LeerBytePersonajeObjeto(PunteroDatosIY + 4) 'obtiene la altura del personaje
         AlturaBase = LeerAlturaBasePlanta_2473(Altura) 'dependiendo de la altura, devuelve la altura base de la planta
         If AlturaBasePlantaActual_2DBA <> AlturaBase Then Exit Function 'si las alturas son distintas, sale con false
-        X = LeerDatoObjeto(PunteroDatosIY + 2) 'posición x del personaje
-        Y = LeerDatoObjeto(PunteroDatosIY + 3) 'posición y del personaje
+        X = LeerBytePersonajeObjeto(PunteroDatosIY + 2) 'posición x del personaje
+        Y = LeerBytePersonajeObjeto(PunteroDatosIY + 3) 'posición y del personaje
         If Not DeterminarPosicionCentral_279B(X, Y) Then Exit Function 'ajusta la posición pasada en X,Y a las 20x20 posiciones centrales que se muestran. Si la posición está fuera, sale
         DeterminarPosicionCentral_0CBE = True 'visible
-        PunteroBufferAlturasIX = 24 * Y + X
+        PunteroBufferAlturasIX = PunteroBufferAlturas_2D8A + 24 * Y + X
     End Function
 
     Function DeterminarPosicionCentral_279B(ByRef X As Byte, ByRef Y As Byte) As Boolean
@@ -3841,14 +4014,15 @@ H2BA6:
         DeterminarPosicionCentral_279B = True
     End Function
 
-    Sub ProcesarObjetoVisible_0DBB(ByVal PunteroSpriteIX As Long, ByVal PunteroDatosIY As Long, ByVal X As Byte, ByVal Y As Byte, ByVal Z As Byte)
+    Sub ProcesarObjetoVisible_0DBB(ByVal PunteroSpriteIX As Integer, ByVal PunteroDatosIY As Integer, ByVal X As Byte, ByVal Y As Byte, ByVal Z As Byte)
         'rutina llamada cuando los objetos del juego son visibles en la pantalla actual
         'si no se dibujaba el objeto, ajusta la posición y lo marca para que se dibuje
         'PunteroSpriteIX apunta al sprite del objeto
         'PunteroDatosIY apunta a los datos del objeto
         'X,Y continene la posición en pantalla del objeto
         'X = la coordenada y del sprite en pantalla (-16)
-        If (TablaPosicionObjetos_3008(PunteroDatosIY - &H3008) And &H80) <> 0 Then Exit Sub 'si el objeto ya se ha cogido, sale
+        'If (TablaPosicionObjetos_3008(PunteroDatosIY - &H3008) And &H80) <> 0 Then Exit Sub 'si el objeto ya se ha cogido, sale
+        If ModFunciones.LeerBitArray(TablaPosicionObjetos_3008, PunteroDatosIY - &H3008, 7) Then Exit Sub 'si el objeto ya se ha cogido, sale
         TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = Z Or &H80  'indica que hay que pintar el objeto y actualiza la profundidad del objeto dentro del buffer de tiles
         TablaSprites_2E17(PunteroSpriteIX + 2 - &H2E17) = Y - 8  'modifica la posición y del objeto (-8 pixels)
         If X >= 2 Then
@@ -3858,11 +4032,11 @@ H2BA6:
         End If
     End Sub
 
-    Sub ProcesarPersonaje_2468(ByVal PunteroSpritePersonajeIX As Long, ByVal PunteroDatosPersonajeIY As Long, ByVal PunteroDatosPersonajeHL As Long)
+    Sub ProcesarPersonaje_2468(ByVal PunteroSpritePersonajeIX As Integer, ByVal PunteroDatosPersonajeIY As Integer, ByVal PunteroDatosPersonajeHL As Integer)
         'procesa los datos del personaje para cambiar la animación y posición del sprite
         'PunteroSpritePersonajeIX = dirección del sprite correspondiente
         'PunteroDatosPersonajeIY = datos de posición del personaje correspondiente
-        Dim PunteroTablaAnimaciones As Long
+        Dim PunteroTablaAnimaciones As Integer
         Dim Y As Byte
         Dim HL As String
         Dim IX As String
@@ -3877,7 +4051,7 @@ H2BA6:
         End If
     End Sub
 
-    Function CambiarAnimacionTrajesMonjes_2A61(ByVal PunteroSpritePersonajeIX As Long, ByVal PunteroDatosPersonajeIY As Long) As Long
+    Function CambiarAnimacionTrajesMonjes_2A61(ByVal PunteroSpritePersonajeIX As Integer, ByVal PunteroDatosPersonajeIY As Integer) As Integer
         'cambia la animación de los trajes de los monjes según la posición y en contador de animaciones y obtiene la dirección de los
         'datos de la animación que hay que poner en hl
         'PunteroSpritePersonajeIX = dirección del sprite correspondiente
@@ -3887,7 +4061,7 @@ H2BA6:
         Dim AnimacionTraje As Byte
         Dim AnimacionSprite As Byte
         Dim Orientacion As Byte
-        Dim PunteroAnimacion As Long
+        Dim PunteroAnimacion As Integer
         Dim IX As String
         Dim IY As String
         Dim DE As String
@@ -3926,7 +4100,7 @@ H2BA6:
         'aquí llega si la dirección que se ha puesto en la instrucción modificada empieza por 0xc0
         'PunteroAnimacion = índice en la tabla de animaciones
         Dim NumeroMonje As Byte
-        Dim PunteroCaraMonje As Long
+        Dim PunteroCaraMonje As Integer
         '2A8F
         NumeroMonje = CByte(PunteroTablaAnimacionesPersonaje_2A84 And &HFF&) 'número de monje (0, 2, 4 ó 6)
         '2A96
@@ -3942,7 +4116,7 @@ H2BA6:
         CambiarAnimacionTrajesMonjes_2A61 = PunteroAnimacion
     End Function
 
-    Function ComprobarVisibilidadSprite_245E(ByVal PunteroSpritePersonajeIX As Long, ByVal PunteroDatosPersonajeIY As Long, ByRef Ypantalla As Byte) As Boolean
+    Function ComprobarVisibilidadSprite_245E(ByVal PunteroSpritePersonajeIX As Integer, ByVal PunteroDatosPersonajeIY As Integer, ByRef Ypantalla As Byte) As Boolean
         Dim Visible As Boolean
         Dim X As Byte
         Dim Z As Byte
@@ -3955,7 +4129,7 @@ H2BA6:
         ComprobarVisibilidadSprite_245E = Visible
     End Function
 
-    Sub ActualizarDatosGraficosPersonaje_2A34(ByVal PunteroSpritePersonajeIX As Long, ByVal PunteroDatosPersonajeIY As Long, ByVal PunteroDatosPersonajeHL As Long, Y As Byte)
+    Sub ActualizarDatosGraficosPersonaje_2A34(ByVal PunteroSpritePersonajeIX As Integer, ByVal PunteroDatosPersonajeIY As Integer, ByVal PunteroDatosPersonajeHL As Integer, Y As Byte)
         'aquí se llega desde fuera si un sprite es visible, después de haber actualizado su posición.
         'en PunteroDatosPersonajeHL se apunta a la animación correspondiente para el sprite
         'PunteroSpritePersonajeIX = dirección del sprite correspondiente
@@ -3972,11 +4146,11 @@ H2BA6:
         '2a47
         TablaSprites_2E17(PunteroSpritePersonajeIX + 0 - &H2E17) = Y Or &H80 'indica que hay que redibujar el sprite. combina el valor con la posición y de pantalla del sprite
         '2a4d
-        Orientacion = ModificarOrientacion_2480(LeerDatoObjeto(PunteroDatosPersonajeIY + 1)) 'obtiene la orientación del personaje. modifica la orientación que se le pasa en a con la orientación de la pantalla actual
+        Orientacion = ModificarOrientacion_2480(LeerBytePersonajeObjeto(PunteroDatosPersonajeIY + 1)) 'obtiene la orientación del personaje. modifica la orientación que se le pasa en a con la orientación de la pantalla actual
         '2a53
         Orientacion = ModFunciones.shr(Orientacion, 1)
         '2a55
-        If Orientacion <> LeerDatoObjeto(PunteroDatosPersonajeIY + 6) Then 'comprueba si ha cambiado la orientación del personaje
+        If Orientacion <> LeerBytePersonajeObjeto(PunteroDatosPersonajeIY + 6) Then 'comprueba si ha cambiado la orientación del personaje
             'si es así, salta al método correspondiente por si hay que flipear los gráficos
             '2A58
             Select Case PunteroRutinaFlipPersonaje_2A59
@@ -4020,7 +4194,7 @@ H2BA6:
 
     Sub FlipearSpritesMalaquias_34FB()
         'este método se llama cuando cambia la orientación del sprite de malaquías y se encarga de flipear las caras del sprite
-        Dim PunteroDatos As Long
+        Dim PunteroDatos As Integer
         TablaCaracteristicasPersonajes_3036(&H305A - &H3036) = TablaCaracteristicasPersonajes_3036(&H305A - &H3036) Xor 1 'flip de malaquías
         PunteroDatos = Leer16(TablaPunterosCarasMonjes_3097, &H3097 - &H3097) 'apunta a los datos de las caras de malaquías
         GirarGraficosRespectoX_3552(DatosMonjes_AB59, PunteroDatos - &HAB59&, 5, &H14) 'flipea las caras de malaquías
@@ -4028,7 +4202,7 @@ H2BA6:
 
     Sub FlipearSpritesAbad_350B()
         'este método se llama cuando cambia la orientación del sprite del abad y se encarga de flipear las caras del sprite
-        Dim PunteroDatos As Long
+        Dim PunteroDatos As Integer
         TablaCaracteristicasPersonajes_3036(&H3069 - &H3036) = TablaCaracteristicasPersonajes_3036(&H3069 - &H3036) Xor 1 'flip de malaquías
         PunteroDatos = Leer16(TablaPunterosCarasMonjes_3097, &H3099 - &H3097) 'apunta a los datos de las caras del abad
         GirarGraficosRespectoX_3552(DatosMonjes_AB59, PunteroDatos - &HAB59&, 5, &H14) 'flipea las caras del abad
@@ -4036,7 +4210,7 @@ H2BA6:
 
     Sub FlipearSpritesBerengario_351B()
         'este método se llama cuando cambia la orientación del sprite de berengario y se encarga de flipear las caras del sprite
-        Dim PunteroDatos As Long
+        Dim PunteroDatos As Integer
         TablaCaracteristicasPersonajes_3036(&H3078 - &H3036) = TablaCaracteristicasPersonajes_3036(&H3078 - &H3036) Xor 1 'flip de malaquías
         PunteroDatos = Leer16(TablaPunterosCarasMonjes_3097, &H309B - &H3097) 'apunta a los datos de las caras de berengario
         GirarGraficosRespectoX_3552(DatosMonjes_AB59, PunteroDatos - &HAB59&, 5, &H14) 'flipea las caras de berengario
@@ -4044,44 +4218,73 @@ H2BA6:
 
     Sub FlipearSpritesSeverino_352B()
         'este método se llama cuando cambia la orientación del sprite de severino y se encarga de flipear las caras del sprite
-        Dim PunteroDatos As Long
+        Dim PunteroDatos As Integer
         TablaCaracteristicasPersonajes_3036(&H3087 - &H3036) = TablaCaracteristicasPersonajes_3036(&H3087 - &H3036) Xor 1 'flip de malaquías
         PunteroDatos = Leer16(TablaPunterosCarasMonjes_3097, &H309D - &H3097) 'apunta a los datos de las caras de severino
         GirarGraficosRespectoX_3552(DatosMonjes_AB59, PunteroDatos - &HAB59&, 5, &H14) 'flipea las caras de severino
     End Sub
 
-    Sub RellenarBufferAlturasPersonaje_28EF(ByVal PunteroDatosPersonajeIY As Long, ByVal ValorBufferAlturas As Byte)
+    Sub RellenarBufferAlturasPersonaje_28EF(ByVal PunteroDatosPersonajeIY As Integer, ByVal ValorBufferAlturas As Byte)
         'si la posición del sprite es central y la altura está bien, pone ValorBufferAlturas en las posiciones que ocupa del buffer de alturas
         'PunteroDatosPersonajeIY = dirección de los datos de posición asociados al personaje
         'ValorBufferAlturas = valor a poner en las posiciones que ocupa el personaje del buffer de alturas
-        Dim PunteroBufferAlturasIX As Long
+        Dim PunteroBufferAlturasIX As Integer
         Dim Altura As Byte
+        Dim BufferAuxiliar As Boolean 'true: se usa el buffer secundario de 96F4
+        If PunteroBufferAlturas_2D8A <> &H01C0 Then BufferAuxiliar = True
         If Not DeterminarPosicionCentral_0CBE(PunteroDatosPersonajeIY, PunteroBufferAlturasIX) Then Exit Sub 'si la posición no es una de las del centro de la pantalla o la altura del personaje no coincide con la altura base de la planta, sale
         '28F3
         'en otro caso PunteroBufferAlturasIX apunta a la altura de la pos actual
-        Altura = TablaBufferAlturas_01C0(PunteroBufferAlturasIX) 'obtiene la entrada del buffer de alturas
+        If Not BufferAuxiliar Then
+            Altura = TablaBufferAlturas_01C0(PunteroBufferAlturasIX - &H01C0) 'obtiene la entrada del buffer de alturas
+        Else
+            Altura = TablaBufferAlturas_96F4(PunteroBufferAlturasIX - &H96F4) 'obtiene la entrada del buffer de alturas
+        End If
         '28f6
-        TablaBufferAlturas_01C0(PunteroBufferAlturasIX) = (Altura And &HF) Or ValorBufferAlturas 'indica que el personaje está en la posición (x, y)
+        If Not BufferAuxiliar Then
+            TablaBufferAlturas_01C0(PunteroBufferAlturasIX - &H01C0) = (Altura And &HF) Or ValorBufferAlturas 'indica que el personaje está en la posición (x, y)
+        Else
+            TablaBufferAlturas_96F4(PunteroBufferAlturasIX - &H96F4) = (Altura And &HF) Or ValorBufferAlturas 'indica que el personaje está en la posición (x, y)
+        End If
         '28FC
-        If (TablaCaracteristicasPersonajes_3036(PunteroDatosPersonajeIY + 5 - &H3036) And &H80) <> 0 Then Exit Sub 'si el bit 7 del byte 5 está puesto, sale
+        'If (TablaCaracteristicasPersonajes_3036(PunteroDatosPersonajeIY + 5 - &H3036) And &H80) <> 0 Then Exit Sub 'si el bit 7 del byte 5 está puesto, sale
+        If LeerBitArray(TablaCaracteristicasPersonajes_3036, PunteroDatosPersonajeIY + 5 - &H3036, 7) Then Exit Sub 'si el bit 7 del byte 5 está puesto, sale
         '2901
         'indica que el personaje también ocupa la posición (x - 1, y)
-        Altura = TablaBufferAlturas_01C0(PunteroBufferAlturasIX - 1)
-        TablaBufferAlturas_01C0(PunteroBufferAlturasIX - 1) = (Altura And &HF) Or ValorBufferAlturas 'indica que el personaje está en la posición (x-1, y)
+        If Not BufferAuxiliar Then
+            Altura = TablaBufferAlturas_01C0(PunteroBufferAlturasIX - 1 - &H01C0)
+            TablaBufferAlturas_01C0(PunteroBufferAlturasIX - 1 - &H01C0) = (Altura And &HF) Or ValorBufferAlturas 'indica que el personaje está en la posición (x-1, y)
+        Else
+            Altura = TablaBufferAlturas_96F4(PunteroBufferAlturasIX - 1 - &H96F4)
+            TablaBufferAlturas_96F4(PunteroBufferAlturasIX - 1 - &H96F4) = (Altura And &HF) Or ValorBufferAlturas 'indica que el personaje está en la posición (x-1, y)
+        End If
         '290A
         'indica que el personaje también ocupa la posición (x, y-1)
-        Altura = TablaBufferAlturas_01C0(PunteroBufferAlturasIX - &H18)
+        If Not BufferAuxiliar Then
+            Altura = TablaBufferAlturas_01C0(PunteroBufferAlturasIX - &H18 - &H01C0)
+        Else
+            Altura = TablaBufferAlturas_96F4(PunteroBufferAlturasIX - &H18 - &H96F4)
+        End If
         '290D
-        TablaBufferAlturas_01C0(PunteroBufferAlturasIX - &H18) = (Altura And &HF) Or ValorBufferAlturas 'indica que el personaje está en la posición (x, y-1)
+        If Not BufferAuxiliar Then
+            TablaBufferAlturas_01C0(PunteroBufferAlturasIX - &H18 - &H01C0) = (Altura And &HF) Or ValorBufferAlturas 'indica que el personaje está en la posición (x, y-1)
+        Else
+            TablaBufferAlturas_96F4(PunteroBufferAlturasIX - &H18 - &H96F4) = (Altura And &HF) Or ValorBufferAlturas 'indica que el personaje está en la posición (x, y-1)
+        End If
         '2913
         'indica que el personaje también ocupa la posición (x-1, y-1)
-        Altura = TablaBufferAlturas_01C0(PunteroBufferAlturasIX - &H19)
-        TablaBufferAlturas_01C0(PunteroBufferAlturasIX - &H19) = (Altura And &HF) Or ValorBufferAlturas 'indica que el personaje está en la posición (x, y-1)
+        If Not BufferAuxiliar Then
+            Altura = TablaBufferAlturas_01C0(PunteroBufferAlturasIX - &H19 - &H01C0)
+            TablaBufferAlturas_01C0(PunteroBufferAlturasIX - &H19 - &H01C0) = (Altura And &HF) Or ValorBufferAlturas 'indica que el personaje está en la posición (x, y-1)
+        Else
+            Altura = TablaBufferAlturas_96F4(PunteroBufferAlturasIX - &H19 - &H96F4)
+            TablaBufferAlturas_96F4(PunteroBufferAlturasIX - &H19 - &H96F4) = (Altura And &HF) Or ValorBufferAlturas 'indica que el personaje está en la posición (x, y-1)
+        End If
     End Sub
 
     Sub DibujarSprites_2674()
         'dibuja los sprites
-        Dim PunteroSpritesHL As Long
+        Dim PunteroSpritesHL As Integer
         Dim Valor As Byte
         If HabitacionOscura_156C Then
             DibujarSprites_267B()
@@ -4092,7 +4295,7 @@ H2BA6:
 
     Sub DibujarSprites_267B()
         'dibuja los sprites
-        Dim PunteroSpritesHL As Long
+        Dim PunteroSpritesHL As Integer
         Dim Valor As Byte
 
         'dibujo de los sprites cuando la habitación no está iluminada
@@ -4116,7 +4319,8 @@ H2BA6:
         If (Not Depuracion.LuzEnGuillermo And Depuracion.Luz = EnumTipoLuz.EnumTipoLuz_Off) Or Depuracion.Luz = EnumTipoLuz.EnumTipoLuz_Normal Then
             If Not Depuracion.Lampara Then
                 '2695
-                If (TablaObjetosPersonajes_2DEC(&H2DF3 - &H2DEC) And &H80) = 0 Then Exit Sub 'si adso no tiene la lámpara, sale '### depuración
+                'If (TablaObjetosPersonajes_2DEC(&H2DF3 - &H2DEC) And &H80) = 0 Then Exit Sub 'si adso no tiene la lámpara, sale '### depuración
+                If Not LeerBitArray(TablaObjetosPersonajes_2DEC, &H2DF3 - &H2DEC, 7) Then Exit Sub 'si adso no tiene la lámpara, sale '### depuración
             End If
         End If
         TablaSprites_2E17(&H2FCF - &H2E17) = &HBC 'activa el sprite de la luz
@@ -4124,15 +4328,15 @@ H2BA6:
     End Sub
 
     Sub DibujarSprites_4914()
-        Dim Punteros(22) As Long 'punteros a los sprites
-        Dim NumeroSprites As Long 'número de sprites en la pila
-        Dim NumeroSpritesVisibles As Long 'número de elementos visibles
-        Dim PunteroSpriteIX As Long 'sprite original (bucle exterior)
+        Dim Punteros(22) As Integer 'punteros a los sprites
+        Dim NumeroSprites As Integer 'número de sprites en la pila
+        Dim NumeroSpritesVisibles As Integer 'número de elementos visibles
+        Dim PunteroSpriteIX As Integer 'sprite original (bucle exterior)
         Dim Valor As Byte
         Dim NumeroCambios As Byte
-        Dim Temporal As Long
-        Dim Contador As Long
-        Dim Contador2 As Long
+        Dim Temporal As Integer
+        Dim Contador As Integer
+        Dim Contador2 As Integer
         Dim Profundidad1 As Byte
         Dim Profundidad2 As Byte
         Dim Xactual As Byte
@@ -4147,22 +4351,22 @@ H2BA6:
         Dim TileY As Byte
         Dim nXsprite As Byte
         Dim nYsprite As Byte
-        Dim ValorLongDE As Long
-        Dim PunteroBufferTiles As Long
-        Dim AltoXanchoSprite As Long
-        Dim PunteroBufferSprites As Long
-        Dim PunteroBufferSpritesAnterior As Long
-        Dim PunteroBufferSpritesLibre As Long '4908
-        Dim ProfundidadMaxima_4DD9 As Long 'límite superior de profundidad de la iteración anterior
-        Dim PunteroSpriteIY As Long 'sprite actual (bucle interior)
+        Dim ValorLongDE As Integer
+        Dim PunteroBufferTiles As Integer
+        Dim AltoXanchoSprite As Integer
+        Dim PunteroBufferSprites As Integer
+        Dim PunteroBufferSpritesAnterior As Integer
+        Dim PunteroBufferSpritesLibre As Integer '4908
+        Dim ProfundidadMaxima_4DD9 As Integer 'límite superior de profundidad de la iteración anterior
+        Dim PunteroSpriteIY As Integer 'sprite actual (bucle interior)
         Dim Distancia1X As Byte 'distancia desde el inicio del sprite actual al inicio del sprite original
         Dim Distancia2X As Byte 'distancia desde el inicio del sprite original al inicio del sprite actual
         Dim LongitudX As Byte 'longitud a pintar del sprite actual
         Dim Distancia1Y As Byte
         Dim Distancia2Y As Byte
         Dim LongitudY As Byte
-        Dim ProfundidadMaxima As Long 'profundidad máxima de la iteración actual
-        Dim PunteroBufferTilesAnterior_3095 As Long
+        Dim ProfundidadMaxima As Integer 'profundidad máxima de la iteración actual
+        Dim PunteroBufferTilesAnterior_3095 As Integer
 
         If Not Depuracion.PersonajesAdso Then
             TablaSprites_2E17(&H2E2B + 0 - &H2E17) = &HFE 'desconecta a adso ###depuración
@@ -4207,7 +4411,8 @@ H2BA6:
                     Punteros(NumeroSprites) = PunteroSpriteIX 'ojo, cambiado.  antes NumeroSpritesVisibles
                     NumeroSprites = NumeroSprites + 1
                     If (Valor And &H80) <> 0 Then 'hay que dibujar el sprite
-                        If (TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) And &H80) <> 0 Then 'hay que dibujar el sprite
+                        'If (TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) And &H80) <> 0 Then 'hay que dibujar el sprite
+                        If LeerBitArray(TablaSprites_2E17, PunteroSpriteIX + 0 - &H2E17, 7) Then 'hay que dibujar el sprite
                             NumeroSpritesVisibles = NumeroSpritesVisibles + 1
                         End If
                     End If
@@ -4244,8 +4449,10 @@ H2BA6:
                 '498C
                 PunteroSpriteIX = Punteros(Contador)
                 '498F
-                TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = (TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) And &HBF) 'pone el bit 6 a 0. sprite no prcesado
-                If (TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) And &H80) <> 0 Then 'el sprite ha cambiado
+                'TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = (TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) And &HBF) 'pone el bit 6 a 0. sprite no prcesado
+                ClearBitArray(TablaSprites_2E17, PunteroSpriteIX + 0 - &H2E17, 6) 'pone el bit 6 a 0. sprite no prcesado
+                'If (TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) And &H80) <> 0 Then 'el sprite ha cambiado
+                If LeerBitArray(TablaSprites_2E17, PunteroSpriteIX + 0 - &H2E17, 7) Then 'el sprite ha cambiado
                     '4999
 
                     Xactual = TablaSprites_2E17(PunteroSpriteIX + 1 - &H2E17) 'posición x en bytes
@@ -4303,7 +4510,8 @@ H2BA6:
                     If PunteroBufferSpritesLibre > &H9CFE& Then Exit For '9CFE= límite del buffer de sprites. si no hay sitio para el sprite, salta pasa vaciar la lista de los procesados y procesa el resto
                     '4a13
                     'aquí llega si hay espacio para procesar el sprite
-                    TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = (TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) Or &H40) 'pone el bit 6 a 1. marca el sprite como procesado
+                    'TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = (TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) Or &H40) 'pone el bit 6 a 1. marca el sprite como procesado
+                    SetBitArray(TablaSprites_2E17, PunteroSpriteIX + 0 - &H2E17, 6) 'pone el bit 6 a 1. marca el sprite como procesado
                     For Contador2 = PunteroBufferSprites To PunteroBufferSpritesLibre - 1
                         BufferSprites_9500(Contador2 - &H9500&) = 0 'limpia la zona asignada del buffer de sprites
                     Next
@@ -4313,7 +4521,8 @@ H2BA6:
                     For Contador2 = NumeroSprites - 1 To 0 Step -1
                         '4a56
                         PunteroSpriteIY = Punteros(Contador2) 'dirección de la entrada del sprite actual
-                        If (TablaSprites_2E17(PunteroSpriteIY + 5 - &H2E17) And &H80) = 0 Then 'si el sprite no va a desaparecer
+                        'If (TablaSprites_2E17(PunteroSpriteIY + 5 - &H2E17) And &H80) = 0 Then 'si el sprite no va a desaparecer
+                        If Not LeerBitArray(TablaSprites_2E17, PunteroSpriteIY + 5 - &H2E17, 7) Then 'si el sprite no va a desaparecer
                             '4A5F
                             'entrada:
                             'l=PosicionOriginal
@@ -4367,7 +4576,8 @@ H2BA6:
                         '4BF2
                         CopiarSpritePantalla_4C1A(PunteroSpriteIX)
                         TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) And &H3F 'limpia el bit 6 y 7 del byte 0
-                        If (TablaSprites_2E17(PunteroSpriteIX + 5 - &H2E17) And &H80) <> 0 Then 'si el sprite va a desaparecer
+                        'If (TablaSprites_2E17(PunteroSpriteIX + 5 - &H2E17) And &H80) <> 0 Then 'si el sprite va a desaparecer
+                        If LeerBitArray(TablaSprites_2E17, PunteroSpriteIX + 5 - &H2E17, 7) Then 'si el sprite va a desaparecer
                             TablaSprites_2E17(PunteroSpriteIX + 5 - &H2E17) = TablaSprites_2E17(PunteroSpriteIX + 5 - &H2E17) And &H7F 'limpia el bit 7
                             TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = &HFE 'marca el sprite como inactivo
                         End If
@@ -4503,30 +4713,31 @@ H2BA6:
         End If
     End Function
 
-    Sub DibujarSprite_4AA3(ByVal PunteroSpriteIY As Long, ByVal Distancia1Y As Byte, ByVal Distancia2Y As Byte, ByVal Distancia1X As Byte, ByVal Distancia2X As Byte, ByVal nXsprite As Byte, ByVal PunteroBufferSprites As Long, ByVal LongitudY As Byte, ByVal LongitudX As Byte)
+    Sub DibujarSprite_4AA3(ByVal PunteroSpriteIY As Integer, ByVal Distancia1Y As Byte, ByVal Distancia2Y As Byte, ByVal Distancia1X As Byte, ByVal Distancia2X As Byte, ByVal nXsprite As Byte, ByVal PunteroBufferSprites As Integer, ByVal LongitudY As Byte, ByVal LongitudX As Byte)
         'pinta el sprite actual
         'Distancia1Y=h
         'Distancia2Y=l
         Dim nX As Byte 'ancho del sprite actual
-        Dim PunteroDatosGraficosSpriteHL As Long
-        Dim PunteroDatosGraficosSpriteAnterior As Long
-        Dim PunteroBufferSpritesDE As Long
-        Dim PunteroBufferSpritesAnterior As Long
-        Dim ValorLong As Long
+        Dim PunteroDatosGraficosSpriteHL As Integer
+        Dim PunteroDatosGraficosSpriteAnterior As Integer
+        Dim PunteroBufferSpritesDE As Integer
+        Dim PunteroBufferSpritesAnterior As Integer
+        Dim ValorLong As Integer
         Dim Valor As Byte
         Dim DesplazAdsoX As Byte
-        Dim Contador As Long
-        Dim Contador2 As Long
-        Dim MascaraOr As Long
-        Dim MascaraAnd As Long
-        Dim Fila As Long
-        Dim PunteroPatronLuz As Long
+        Dim Contador As Integer
+        Dim Contador2 As Integer
+        Dim MascaraOr As Integer
+        Dim MascaraAnd As Integer
+        Dim Fila As Integer
+        Dim PunteroPatronLuz As Integer
         Dim DesplazamientoDE As Byte '= 80 (desplazamiento de medio tile)
-        Dim PunteroBufferSpritesIX As Long
-        Dim ValorRelleno As Long 'valor de la tabla 48E8 de rellenos de la luz
+        Dim PunteroBufferSpritesIX As Integer
+        Dim ValorRelleno As Integer 'valor de la tabla 48E8 de rellenos de la luz
         Dim HL As String
         '4AA3
-        If Distancia1Y < 10 Or (Distancia1Y >= 10 And (TablaSprites_2E17(PunteroSpriteIY + &HB - &H2E17) And &H80) <> 0) Then 'si la distancia en y desde el inicio del sprite actual al inicio del sprite original < 10 o no se trata de un monje
+        'If Distancia1Y < 10 Or (Distancia1Y >= 10 And (TablaSprites_2E17(PunteroSpriteIY + &HB - &H2E17) And &H80) <> 0) Then 'si la distancia en y desde el inicio del sprite actual al inicio del sprite original < 10 o no se trata de un monje
+        If Distancia1Y < 10 Or (Distancia1Y >= 10 And LeerBitArray(TablaSprites_2E17, PunteroSpriteIY + &HB - &H2E17, 7)) Then 'si la distancia en y desde el inicio del sprite actual al inicio del sprite original < 10 o no se trata de un monje
             '4AD5
             'calcula la línea en la que empezar a dibujar el sprite actual (saltandose la distancia entre el inicio del sprite actual y el inicio del sprite original)
             nX = TablaSprites_2E17(PunteroSpriteIY + 5 - &H2E17) 'obtiene el ancho del sprite actual
@@ -4554,7 +4765,7 @@ H2BA6:
         HL = Hex$(PunteroDatosGraficosSpriteHL)
         '4AED
         'distancia en y desde el inicio del sprite original al inicio del sprite actual * ancho ampliado del sprite original
-        ValorLong = CLng(Distancia2Y) * CLng(nXsprite)
+        ValorLong = CInt(Distancia2Y) * CInt(nXsprite)
         'PunteroBufferSpritelibre=posición inicial del buffer de sprites para este sprite
         'dirección del buffer de sprites para el sprite original (saltando lo que no puede sobreescribir el sprite actual en y)
         PunteroBufferSpritesDE = PunteroBufferSprites + ValorLong
@@ -4596,7 +4807,8 @@ H2BA6:
                 PunteroDatosGraficosSpriteHL = PunteroDatosGraficosSpriteHL + nX 'pasa a la siguiente línea del sprite
                 PunteroBufferSpritesDE = PunteroBufferSpritesAnterior 'obtiene el puntero al buffer de sprites
                 Distancia1Y = Distancia1Y + 1
-                If Distancia1Y = 10 And (TablaSprites_2E17(PunteroSpriteIY + &HB - &H2E17) And &H80) = 0 Then
+                'If Distancia1Y = 10 And (TablaSprites_2E17(PunteroSpriteIY + &HB - &H2E17) And &H80) = 0 Then
+                If Distancia1Y = 10 And LeerBitArray(TablaSprites_2E17, PunteroSpriteIY + &HB - &H2E17, 7) = 0 Then
                     '4B41
                     'si llega a 10, cambia la dirección de los datos gráficos de origen,
                     'puesto que se pasa de dibujar la cabeza de un monje a dibujar su traje
@@ -4679,12 +4891,12 @@ H2BA6:
         GuardarArchivo("BufferSprites", BufferSprites_9500)
     End Sub
 
-    Function EsValidoPunteroBufferTiles(ByVal Puntero As Long) As Boolean
+    Function EsValidoPunteroBufferTiles(ByVal Puntero As Integer) As Boolean
         'comprueba si un puntero al buffer de tiles está dentro de sus límites
         If (Puntero - &H8D80&) >= 0 And (Puntero - &H8D80&) <= UBound(BufferTiles_8D80) Then EsValidoPunteroBufferTiles = True
     End Function
 
-    Sub CopiarTilesBufferSprites_4D9E(ByVal ProfundidadMaxima As Long, ByVal ProfundidadMinima As Long, ByVal SpritesPilaProcesados As Boolean, ByVal PunteroBufferTilesIX As Long, ByVal PunteroBufferSpritesDE As Long, ByVal nXsprite As Byte, ByVal nYsprite As Byte)
+    Sub CopiarTilesBufferSprites_4D9E(ByVal ProfundidadMaxima As Integer, ByVal ProfundidadMinima As Integer, ByVal SpritesPilaProcesados As Boolean, ByVal PunteroBufferTilesIX As Integer, ByVal PunteroBufferSpritesDE As Integer, ByVal nXsprite As Byte, ByVal nYsprite As Byte)
         '4dd9=ProfundidadMinima
         '4afa=PunteroBufferSpritesDE
         'bc=ProfundidadMaxima
@@ -4693,13 +4905,13 @@ H2BA6:
         '2dd8=nYsprite
         'copia en el buffer de sprites los tiles que están entre la profundidad mínima y la máxima
         'Exit Sub
-        Dim NtilesY As Long 'número de tiles que ocupa el sprite en y
-        Dim NtilesX As Long 'número de tiles que ocupa el sprite en x
-        Dim PunteroBufferTilesAnterior As Long
-        Dim PunteroBufferSpritesAnterior As Long
-        Dim PunteroBufferSpritesAnterior2 As Long
-        Dim Contador As Long
-        Dim Contador2 As Long
+        Dim NtilesY As Integer 'número de tiles que ocupa el sprite en y
+        Dim NtilesX As Integer 'número de tiles que ocupa el sprite en x
+        Dim PunteroBufferTilesAnterior As Integer
+        Dim PunteroBufferSpritesAnterior As Integer
+        Dim PunteroBufferSpritesAnterior2 As Integer
+        Dim Contador As Integer
+        Dim Contador2 As Integer
         Dim ProcesarTileDirectamente_4DE4 As Boolean 'true si salta a 4E11 (procesar directamente), false salta a 4DE6 (comprobaciones previas)
         Dim Valor As Byte
         Dim ProfundidadX As Byte
@@ -4709,8 +4921,8 @@ H2BA6:
         Dim ProfundidadMaximaX As Byte
         Dim ProfundidadMaximaY As Byte
         Dim ProcesarTile As Boolean
-        Dim Contador3 As Long
-        Dim PunteroBufferTilesAnterior3 As Long
+        Dim Contador3 As Integer
+        Dim PunteroBufferTilesAnterior3 As Integer
         Dim BugOverflow As Boolean 'true si el puntero a la tabla de tiles está fuera
         'On Error Resume Next
 
@@ -4780,7 +4992,8 @@ H2BA6:
                                 '4E07
                                 If EsDireccionBufferTiles_37A5(PunteroBufferTilesIX) Then 'si ix está dentro del buffer de tiles
                                     If Not BugOverflow Then
-                                        BufferTiles_8D80(PunteroBufferTilesIX + 0 - &H8D80&) = BufferTiles_8D80(PunteroBufferTilesIX + 0 - &H8D80&) Or &H80 'indica que se ha procesado este tile
+                                        'BufferTiles_8D80(PunteroBufferTilesIX + 0 - &H8D80&) = BufferTiles_8D80(PunteroBufferTilesIX + 0 - &H8D80&) Or &H80 'indica que se ha procesado este tile
+                                        SetBitArray(BufferTiles_8D80, PunteroBufferTilesIX + 0 - &H8D80&, 7) 'indica que se ha procesado este tile
                                     End If
                                 End If
 
@@ -4825,30 +5038,31 @@ H2BA6:
         PunteroBufferTilesIX = PunteroBufferTilesAnterior3
     End Sub
 
-    Sub LimpiarBit7BufferTiles_4D85(ByVal SpritesPilaProcesados As Boolean, ByVal PunteroBufferTilesIX As Long)
+    Sub LimpiarBit7BufferTiles_4D85(ByVal SpritesPilaProcesados As Boolean, ByVal PunteroBufferTilesIX As Integer)
         'vuelve si no ha terminado de procesar los sprites de la pila o limpia el bit 7 de (ix+0) del buffer de tiles (si es una posición válida del buffer)
         If Not SpritesPilaProcesados Then Exit Sub
         If EsDireccionBufferTiles_37A5(PunteroBufferTilesIX) Then
             'If PunteroBufferTilesIX + 0 - &H8D80& >= 0 And PunteroBufferTilesIX + 0 - &H8D80& < UBound(BufferTiles_8D80) Then
-            BufferTiles_8D80(PunteroBufferTilesIX + 0 - &H8D80&) = BufferTiles_8D80(PunteroBufferTilesIX + 0 - &H8D80&) And &H7F 'limpia el bit mas significativo del buffer de tiles
+            'BufferTiles_8D80(PunteroBufferTilesIX + 0 - &H8D80&) = BufferTiles_8D80(PunteroBufferTilesIX + 0 - &H8D80&) And &H7F 'limpia el bit mas significativo del buffer de tiles
+            ClearBitArray(BufferTiles_8D80, PunteroBufferTilesIX + 0 - &H8D80&, 7) 'limpia el bit mas significativo del buffer de tiles
             'End If
         End If
     End Sub
 
-    Function EsDireccionBufferTiles_37A5(ByVal PunteroBufferTilesIX As Long) As Boolean
+    Function EsDireccionBufferTiles_37A5(ByVal PunteroBufferTilesIX As Integer) As Boolean
         'dada una dirección, devuelve true si es una dirección válida del buffer de tiles
         If PunteroBufferTilesIX >= &H8D80 Then EsDireccionBufferTiles_37A5 = True '8d80=inicio del buffer de tiles
     End Function
 
-    Sub CombinarTileBufferSprites_4E49(ByVal PunteroBufferTilesIX As Long, ByVal PunteroBufferSpritesDE As Long, ByVal nXsprite As Byte)
+    Sub CombinarTileBufferSprites_4E49(ByVal PunteroBufferTilesIX As Integer, ByVal PunteroBufferSpritesDE As Integer, ByVal nXsprite As Byte)
         'aquí entra con PunteroBufferTilesIX apuntando a alguna entrada del buffer de tiles y PunteroBufferSpritesDE apuntando
         'a alguna posición del buffer de sprites
         'combina el tile de la entrada actual de ix en la posición actual del buffer de sprites
         Dim NumeroTile As Byte
-        Dim PunteroDatosTile As Long
-        Dim Contador As Long
-        Dim Contador2 As Long
-        Dim PunteroTablasAndOr As Long
+        Dim PunteroDatosTile As Integer
+        Dim Contador As Integer
+        Dim Contador2 As Integer
+        Dim PunteroTablasAndOr As Integer
         Dim MascaraAnd As Byte
         Dim MascaraOr As Byte
         Dim Valor As Byte
@@ -4879,7 +5093,8 @@ H2BA6:
             '4e60
             'si el gráfico es mayor o igual que 0x0b (gráficos con transparencia)
             If Not BugOverflow Then
-                If (BufferTiles_8D80(PunteroBufferTilesIX + 2 - &H8D80&) And &H80) = 0 Then 'comprueba que tabla usar según el número de tile que haya
+                'If (BufferTiles_8D80(PunteroBufferTilesIX + 2 - &H8D80&) And &H80) = 0 Then 'comprueba que tabla usar según el número de tile que haya
+                If LeerBitArray(BufferTiles_8D80, PunteroBufferTilesIX + 2 - &H8D80&, 7) = 0 Then 'comprueba que tabla usar según el número de tile que haya
                     PunteroTablasAndOr = &H9D00& 'tablas 0 y 1
                 Else
                     PunteroTablasAndOr = &H9F00& 'tablas 2 y 3
@@ -4913,18 +5128,18 @@ H2BA6:
         'GuardarArchivo "D:\datos\vbasic\Abadia\Abadia2\BufferSprites", BufferSprites_9500
     End Sub
 
-    Sub CopiarSpritePantalla_4C1A(ByVal PunteroSpriteIX As Long)
+    Sub CopiarSpritePantalla_4C1A(ByVal PunteroSpriteIX As Integer)
         'vuelca el buffer del sprite a la pantalla
         Dim Xnovisible As Byte 'distancia en x de lo que no es visible
         Dim Xsprite As Byte 'posición en x del tile en el que empieza el sprite (en bytes)
         Dim Ysprite As Byte 'posición en y del tile en el que empieza el sprite
         Dim nXsprite As Byte 'ancho final del sprite (en bytes)
         Dim nYsprite As Byte 'alto final del sprite (en pixels)
-        Dim PunteroBufferSpritesHL As Long 'dirección del buffer de sprites asignada a este sprite
-        Dim PunteroPantallaDE As Long 'posición en pantalla donde copiar los bytes
-        Dim PunteroPantallaAnterior As Long
-        Dim Contador As Long
-        Dim Contador2 As Long
+        Dim PunteroBufferSpritesHL As Integer 'dirección del buffer de sprites asignada a este sprite
+        Dim PunteroPantallaDE As Integer 'posición en pantalla donde copiar los bytes
+        Dim PunteroPantallaAnterior As Integer
+        Dim Contador As Integer
+        Dim Contador2 As Integer
         Dim ValorPantalla As Byte
         '4C1A
         Xnovisible = 0 'distancia en x de lo que no es visible
@@ -5005,12 +5220,12 @@ H2BA6:
         ModPantalla.Refrescar()
     End Sub
 
-    Function ObtenerDesplazamientoPantalla_3C42(ByVal X As Byte, ByVal Y As Byte) As Long
+    Function ObtenerDesplazamientoPantalla_3C42(ByVal X As Byte, ByVal Y As Byte) As Integer
         '; dados X,Y, calcula el desplazamiento correspondiente en pantalla
         'al valor calculado se le suma 32 pixels a la derecha (puesto que el área de juego va desde x = 32 a x = 256 + 32 - 1
         'l = coordenada X (en bytes)
-        Dim PunteroPantalla As Long
-        Dim ValorLong As Long
+        Dim PunteroPantalla As Integer
+        Dim ValorLong As Integer
         PunteroPantalla = Byte2Long(Y And &HF8) 'obtiene el valor para calcular el desplazamiento dentro del banco de VRAM
         'dentro de cada banco, la línea a la que se quiera ir puede calcularse como (y & 0xf8)*10
         'o lo que es lo mismo, (y >> 3)*0x50
@@ -5024,7 +5239,7 @@ H2BA6:
         ObtenerDesplazamientoPantalla_3C42 = PunteroPantalla
     End Function
 
-    Sub ActualizarDatosPersonaje_291D(ByVal PunteroPersonajeHL As Long)
+    Sub ActualizarDatosPersonaje_291D(ByVal PunteroPersonajeHL As Integer)
         'comprueba si el personaje puede moverse a donde quiere y actualiza su sprite y el buffer de alturas
         'PunteroPersonajeHL apunta a la tabla del personaje a mover
         '&H2BAE 'guillermo
@@ -5033,11 +5248,12 @@ H2BA6:
         '&H2BCC 'abad
         '&H2BD6 'berengario
         '&H2BE0 'severino
-        Dim PunteroSpriteIX As Long
-        Dim PunteroCaracteristicasPersonajeIY As Long
-        Dim PunteroRutinaComportamientoHL As Long
-        Dim PunteroRutinaFlipearGraficos As Long
+        Dim PunteroSpriteIX As Integer
+        Dim PunteroCaracteristicasPersonajeIY As Integer
+        Dim PunteroRutinaComportamientoHL As Integer
+        Dim PunteroRutinaFlipearGraficos As Integer
         Dim Valor As Byte
+        Dim Volver As Boolean
         PunteroSpriteIX = ModFunciones.Leer16(TablaDatosPersonajes_2BAE, PunteroPersonajeHL + 0 - &H2BAE)
         PunteroCaracteristicasPersonajeIY = ModFunciones.Leer16(TablaDatosPersonajes_2BAE, PunteroPersonajeHL + 2 - &H2BAE)
         PunteroRutinaComportamientoHL = ModFunciones.Leer16(TablaDatosPersonajes_2BAE, PunteroPersonajeHL + 4 - &H2BAE)
@@ -5048,24 +5264,25 @@ H2BA6:
         'si la posición del sprite es central y la altura está bien, limpia las posiciones que ocupaba el sprite en el buffer de alturas
         '292f
         RellenarBufferAlturasPersonaje_28EF(PunteroCaracteristicasPersonajeIY, 0)
+        '2932
         If MalaquiasAscendiendo_4384 Then
             MalaquiasAscendiendo_4384 = False
             '2945
-            AvanzarAnimacionSprite_2A27(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, PunteroRutinaFlipearGraficos)
+            AvanzarAnimacionSprite_2A27(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY)
         Else
             '2948
             'lee el contador de la animación
             Valor = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 0 - &H3036)
             If (Valor And &O1&) <> 0 Then
                 '294d
-                IncrementarContadorAnimacionSprite_2A01(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, PunteroRutinaFlipearGraficos)
+                IncrementarContadorAnimacionSprite_2A01(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY)
             Else
                 '2950
                 Select Case PunteroRutinaComportamientoHL
                     Case Is = &H288D 'guillermo
-                        EjecutarComportamientoGuillermo_288D(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, PunteroRutinaFlipearGraficos)
+                        EjecutarComportamientoGuillermo_288D(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY)
                     Case Is = &H2C3A 'resto
-                        'EjecutarComportamientoPersonaje_2C3A PunteroSpriteIX, PunteroCaracteristicasPersonajeIY
+                        EjecutarComportamientoPersonaje_2C3A(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY)
                 End Select
             End If
         End If
@@ -5077,9 +5294,9 @@ H2BA6:
         RellenarBufferAlturasPersonaje_28EF(PunteroCaracteristicasPersonajeIY, Valor)
     End Sub
 
-    Sub AvanzarAnimacionSprite_2A27(ByVal PunteroSpriteIX As Long, ByVal PunteroCaracteristicasPersonajeIY As Long, ByVal PunteroRutinaFlipearGraficos As Long)
+    Sub AvanzarAnimacionSprite_2A27(ByVal PunteroSpriteIX As Integer, ByVal PunteroCaracteristicasPersonajeIY As Integer)
         'avanza la animación del sprite y lo redibuja
-        Dim PunteroTablaAnimacionesHL As Long
+        Dim PunteroTablaAnimacionesHL As Integer
         Dim Yp As Byte 'posición y en pantalla del sprite
         Dim Valor As Byte
         'cambia la animación de los trajes de los monjes según la posición y el contador de animaciones y
@@ -5096,7 +5313,7 @@ H2BA6:
         End If
     End Sub
 
-    Function EsSpriteVisible_2AC9(ByVal PunteroSpriteIX As Long, ByVal PunteroCaracteristicasPersonajeIY As Long, ByVal Yp As Byte) As Boolean
+    Function EsSpriteVisible_2AC9(ByVal PunteroSpriteIX As Integer, ByVal PunteroCaracteristicasPersonajeIY As Integer, ByRef Yp As Byte) As Boolean
         Dim Visible As Boolean
         Dim X As Byte
         Dim Y As Byte
@@ -5113,11 +5330,12 @@ H2BA6:
             Exit Function
         Else
             TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = &H80 'en otro caso, indica que hay que redibujar el sprite
-            TablaSprites_2E17(PunteroSpriteIX + 5 - &H2E17) = TablaSprites_2E17(PunteroSpriteIX + 5 - &H2E17) Or &H80 'indica que el sprite va a pasar a inactivo, y solo se quiere redibujar la zona que ocupaba
+            'TablaSprites_2E17(PunteroSpriteIX + 5 - &H2E17) = TablaSprites_2E17(PunteroSpriteIX + 5 - &H2E17) Or &H80 'indica que el sprite va a pasar a inactivo, y solo se quiere redibujar la zona que ocupaba
+            SetBitArray(TablaSprites_2E17, PunteroSpriteIX + 5 - &H2E17, 7)  'indica que el sprite va a pasar a inactivo, y solo se quiere redibujar la zona que ocupaba
         End If
     End Function
 
-    Sub IncrementarContadorAnimacionSprite_2A01(ByVal PunteroSpriteIX As Long, ByVal PunteroCaracteristicasPersonajeIY As Long, ByVal PunteroRutinaFlipearGraficos As Long)
+    Sub IncrementarContadorAnimacionSprite_2A01(ByVal PunteroSpriteIX As Integer, ByVal PunteroCaracteristicasPersonajeIY As Integer)
         'incrementa el contador de los bits 0 y 1 del byte 0, avanza la animación del sprite y lo redibuja
         Dim Valor As Byte
         'lee el contador de la animación
@@ -5127,18 +5345,17 @@ H2BA6:
         '2a07
         TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 0 - &H3036) = Valor
         '2A0A
-        AvanzarAnimacionSprite_2A27(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, PunteroRutinaFlipearGraficos)
+        AvanzarAnimacionSprite_2A27(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY)
     End Sub
 
-    Sub EjecutarComportamientoGuillermo_288D(ByVal PunteroSpriteIX As Long, ByVal PunteroCaracteristicasPersonajeIY As Long, ByVal PunteroRutinaFlipearGraficos As Long)
+    Sub EjecutarComportamientoGuillermo_288D(ByVal PunteroSpriteIX As Integer, ByVal PunteroCaracteristicasPersonajeIY As Integer)
         'rutina del comportamiento de guillermo
         'PunteroSpriteIX que apunta al sprite de guillermo
         'PunteroCaracteristicasPersonajeIY apunta a los datos de posición de guillermo
         Dim Valor As Byte
-        Dim RetornoA As Long
-        Dim RetornoC As Long
-        Dim RetornoHL As Long
-
+        Dim RetornoA As Integer
+        Dim RetornoC As Integer
+        Dim RetornoHL As Integer
         If EstadoGuillermo_288F <> 0 Then
             '2893
             If EstadoGuillermo_288F = 1 Then Exit Sub 'si EstadoGuillermo_288F era 1, sale
@@ -5153,7 +5370,7 @@ H2BA6:
                     Valor = Valor - 1
                     TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 2 - &H3036) = Valor
                     'avanza la animación del sprite y lo redibuja
-                    AvanzarAnimacionSprite_2A27(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, PunteroRutinaFlipearGraficos)
+                    AvanzarAnimacionSprite_2A27(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY)
                     Exit Sub
                 End If
                 '28a9
@@ -5178,40 +5395,36 @@ H2BA6:
         Else
             '28ca
             'aquí llega si el estado de guillermo es 0, que es el estado normal
-            If PersonajeSeguidoPorCamara_3C8F <> 0 Then Exit Sub 'si la cámara no sigue a guillermo, sale
+            If TablaVariablesLogica_3C85(PersonajeSeguidoPorCamara_3C8F - &H3C85) <> 0 Then Exit Sub 'si la cámara no sigue a guillermo, sale
             '28CF
             If ModTeclado.TeclaPulsadaFlanco(EnumTecla.TeclaIzquierda) Then
                 '2a0c
-                ActualizarDatosPersonajeCursorIzquierdaDerecha_2A0C(True, PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, PunteroRutinaFlipearGraficos)
+                ActualizarDatosPersonajeCursorIzquierdaDerecha_2A0C(True, PunteroSpriteIX, PunteroCaracteristicasPersonajeIY)
             End If
             '28d9
             If ModTeclado.TeclaPulsadaFlanco(EnumTecla.TeclaDerecha) Then 'comprueba si ha cambiado el estado de cursor derecha
                 '2a0c
-                ActualizarDatosPersonajeCursorIzquierdaDerecha_2A0C(False, PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, PunteroRutinaFlipearGraficos)
+                ActualizarDatosPersonajeCursorIzquierdaDerecha_2A0C(False, PunteroSpriteIX, PunteroCaracteristicasPersonajeIY)
             Else
                 '28e3
                 If ModTeclado.TeclaPulsadaNivel(EnumTecla.TeclaArriba) = False Then Exit Sub 'si no se ha pulsado el cursor arriba, sale
-
                 '28E9
-                ObtenerAlturaDestinoPersonaje_27B8(0, PunteroCaracteristicasPersonajeIY, RetornoA, RetornoC, RetornoHL)
-
+                ObtenerAlturaDestinoPersonaje_27B8(0, &HFF, PunteroCaracteristicasPersonajeIY, RetornoA, RetornoC, RetornoHL)
                 '28EC
-                AvanzarPersonaje_2954(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, PunteroRutinaFlipearGraficos, RetornoA, RetornoC, RetornoHL)
+                AvanzarPersonaje_2954(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, RetornoA, RetornoC, RetornoHL)
             End If
-
         End If
-
-
-
     End Sub
 
-    Sub ActualizarDatosPersonajeCursorIzquierdaDerecha_2A0C(ByVal Izquierda As Boolean, ByVal PunteroSpriteIX As Long, ByVal PunteroCaracteristicasPersonajeIY As Long, ByVal PunteroRutinaFlipearGraficos As Long)
+    Sub ActualizarDatosPersonajeCursorIzquierdaDerecha_2A0C(ByVal IzquierdaC As Boolean, ByVal PunteroSpriteIX As Integer, ByVal PunteroCaracteristicasPersonajeIY As Integer)
         'aquí llega si se ha pulsado cursor derecha o izquierda
         Dim Valor As Byte
         TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 0 - &H3036) = 0 'resetea el contador de la animación
         '2A10
-        If (TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) And &H80) <> 0 Then
+        'If (TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) And &H80) <> 0 Then
+        If LeerBitArray(TablaCaracteristicasPersonajes_3036, PunteroCaracteristicasPersonajeIY + 5 - &H3036, 7) <> 0 Then
             '2a16
+            'si el personaje ocupa 4 casillas en el buffer de alturas
             Valor = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036)
             Valor = Valor Xor &H20
             TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) = Valor
@@ -5219,24 +5432,18 @@ H2BA6:
         '2a1e
         Valor = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 1 - &H3036) 'lee la orientación
         'cambia la orientación del personaje
-        If Izquierda Then
+        If IzquierdaC Then
             Valor = (Valor + 1) And &H3
         Else
             Valor = (Valor + 255) And &H3
         End If
-
+        '2A24
         TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 1 - &H3036) = Valor
-
-
-        AvanzarAnimacionSprite_2A27(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, PunteroRutinaFlipearGraficos)
-
-
-
-
-
+        '2A27
+        AvanzarAnimacionSprite_2A27(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY)
     End Sub
 
-    Sub ObtenerAlturaDestinoPersonaje_27B8(ByVal DiferenciaAlturaA As Byte, ByVal PunteroCaracteristicasPersonajeIY As Long, ByRef Salida1A As Long, ByRef Salida2C As Long, ByRef Salida3HL As Long)
+    Sub ObtenerAlturaDestinoPersonaje_27B8(ByVal DiferenciaAlturaA As Byte, ByVal AlturaC As Byte, ByVal PunteroCaracteristicasPersonajeIY As Integer, ByRef Salida1A As Integer, ByRef Salida2C As Integer, ByRef Salida3HL As Integer)
         'comprueba la altura de las posiciones a las que va a moverse el personaje y las devuelve en Salida1A y Salida2C
         'en Salida3HL devuelve el puntero en la tabla TablaAvancePersonaje con los incrementos necesarios en x e y para avanzar el personaje
         'si el personaje no está en la pantalla actual, se devuelve lo mismo que se pasó en DiferenciaAlturaA (se supone que ya se ha calculado la diferencia de altura fuera)
@@ -5252,35 +5459,43 @@ H2BA6:
         AlturaBasePlanta = LeerAlturaBasePlanta_2473(AlturaPersonaje)
         If AlturaBasePlanta <> AlturaBasePlantaActual_2DBA Then 'si no coincide la planta en la que está el personaje con la que se está mostrando, sale
             Salida1A = DiferenciaAlturaA
+            Salida2C = AlturaC
             Exit Sub
         End If
         '27c6
         AlturaRelativa = AlturaPersonaje - AlturaBasePlanta
         '27CB
-        ObtenerAlturaDestinoPersonaje_27CB(AlturaRelativa, PunteroCaracteristicasPersonajeIY, Salida1A, Salida2C, Salida3HL)
+        ObtenerAlturaDestinoPersonaje_27CB(AlturaRelativa, DiferenciaAlturaA, AlturaC, PunteroCaracteristicasPersonajeIY, Salida1A, Salida2C, Salida3HL)
     End Sub
 
-    Sub ObtenerAlturaDestinoPersonaje_27CB(ByVal DiferenciaAlturaA As Byte, ByVal PunteroCaracteristicasPersonajeIY As Long, ByRef Salida1A As Long, ByRef Salida2C As Long, ByRef Salida3HL As Long)
+    Sub ObtenerAlturaDestinoPersonaje_27CB(ByVal DiferenciaAlturaA As Byte, ByVal DiferenciaAlturaB As Byte, ByVal AlturaC As Byte, ByVal PunteroCaracteristicasPersonajeIY As Integer, ByRef Salida1A As Integer, ByRef Salida2C As Integer, ByRef Salida3HL As Integer)
+        'comprueba la altura de las posiciones a las que va a moverse el personaje y las devuelve en a y c
+        'si el personaje no está visible, se devuelve lo mismo que se pasó en a
+        'en iy se pasan las características del personaje que se mueve hacia delante
         'aquí llega con DiferenciaAlturaA = altura relativa dentro de la planta
         Dim PosicionX As Byte 'posición global del personaje
         Dim PosicionY As Byte 'posición global del personaje
-        Dim PunteroBufferAlturas As Long
-        Dim PunteroBufferAlturasAnterior As Long
-        Dim PunteroTablaAvancePersonaje As Long 'puntero a la tabla de incrementos
-        Dim IncrementoBucleInterior As Long
-        Dim IncrementoBucleExterior As Long
-        Dim IncrementoInicial As Long
-        Dim ContadorExterior As Long
-        Dim ContadorInterior As Long
-        Dim BufferAuxiliar_2DC5(&HF) As Long
-        Dim PunteroBufferAuxiliar As Long
+        Dim PunteroBufferAlturas As Integer
+        Dim PunteroBufferAlturasAnterior As Integer
+        Dim PunteroTablaAvancePersonaje As Integer 'puntero a la tabla de incrementos
+        Dim IncrementoBucleInterior As Integer
+        Dim IncrementoBucleExterior As Integer
+        Dim IncrementoInicial As Integer
+        Dim ContadorExterior As Integer
+        Dim ContadorInterior As Integer
+
+        Dim PunteroBufferAuxiliar As Integer
         Dim ValorBufferAlturas As Byte
+        Dim BufferAuxiliar As Boolean 'true: se usa el buffer secundario de 96F4
+
+        If PunteroBufferAlturas_2D8A <> &H01C0 Then BufferAuxiliar = True
         'obtiene la posición global del personaje
         PosicionY = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 3 - &H3036)
         PosicionX = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 2 - &H3036)
         If Not DeterminarPosicionCentral_279B(PosicionX, PosicionY) Then 'PosicionX,PosicionY = posición ajustada a las 20x20 posiciones centrales
             '27d8
-            Salida1A = DiferenciaAlturaA
+            Salida1A = DiferenciaAlturaB
+            Salida2C = AlturaC
             Exit Sub
         End If
         'aquí llega si la posición es visible
@@ -5306,10 +5521,14 @@ H2BA6:
             '2812
             For ContadorInterior = 1 To 4 'el bucle interior realiza 4 iteraciones
                 '2815
-                ValorBufferAlturas = TablaBufferAlturas_01C0(PunteroBufferAlturas - &H1C0)
-                If ValorBufferAlturas < &H10 Then 'comprueba si en esa posición hay algun personaje
-                    '281E
-                    BufferAuxiliar_2DC5(PunteroBufferAuxiliar - &H2DC5) = CLng(ValorBufferAlturas) - CLng(DiferenciaAlturaA)
+                If Not BufferAuxiliar Then
+                    ValorBufferAlturas = TablaBufferAlturas_01C0(PunteroBufferAlturas - &H1C0)
+                Else
+                    ValorBufferAlturas = TablaBufferAlturas_96F4(PunteroBufferAlturas - &H96F4&)
+                End If
+                If ValorBufferAlturas <&H10 Then 'comprueba si en esa posición hay algun personaje
+                    ' 281E
+                    BufferAuxiliar_2DC5(PunteroBufferAuxiliar - &H2DC5) = CInt(ValorBufferAlturas) - CInt(DiferenciaAlturaA)
                 Else
                     '281A
                     BufferAuxiliar_2DC5(PunteroBufferAuxiliar - &H2DC5) = ValorBufferAlturas And &H30&
@@ -5323,7 +5542,8 @@ H2BA6:
             PunteroBufferAlturas = PunteroBufferAlturasAnterior + IncrementoBucleExterior
         Next
         '2833
-        If (TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) And &H80) Then  'si el personaje sólo ocupa 1 posición
+        'If (TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) And &H80) Then  'si el personaje sólo ocupa 1 posición
+        If LeerBitArray(TablaCaracteristicasPersonajes_3036, PunteroCaracteristicasPersonajeIY + 5 - &H3036, 7) Then  'si el personaje sólo ocupa 1 posición
             '2839
             'guarda en a y en c el contenido de las 2 posiciones hacia las que avanza el personaje
             Salida2C = BufferAuxiliar_2DC5(&H2DC6 - &H2DC5)
@@ -5339,15 +5559,16 @@ H2BA6:
         End If
     End Sub
 
-    Function ObtenerPunteroPosicionVecinaPersonaje_2783(ByVal PunteroCaracteristicasPersonajeIY As Long) As Long
+    Function ObtenerPunteroPosicionVecinaPersonaje_2783(ByVal PunteroCaracteristicasPersonajeIY As Integer) As Integer
         'devuelve la dirección de la tabla para calcular la altura de las posiciones vecinas
         'según el tamaño de la posición del personaje y la orientación
         'iy=3072,a=0->284d
-        Dim OrientacionA As Long
+        Dim OrientacionA As Integer
         'obtiene la orientación del personaje
         '278f
         OrientacionA = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 1 - &H3036)
-        If (TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) And &H80) Then
+        'If (TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) And &H80) Then
+        If LeerBitArray(TablaCaracteristicasPersonajes_3036, PunteroCaracteristicasPersonajeIY + 5 - &H3036, 7) Then
             '2792
             ObtenerPunteroPosicionVecinaPersonaje_2783 = &H286D + 8 * OrientacionA
         Else 'si el bit 7 no está puesto (si el personaje ocupa 4 tiles)
@@ -5357,7 +5578,7 @@ H2BA6:
         End If
     End Function
 
-    Private Function LeerDatoTablaAvancePersonaje(ByVal PunteroPosicionVecinaPersonajeHL As Long, ByVal NBits As Long) As Long
+    Private Function LeerDatoTablaAvancePersonaje(ByVal PunteroPosicionVecinaPersonajeHL As Integer, ByVal NBits As Integer) As Integer
         'busca en la tabla 284D ó 286D, dependiendo del valor de HL, un valor con signo de 8 ó 16 bits
 
         '; tabla para el cálculo del avance de los personajes según la orientación (para personajes que ocupan 4 tiles)
@@ -5395,21 +5616,23 @@ H2BA6:
         End If
     End Function
 
-    Sub AvanzarPersonaje_2954(ByVal PunteroSpriteIX As Long, ByVal PunteroCaracteristicasPersonajeIY As Long, ByVal PunteroRutinaFlipearGraficos As Long, ByVal Altura1A As Long, ByVal Altura2C As Long, ByVal PunteroTablaAvancePersonajeHL As Long)
+    Sub AvanzarPersonaje_2954(ByVal PunteroSpriteIX As Integer, ByVal PunteroCaracteristicasPersonajeIY As Integer, ByVal Altura1A As Integer, ByVal Altura2C As Integer, ByVal PunteroTablaAvancePersonajeHL As Integer)
         '; rutina llamada para ver si el personaje avanza
         '; en a y en c se pasa la diferencia de alturas a la posición a la que quiere avanzar
         ' en HL se pasa el puntero a la tabla de avence de personaje para actualizar la posición del personaje
         Dim AlturaPersonajeE As Byte
         Dim TamañoOcupadoA As Byte 'tamaño ocupado por el personaje en el buffer de alturas
-        TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) And &HEF 'pone a 0 el bit que indica si el personaje está bajando o subiendo
+        'TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) And &HEF 'pone a 0 el bit que indica si el personaje está bajando o subiendo
+        ClearBitArray(TablaCaracteristicasPersonajes_3036, PunteroCaracteristicasPersonajeIY + 5 - &H3036, 4)  'pone a 0 el bit que indica si el personaje está bajando o subiendo
         '295C
         AlturaPersonajeE = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) 'altura del personaje
         '295F
-        If (TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) And &HF0) = 0 Then ' si el personaje ocupa 4 posiciones
+        'If (TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) And &HF0) = 0 Then ' si el personaje ocupa 4 posiciones
+        If Not LeerBitArray(TablaCaracteristicasPersonajes_3036, PunteroCaracteristicasPersonajeIY + 5 - &H3036, 7) Then ' si el personaje ocupa 4 posiciones
             '29b7
-            '; aquí salta si el personaje ocupa 4 posiciones. Llega con:
-            ';  Altura1A = diferencia de altura con la posicion 1 más cercana al personaje según la orientación
-            ';  Altura2C = diferencia de altura con la posicion 2 más cercana al personaje según la orientación
+            'aquí salta si el personaje ocupa 4 posiciones. Llega con:
+            'Altura1A = diferencia de altura con la posicion 1 más cercana al personaje según la orientación
+            'Altura2C = diferencia de altura con la posicion 2 más cercana al personaje según la orientación
             If Altura1A = 1 Or Altura1A = -1 Then
                 If Altura1A = 1 Then 'si se va hacia arriba
                     '29c3
@@ -5434,7 +5657,7 @@ H2BA6:
                 MovimientoRealizado_2DC1 = True 'indica que ha habido movimiento
                 '29E2
                 'incrementa el contador de los bits 0 y 1 del byte 0, avanza la animación del sprite y lo redibuja
-                IncrementarContadorAnimacionSprite_2A01(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, PunteroRutinaFlipearGraficos)
+                IncrementarContadorAnimacionSprite_2A01(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY)
                 Exit Sub
                 '29bf
             ElseIf Altura1A <> 0 Then 'en otro caso, sale si quiere subir o bajar más de una unidad
@@ -5443,7 +5666,7 @@ H2BA6:
             Else
                 '29C1
                 'si no cambia de altura, actualiza la posición según hacia donde se avance, incrementa el contador de los bits 0 y 1 del byte 0, avanza la animación del sprite y lo redibuja
-                AvanzarPersonaje_29F4(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, PunteroRutinaFlipearGraficos, Altura1A, Altura2C, PunteroTablaAvancePersonajeHL)
+                AvanzarPersonaje_29F4(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, Altura1A, Altura2C, PunteroTablaAvancePersonajeHL)
             End If
             Exit Sub
         Else
@@ -5454,7 +5677,8 @@ H2BA6:
             If Altura2C = &H10 Then Exit Sub 'si en la posición del personaje + 2 (según la orientación que tenga) hay un personaje, sale
             If Altura2C = &H20 Then Exit Sub 'si se quiere avanzar a una posición donde hay un personaje, sale
             '2969
-            If (TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) And &H20) = 0 Then 'si el personaje no está girado en el sentido de subir o bajar en el desnivel
+            'If (TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) And &H20) = 0 Then 'si el personaje no está girado en el sentido de subir o bajar en el desnivel
+            If Not LeerBitArray(TablaCaracteristicasPersonajes_3036, PunteroCaracteristicasPersonajeIY + 5 - &H3036, 5) Then 'si el personaje no está girado en el sentido de subir o bajar en el desnivel
                 '297D
                 ' aquí salta si el bit 5 es 0. Llega con:
                 '  Altura1A = diferencia de altura con la posición más cercana al personaje según la orientación
@@ -5465,7 +5689,8 @@ H2BA6:
                     TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) - 1 'deshace el incremento
                     If Altura1A <> -1 Then Exit Sub 'si no se está bajando una unidad, sale
                     '298a
-                    TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) Or &H10 'indica que está bajando
+                    'TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) Or &H10 'indica que está bajando
+                    SetBitArray(TablaCaracteristicasPersonajes_3036, PunteroCaracteristicasPersonajeIY + 5 - &H3036, 4) 'indica que está bajando
                     '298e
                     TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) - 1 'decrementa la altura del personaje
                 End If
@@ -5473,7 +5698,7 @@ H2BA6:
                 If Altura1A <> Altura2C Then 'compara la altura de la posición más cercana al personaje con la siguiente
                     '2992
                     'si las alturas no son iguales, avanza la posición
-                    AvanzarPersonaje_29F4(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, PunteroRutinaFlipearGraficos, Altura1A, Altura2C, PunteroTablaAvancePersonajeHL)
+                    AvanzarPersonaje_29F4(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, Altura1A, Altura2C, PunteroTablaAvancePersonajeHL)
                 Else
                     '2994
                     'aquí llega si avanza y las 2 posiciones siguientes tienen la misma altura
@@ -5488,12 +5713,12 @@ H2BA6:
                     End If
                     MovimientoRealizado_2DC1 = True 'indica que ha habido movimiento
                     'incrementa el contador de los bits 0 y 1 del byte 0, avanza la animación del sprite y lo redibuja
-                    IncrementarContadorAnimacionSprite_2A01(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, PunteroRutinaFlipearGraficos)
+                    IncrementarContadorAnimacionSprite_2A01(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY)
                 End If
             Else
                 '2970
-                Dim Orientacion As Long
-                Dim Valor As Long
+                Dim Orientacion As Integer
+                Dim Valor As Integer
                 Orientacion = ObtenerOrientacion_29AE(PunteroCaracteristicasPersonajeIY) 'devuelve 0 si la orientación del personaje es 0 o 3, en otro caso devuelve 1
                 '2974
                 'cuando va hacia la derecha o hacia abajo, al convertir la posición en 4, solo hay 1 de diferencia
@@ -5508,31 +5733,31 @@ H2BA6:
                 If Valor <> 0 Then Exit Sub 'si no está a ras de suelo, sale?
                 '297a
                 'aunque en realidad se llama a 29FE, la primera parte no hace nada, así que es lo mismo llamar a 29F4
-                AvanzarPersonaje_29F4(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, PunteroRutinaFlipearGraficos, Altura1A, Altura2C, PunteroTablaAvancePersonajeHL)
+                AvanzarPersonaje_29F4(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, Altura1A, Altura2C, PunteroTablaAvancePersonajeHL)
             End If
         End If
     End Sub
 
 
-    Sub AvanzarPersonaje_29F4(ByVal PunteroSpriteIX As Long, ByVal PunteroCaracteristicasPersonajeIY As Long, ByVal PunteroRutinaFlipearGraficos As Long, ByVal Altura1A As Long, ByVal Altura2C As Long, ByVal PunteroTablaAvancePersonajeHL As Long)
+    Sub AvanzarPersonaje_29F4(ByVal PunteroSpriteIX As Integer, ByVal PunteroCaracteristicasPersonajeIY As Integer, ByVal Altura1A As Integer, ByVal Altura2C As Integer, ByVal PunteroTablaAvancePersonajeHL As Integer)
         '; actualiza la posición según hacia donde se avance, incrementa el contador de los bits 0 y 1 del byte 0, avanza la animación del sprite y lo redibuja
         '; aquí salta si las alturas de las 2 posiciones no son iguales. Llega con:
         ';  Altura1A = diferencia de altura con la posición más cercana al personaje según la orientación
         ';  Altura2C = diferencia de altura con la posición del personaje + 2 (según la orientación que tenga)
         '   PunteroTablaAvancePersonajeHL=puntero a la tabla de avance del personaje
-        Dim DiferenciaAlturaA As Long
+        Dim DiferenciaAlturaA As Integer
         DiferenciaAlturaA = Altura1A - Altura2C + 1
         '29F8
         AvanzarPersonaje_29E4(PunteroCaracteristicasPersonajeIY, PunteroTablaAvancePersonajeHL)
         'modFunciones.GuardarArchivo "Perso0", TablaCaracteristicasPersonajes_3036
         '2a01
-        IncrementarContadorAnimacionSprite_2A01(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY, PunteroRutinaFlipearGraficos)
+        IncrementarContadorAnimacionSprite_2A01(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY)
     End Sub
 
-    Sub AvanzarPersonaje_29E4(ByVal PunteroCaracteristicasPersonajeIY As Long, ByVal PunteroTablaAvancePersonajeHL As Long)
+    Sub AvanzarPersonaje_29E4(ByVal PunteroCaracteristicasPersonajeIY As Integer, ByVal PunteroTablaAvancePersonajeHL As Integer)
         'actualiza la posición en x y en y del personaje según la orientación hacia la que avanza
-        Dim AvanceX As Long
-        Dim AvanceY As Long
+        Dim AvanceX As Integer
+        Dim AvanceY As Integer
         AvanceX = LeerDatoTablaAvancePersonaje(PunteroTablaAvancePersonajeHL, 8)
         '29e5
         TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 2 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 2 - &H3036) + AvanceX
@@ -5542,7 +5767,7 @@ H2BA6:
         TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 3 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 3 - &H3036) + AvanceY
     End Sub
 
-    Function ObtenerOrientacion_29AE(ByVal PunteroCaracteristicasPersonajeIY As Long) As Byte
+    Function ObtenerOrientacion_29AE(ByVal PunteroCaracteristicasPersonajeIY As Integer) As Byte
         'devuelve 0 si la orientación del personaje es 0 o 3, en otro caso devuelve 1
         Dim Valor As Byte
         Valor = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 1 - &H3036) 'lee la orientación del personaje
@@ -5558,8 +5783,8 @@ H2BA6:
 
     Sub ModificarCaracteristicasSpriteLuz_26A3()
         'modifica las características del sprite de la luz si puede ser usada por adso
-        Dim PosicionX As Long 'posición x del sprite de la luz
-        Dim PosicionY As Long 'posición y del sprite de la luz
+        Dim PosicionX As Integer 'posición x del sprite de la luz
+        Dim PosicionY As Integer 'posición y del sprite de la luz
         TablaSprites_2E17(&H2FCF - &H2E17) = &HFE 'desactiva el sprite de la luz
         If Not HabitacionOscura_156C Then Exit Sub 'si la habitación está iluminada, sale
         '26ad
@@ -5613,7 +5838,46 @@ H2BA6:
         End If
     End Sub
 
-    Public Async Sub DibujarPresentacion()
+    Public Sub DibujarPresentacion()
+        'coloca en pantalla la imagen de presentación, usando el orden
+        'de líneas del original
+        Static Estado As Byte = 0
+        Static ContadorBanco As Integer = 7
+        Select Case Estado
+            Case = 0
+                SeleccionarPaleta(0)
+                ModPantalla.DibujarRectangulo(0, 0, 319, 199, 6) 'fondo azul oscuro
+                SeleccionarPaleta(4)
+                Estado = 1
+                SiguienteTick(2500, "DibujarPresentacion")
+            Case = 1
+                ModPantalla.DibujarRectangulo(0, 0, 319, 199, 0) 'fondo rosa
+                ModPantalla.Refrescar()
+                Estado = 2
+                ContadorBanco = 7
+                SiguienteTick(1200, "DibujarPresentacion")
+            Case = 2
+                DibujarBancoPresentacion(ContadorBanco)
+                ModPantalla.Refrescar()
+                Application.DoEvents()
+                ContadorBanco = ContadorBanco - 1
+                If ContadorBanco < 0 Then Estado = 3
+                SiguienteTick(100, "DibujarPresentacion")
+            Case = 3
+                Estado = 4
+                SiguienteTick(5000, "DibujarPresentacion")
+            Case = 4
+                Estado = 0
+                ContadorBanco = 7
+                ModPantalla.DibujarRectangulo(0, 0, 319, 199, 1) 'fondo negro
+                SeleccionarPaleta(0) 'paleta negra
+                'ModPantalla.DibujarRectangulo(0, 0, 319, 199, 0) 'fondo rosa
+                'SeleccionarPaleta(1)
+                InicializarJuego_249A_b()
+        End Select
+    End Sub
+
+    Public Async Sub DibujarPresentacion_anterior()
         'coloca en pantalla la imagen de presentación, usado el orden
         'de líneas del original
         Dim ContadorBanco As Integer
@@ -5700,5 +5964,3142 @@ H2BA6:
         If Pixel And &H02 Then NColor = NColor Or 8
         LeerColorPixel0Modo0 = NColor
     End Function
+
+    Public Sub Retardo(Tiempo As Integer)
+        'hace una pausa de la duración indicada en "tiempo" (ms)
+        Dim Contador As Integer
+        TmRetardo.Interval = Tiempo
+        TmRetardo.Enabled = True
+        Do While TmRetardo.Enabled = True
+            Contador = Contador + 1
+            If Contador = 10 Then
+                Application.DoEvents()
+                Contador = 0
+            End If
+        Loop
+    End Sub
+
+    Private Sub TmRetardo_Tick(sender As Object, e As EventArgs) Handles TmRetardo.Tick
+        TmRetardo.Enabled = False
+    End Sub
+
+    Public Function EscribirComando_0CE9(ByVal PersonajeIY As Integer, ByVal DatosComandoHL As Integer, ByVal LongitudDatosB As Byte) As Integer
+        '; escribe b bits del comando que se le pasa en hl del personaje pasado en iy
+        ';  iy = apunta a los datos de posición del personaje (características)
+        ';  b = longitud del comando
+        ';  hl = datos del comando
+        'devuelve:
+        ' de = posición del último byte escrito en el buffer de comandos
+        Dim Contador As Byte
+        Dim NBits As Byte
+        Dim PunteroDE As Integer
+        Dim Comando As Byte
+        For Contador = 0 To LongitudDatosB - 1
+            NBits = TablaCaracteristicasPersonajes_3036(PersonajeIY + 9 - &H3036) 'lee el contador
+            '0cec
+            If NBits = 8 Then
+                'aquí llega cuando se ha procesado un byte completo
+                '0cf0
+                TablaCaracteristicasPersonajes_3036(PersonajeIY + 9 - &H3036) = 0 'si llega a 8 se reinicia
+                PunteroDE = TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0B - &H3036) 'lee el índice de la tabla de bc
+                PunteroDE = PunteroDE + Leer16(TablaCaracteristicasPersonajes_3036, PersonajeIY + &H0C - &H3036) 'punterode = dirección[indice]
+                'incrementa el índice de la tabla
+                TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0B - &H3036) = TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0B - &H3036) + 1
+                Comando = TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0A - &H3036) 'lee el comando y lo escribe en la posición anterior
+                'escribe en el buffer de comandos
+                BufferComandosMonjes_A200(PunteroDE - &HA200) = Comando
+                EscribirComando_0CE9 = PunteroDE
+            End If
+            '0d07
+            TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0A - &H3036) = TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0A - &H3036) << 1
+            If DatosComandoHL And &H8000& Then
+                TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0A - &H3036) = TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0A - &H3036) + 1 'rota el valor a la izquierda y mete el bit 15 de HL como bit 0
+            End If
+            DatosComandoHL = (DatosComandoHL << 1) And &HFFFF
+            TablaCaracteristicasPersonajes_3036(PersonajeIY + 9 - &H3036) = TablaCaracteristicasPersonajes_3036(PersonajeIY + 9 - &H3036) + 1
+        Next
+    End Function
+
+
+    Public Function EscribirComando_4729(PersonajeIY As Integer, Altura1A As Byte, Altura2C As Byte, ByVal PunteroTablaAvancePersonajeHL As Integer)
+        '; escribe un comando dependiendo de si sube, baja o se mantiene
+        '; llamado con:
+        ';  iy = datos de posición del personaje 
+        ';  a y c = altura de las posiciones a las que va a moverse el personaje
+        Dim PunteroTablaComandosHL As Integer
+        Dim NuevoEstadoA As Byte
+        Dim Comando As Integer
+        Dim LongitudComando As Byte
+        EscribirComando_4729 = 0
+        ClearBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 5 - &H3036, 4) 'indica que el personaje no está bajando en altura
+        '4731
+        If LeerBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 5 - &H3036, 7) Then 'si el personaje ocupa una posición
+            'aquí llega si el personaje ocupa una posición
+            '4733
+            If LeerBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 5 - &H3036, 5) Then
+                'si el personaje está girado con respecto al desnivel
+                '4739
+                PunteroTablaComandosHL = &H441A 'apunta a la tabla de comandos si el personaje sube en altura
+                '47b4
+                AvanzarPersonaje_29E4(PersonajeIY, PunteroTablaAvancePersonajeHL)
+            Else
+                'aquí llega si el personaje ocupa una posición y el bit 5 es 0
+                '4741
+                IncByteArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 4 - &H3036) 'incrementa la altura del personaje
+                PunteroTablaComandosHL = &H441A 'apunta a la tabla de comandos si el personaje sube en altura
+                If Altura1A <> 1 Then
+                    'si la diferencia de altura no es 1 (está bajando)
+                    '474D
+                    PunteroTablaComandosHL = &H4420 'apunta a la tabla de comandos si el personaje baja en altura
+                    DecByteArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 4 - &H3036)
+                    SetBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 5 - &H3036, 4)
+                    DecByteArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 4 - &H3036)
+                End If
+                '475C
+                If Altura1A = Altura2C Then
+                    'si las diferencias de altura son iguales
+                    '475F
+                    PunteroTablaComandosHL = PunteroTablaComandosHL + 3 'pasa a otra entrada de la tabla
+                    TablaCaracteristicasPersonajes_3036(PersonajeIY + 5 - &H3036) = TablaCaracteristicasPersonajes_3036(PersonajeIY + 5 - &H3036) And &H10 'preserva tan solo el bit de si sube y baja (y convierte al personaje en uno de 4 posiciones)
+                    '476c
+                    AvanzarPersonaje_29E4(PersonajeIY, PunteroTablaAvancePersonajeHL) 'actualiza la posición en x y en y del personaje según la orientación hacia la que avanza
+                    If ObtenerOrientacion_29AE(PersonajeIY) = 0 Then 'devuelve 0 si la orientación del personaje es 0 o 3, en otro caso devuelve 1
+                        AvanzarPersonaje_29E4(PersonajeIY, PunteroTablaAvancePersonajeHL) 'actualiza la posición en x y en y del personaje según la orientación hacia la que avanza
+                    End If
+                Else
+                    '47ae
+                    AvanzarPersonaje_29E4(PersonajeIY, PunteroTablaAvancePersonajeHL) 'actualiza la posición en x y en y del personaje según la orientación hacia la que avanza
+                End If
+            End If
+        Else
+            '4779
+            'aquí llega si el personaje ocupa cuatro posiciones
+            'altura1a = diferencia de altura con la posicion 1 más cercana al personaje según la orientación
+            'altura1c = diferencia de altura con la posicion 2 más cercana al personaje según la orientación
+            If Altura1A = 1 Then
+                'si está subiendo
+                '4788
+                IncByteArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 4 - &H3036) 'incrementa la altura
+                NuevoEstadoA = &H80
+                PunteroTablaComandosHL = &H441D 'apunta a la tabla si el personaje sube en altura
+                '479e
+                TablaCaracteristicasPersonajes_3036(PersonajeIY + 5 - &H3036) = NuevoEstadoA 'actualiza el estado
+                AvanzarPersonaje_29E4(PersonajeIY, PunteroTablaAvancePersonajeHL) 'actualiza la posición en x y en y del personaje según la orientación hacia la que avanza
+                If ObtenerOrientacion_29AE(PersonajeIY) <> 0 Then 'devuelve 0 si la orientación del personaje es 0 o 3, en otro caso devuelve 1
+                    AvanzarPersonaje_29E4(PersonajeIY, PunteroTablaAvancePersonajeHL) 'actualiza la posición en x y en y del personaje según la orientación hacia la que avanza
+                End If
+            Else
+                '477D
+                If Altura1A = &HFF Then
+                    'si está bajando
+                    '4794
+                    DecByteArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 4 - &H3036) 'decrementa la altura
+                    NuevoEstadoA = &H90
+                    PunteroTablaComandosHL = &H4423 'apunta a la tabla si el personaje baja en altura
+                    '479e. repetido para evitar got0s
+                    TablaCaracteristicasPersonajes_3036(PersonajeIY + 5 - &H3036) = NuevoEstadoA 'actualiza el estado
+                    AvanzarPersonaje_29E4(PersonajeIY, PunteroTablaAvancePersonajeHL) 'actualiza la posición en x y en y del personaje según la orientación hacia la que avanza
+                    If ObtenerOrientacion_29AE(PersonajeIY) <> 0 Then 'devuelve 0 si la orientación del personaje es 0 o 3, en otro caso devuelve 1
+                        AvanzarPersonaje_29E4(PersonajeIY, PunteroTablaAvancePersonajeHL) 'actualiza la posición en x y en y del personaje según la orientación hacia la que avanza
+                    End If
+                Else
+                    'si el personaje no cambia de altura
+                    '4781
+                    PunteroTablaComandosHL = &H4426 'apunta a la tabla si el personaje no cambia de altura
+                    '47ae. repetido para evitar got0s
+                    AvanzarPersonaje_29E4(PersonajeIY, PunteroTablaAvancePersonajeHL) 'actualiza la posición en x y en y del personaje según la orientación hacia la que avanza
+                End If
+            End If
+        End If
+        '47b7
+        Comando = Leer16Inv(TablaComandos_440C, PunteroTablaComandosHL - &H440C) 'lee en el comando a poner
+        LongitudComando = TablaComandos_440C(PunteroTablaComandosHL + 2 - &H440C) 'lee la longitud del comando
+        EscribirComando_0CE9(PersonajeIY, Comando, LongitudComando) 'escribe b bits del comando que se le pasa en hl del personaje pasado en iy
+    End Function
+
+    Public Sub GenerarComandosOrientacionPersonaje_47C3(ByVal PersonajeIY As Integer, ByVal ActualA As Byte, ByRef RequeridaC As Byte)
+        'escribe unos comandos para cambiar la orientación del personaje desde la orientación actual a la deseada
+        'a = orientación actual del personaje
+        'c = orientación que tomará del personaje
+        Dim OrientacionC As Byte
+        Dim PunteroComandoHL As Integer
+        Dim Comando As Integer
+        Dim LongitudComando As Byte
+        If ActualA >= RequeridaC Then
+            'si la diferencia es positiva
+            '47CE
+            OrientacionC = ActualA - RequeridaC
+        Else
+            '47C6
+            OrientacionC = RequeridaC - ActualA
+            OrientacionC = OrientacionC Xor &H02 'cambia el sentido en x
+            If OrientacionC = 0 Then OrientacionC = 2 'si era 0, pone 2
+        End If
+        '47cf
+        PunteroComandoHL = &H440C 'apunta a la tabla de la longitud de los comandos según la orientación
+        PunteroComandoHL = PunteroComandoHL + OrientacionC
+        LongitudComando = TablaComandos_440C(PunteroComandoHL - &H440C) 'lee la longitud del comando
+        PunteroComandoHL = &H4410 'apunta a la tabla de comandos para girar
+        PunteroComandoHL = PunteroComandoHL + 2 * OrientacionC
+        Comando = Leer16Inv(TablaComandos_440C, PunteroComandoHL - &H440C)
+        EscribirComando_0CE9(PersonajeIY, Comando, LongitudComando) 'escribe b bits del comando que se le pasa en hl del personaje pasado en iy
+        RequeridaC = OrientacionC
+    End Sub
+
+    Public Sub GenerarComandosOrigenDestino_4660(PersonajeIY As Integer, PunteroPilaCaminoHL As Integer)
+        'genera los comandos para seguir un camino en la misma pantalla
+        Dim PunteroBufferSpritesHL As Integer
+        Dim PunteroBufferSpritesIX As Integer
+        Dim DestinoDE As Integer
+        Dim DestinoYD As Byte
+        Dim DestinoXE As Byte
+        Dim PosicionBC As Integer 'posición intermedia
+        Dim PosicionXC As Byte 'nibble inferior de BC
+        Dim PosicionYB As Byte 'nibble superior de BC
+        Dim OrientacionA As Byte
+        Dim OrientacionB As Byte
+        Dim OrientacionResultadoC As Byte
+        Dim Valor As Integer
+        Dim Valor1 As Byte
+        Dim Valor2 As Byte
+        Dim Altura1A As Integer
+        Dim Altura2C As Integer
+        Dim PunteroTablaAvanceHL As Integer
+        ContadorInterrupcion_2D4B = &HFF 'pone el contador de la interrupción al máximo para que no se espere nada en el bucle principal
+        PunteroPilaCamino = PunteroPilaCaminoHL
+        DestinoDE = PopCamino() 'obtiene el movimiento en el tope de la pila
+        Integer2Nibbles(DestinoDE, DestinoYD, DestinoXE)
+        PunteroBufferSpritesHL = &H9500 'apunta al comienzo del buffer de sprites
+        BufferSprites_9500(PunteroBufferSpritesHL - &H9500) = &HFF 'marca el final de los movimientos
+        PunteroBufferSpritesHL = PunteroBufferSpritesHL + 1
+        '4674
+        Escribir16(BufferSprites_9500, PunteroBufferSpritesHL - &H9500, PosicionDestino_2DB4) 'obtiene la posición a la que debe ir el personaje y la graba al principio del buffer
+        PunteroBufferSpritesHL = PunteroBufferSpritesHL + 2
+        OrientacionA = TablaComandos_440C(&H4418 - &H440C) 'lee la orientación resultado
+        OrientacionA = OrientacionA Xor &H02 'invierte la orientación
+        BufferSprites_9500(PunteroBufferSpritesHL - &H9500) = OrientacionA 'escribe la orientación
+        If TablaComandos_440C(&H4419 - &H440C) <> 1 Then 'si el número de iteraciones realizadas no es 1, comienza a iterar
+            'si llega aquí, ya se ha encontrado el camino completo del destino al origen
+            '4689
+            Do
+                Do 'coge valores de la pila hasta encontrar el marcador de iteración (-1)
+                    Valor = PopCamino()
+                Loop While (Valor And &H8000) = 0
+                'aquí llega después de sacar FFFF de la pila
+                '468F
+                PunteroBufferSpritesHL = PunteroBufferSpritesHL + 1
+                'graba el movimiento del tope de la pila
+                '4690
+                BufferSprites_9500(PunteroBufferSpritesHL - &H9500) = DestinoXE
+                PunteroBufferSpritesHL = PunteroBufferSpritesHL + 1
+                BufferSprites_9500(PunteroBufferSpritesHL - &H9500) = DestinoYD
+                Do
+                    Do
+                        '4693
+                        PosicionBC = PopCamino() 'obtiene el siguiente valor de la pila
+                        Integer2Nibbles(PosicionBC, PosicionYB, PosicionXC)
+                        'si la distancia en y o en x >= 2, sigue sacando valores de la pila
+                        Valor1 = Z80Inc(Z80Sub(PosicionYB, DestinoYD))
+                        Valor2 = Z80Inc(Z80Sub(PosicionXC, DestinoXE))
+                        If (Valor1 < 3) And (Valor2 < 3) Then Exit Do
+                    Loop
+                    '46A5
+                    'combina las distancias +1 en x y en y en los 4 bits inferiores de a
+                    OrientacionA = Valor2 * 4 + Valor1
+                    '46ad
+                    'prueba la orientación 0
+                    OrientacionB = 0
+                    'a = 1 (00 01) cuando la distancia en x es -1 y en y es 0 (x-1,y)
+                    If OrientacionA = 1 Then Exit Do
+                    'prueba la orientación 1
+                    OrientacionB = 1
+                    'a = 6 (01 10) cuando la distancia en x es 0 y en y es 1 (x,y+1)
+                    If OrientacionA = 6 Then Exit Do
+                    'prueba la orientación 2
+                    OrientacionB = 2
+                    'a = 9 (10 01) cuando la distancia en x es 1 y en y es 0 (x+1,y)
+                    If OrientacionA = 9 Then Exit Do
+                    'prueba la orientación 3
+                    OrientacionB = 3
+                    'a = 4 (01 00) cuando la distancia en x es 0 y en y es -1 (x,y-1)
+                    If OrientacionA = 4 Then Exit Do
+                    'si no es ninguno de los 4 casos en los que se ha avanzado una unidad, sigue sacando elementos
+                Loop
+                'aquí llega si el valor sacado de la pila era una iteración anterior de alguno de los de antes
+                'define como destino la última dirección sacada de la pila
+                DestinoYD = PosicionYB
+                DestinoXE = PosicionXC
+                '46c2
+                PunteroBufferSpritesHL = PunteroBufferSpritesHL + 1
+                BufferSprites_9500(PunteroBufferSpritesHL - &H9500) = OrientacionB 'graba la orientación del movimiento
+
+                If PosicionBC = PosicionOrigen_2DB2 Then Exit Do
+                'si la coordenada del origen no es la misma que la sacada de la pila, continua procesando una iteración más
+            Loop
+            'si llega aquí, ya se ha encontrado el camino completo del destino al origen
+            '46d3
+            PunteroBufferSpritesIX = PunteroBufferSpritesHL 'obtiene el principio de la pila de movimientos en ix
+            Do
+                '46db
+                OrientacionB = TablaCaracteristicasPersonajes_3036(PersonajeIY + 1 - &H3036) 'obtiene la orientación del personaje
+                OrientacionA = BufferSprites_9500(PunteroBufferSpritesIX - &H9500) 'lee la orientación que debe tomar
+                'si el personaje ocupa 4 posiciones, salta esta parte
+                If LeerBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 5 - &H3036, 7) Then
+                    'el personaje ocupa 1 posición
+                    '46E7
+                    'compara la orientación del personaje con la que debe tomar
+                    If (OrientacionB Xor OrientacionA) And &H01 Then 'si el personaje está girado respecto de las escaleras
+                        'en otro caso, cambia el estado de girado en desnivel
+                        '46ED
+                        TablaCaracteristicasPersonajes_3036(PersonajeIY + 5 - &H3036) = TablaCaracteristicasPersonajes_3036(PersonajeIY + 5 - &H3036) Xor &H20
+                    End If
+                End If
+                '46f5
+                'modifica la orientación del personaje con la de la ruta que debe seguir
+                TablaCaracteristicasPersonajes_3036(PersonajeIY + 1 - &H3036) = OrientacionA
+                If OrientacionA <> OrientacionB Then 'comprueba si ha variado su orientación
+                    'si ha variado su orientación, escribe unos comandos para cambiar la orientación del personaje
+                    '46fa
+                    GenerarComandosOrientacionPersonaje_47C3(PersonajeIY, OrientacionB, OrientacionA)
+                End If
+                '46fd
+                ObtenerAlturaDestinoPersonaje_27B8(0, OrientacionA, PersonajeIY, Altura1A, Altura2C, PunteroTablaAvanceHL)
+                EscribirComando_4729(PersonajeIY, Int2Byte(Altura1A), Int2Byte(Altura2C), PunteroTablaAvanceHL)
+                Do
+                    '4707
+                    PunteroBufferSpritesIX = PunteroBufferSpritesIX - 3 'avanza a la siguiente posición del camino
+                    Valor1 = BufferSprites_9500(PunteroBufferSpritesIX - &H9500&)
+                    If Valor1 = &HFF Then Exit Sub 'si se ha alcanzado la última posición del camino, sale
+                    'obtiene la posición del personaje
+                    PosicionXC = TablaCaracteristicasPersonajes_3036(PersonajeIY + 2 - &H3036)
+                    PosicionYB = TablaCaracteristicasPersonajes_3036(PersonajeIY + 3 - &H3036)
+                    'ajusta la posición pasada en hl a las 20x20 posiciones centrales que se muestran. Si la posición está fuera, CF=1
+                    DeterminarPosicionCentral_279B(PosicionXC, PosicionYB)
+                    DestinoXE = BufferSprites_9500(PunteroBufferSpritesIX + 1 - &H9500)
+                    DestinoYD = BufferSprites_9500(PunteroBufferSpritesIX + 2 - &H9500)
+                    '4723
+                    'compara la posición del personaje con la de la pila
+                    'si coincide, es porque comprueba ha llegado a la posición de destino y debe sacar más valores de la pila
+                    If DestinoXE = PosicionXC And DestinoYD = PosicionYB Then Exit Do
+                    'en otro caso, sigue procesando entradas
+                Loop
+            Loop
+        End If
+    End Sub
+
+    Public Sub CambiarOrientacionPersonaje_464F(ByVal PersonajeIY As Integer, ByVal OrientacionNuevaC As Byte)
+        'cambia la orientación del personaje y avanza en esa orientación
+        'iy apunta a los datos de posición de un personaje
+        'c = nueva orientación del personaje
+        Dim OrientacionActualA As Byte
+        Dim Altura1A As Integer
+        Dim Altura2C As Integer
+        Dim PunteroTablaAvanceHL As Integer
+        OrientacionActualA = TablaCaracteristicasPersonajes_3036(PersonajeIY + 1 - &H3036) 'obtiene la orientación del personaje
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + 1 - &H3036) = OrientacionNuevaC 'pone la nueva orientación del personaje
+        '4656
+        If OrientacionActualA <> OrientacionNuevaC Then 'comprueba si era la orientación que tenía el personaje
+            'si no era así, escribe unos comandos para cambiar la orientación del personaje
+            GenerarComandosOrientacionPersonaje_47C3(PersonajeIY, OrientacionActualA, OrientacionNuevaC)
+        End If
+        '4659
+        'comprueba la altura de las posiciones a las que va a moverse el personaje y las devuelve en a y c
+        ObtenerAlturaDestinoPersonaje_27B8(0, OrientacionNuevaC, PersonajeIY, Int2Byte(Altura1A), Int2Byte(Altura2C), PunteroTablaAvanceHL)
+        'escribe un comando dependiendo de si sube, baja o se mantiene
+        EscribirComando_4729(PersonajeIY, Altura1A, Altura2C, PunteroTablaAvanceHL)
+    End Sub
+
+    Public Sub GenerarComandos_47E6(ByVal PersonajeIY As Integer, ByVal OrientacionNuevaC As Byte, ByVal NumeroRutina As Integer, ByVal PunteroPilaCaminoHL As Integer)
+        'puede llamar a la rutina 0x4660 o a la 0x464f
+        'la rutina 0x4660 se encarga de generar todos los comandos para ir desde el origen al destino
+        'la rutina de 0x464f escribe un comando dependiendo de si sube, baja o se mantiene o de la orientación y sale
+        'iy apunta a los datos de posición de un personaje
+        'c = nueva orientación del personaje
+        Dim OrientacionActualA As Byte
+        Dim PosicionActualDE As Integer
+        Dim AlturaActual As Byte
+        Dim Posiciones As Byte
+        'guarda la posición del personaje
+        PosicionActualDE = Leer16(TablaCaracteristicasPersonajes_3036, PersonajeIY + 2 - &H3036)
+        'guarda la orientación
+        OrientacionActualA = TablaCaracteristicasPersonajes_3036(PersonajeIY + 1 - &H3036)
+        'guarda la altura del personaje
+        AlturaActual = TablaCaracteristicasPersonajes_3036(PersonajeIY + 4 - &H3036)
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + 9 - &H3036) = 0 'reinicia las acciones del personaje
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0B - &H3036) = 0
+        'a indica para donde se mueve el personaje y su tamaño
+        Posiciones = TablaCaracteristicasPersonajes_3036(PersonajeIY + 5 - &H3036)
+        '4800
+        If NumeroRutina = &H4660 Then
+            GenerarComandosOrigenDestino_4660(PersonajeIY, PunteroPilaCaminoHL)
+        Else '464f
+            CambiarOrientacionPersonaje_464F(PersonajeIY, OrientacionNuevaC)
+        End If
+        'restaura el valor anterior de iy+05
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + 5 - &H3036) = Posiciones
+        'escribe un comando para que espere un poco antes de volver a moverse
+        EscribirComando_0CE9(PersonajeIY, &H1000, &H0C) 'escribe b bits del comando que se le pasa en hl del personaje pasado en iy
+        '480F
+        'restaura la orientación y altura del personaje
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + 4 - &H3036) = AlturaActual
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + 1 - &H3036) = OrientacionActualA
+        'restaura la posición del personaje
+        Escribir16(TablaCaracteristicasPersonajes_3036, PersonajeIY + 2 - &H3036, PosicionActualDE)
+        '481D
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + 9 - &H3036) = 0 'reinicia el puntero de las acciones del personaje
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0B - &H3036) = 0
+    End Sub
+
+    Public Function ComprobarPosicionesVecinas_4517(ByVal PosicionDE As Integer, ByVal PunteroBufferAlturasIX As Integer, ByVal AlturaC As Byte, ByVal AlturaBase_451C As Byte, ByVal RutinaCompleta As Boolean) As Boolean
+        'comprueba 4 posiciones relativas a ix ((x,y),(x,y-1),(x-1,y)(x-1,y-1) y si no hay mucha diferencia de altura, pone el bit 7 de (x,y)
+        'aquí llega con:
+        'c = contenido del buffer de alturas (sin el bit 7) para una posición próxima a la que estaba el personaje
+        'ix = puntero a una posición del buffer de alturas
+        'RutinaCompleta=false: sale en 4559
+        'si devuelve true, la función llamante debe terminar
+        Dim Valor As Byte
+        Dim DiferenciaAltura As Byte
+        Dim Encontrado As Boolean
+        ComprobarPosicionesVecinas_4517 = False
+        AlturaC = AlturaC And &H3F 'quita el bit 7 y 6
+        'obtiene la diferencia de altura entre el personaje y la posición que se está considerando
+        'y le suma 1
+        DiferenciaAltura = Z80Inc(Z80Sub(AlturaC, AlturaBase_451C))
+        If DiferenciaAltura >= 3 Then Exit Function 'si la diferencia de altura es >= 0x02, sale
+        '4522
+        'compara la altura de la posición de la izquierda con la altura de la posición actual
+        Valor = LeerByteBufferAlturas(PunteroBufferAlturasIX - 1)
+        Valor = Valor And &H3F
+        DiferenciaAltura = Z80Sub(Valor, AlturaC)
+        If DiferenciaAltura <> 0 Then
+            'aquí llega si la altura de pos (x,y) y de pos (x-1,y) no coincide
+            '452a
+            DiferenciaAltura = Z80Inc(DiferenciaAltura)
+            If DiferenciaAltura >= 3 Then Exit Function 'si la diferencia de altura es muy grande, sale
+            '452e
+            'obtiene la altura de la posición (x,y-1)
+            Valor = LeerByteBufferAlturas(PunteroBufferAlturasIX - &H18)
+            Valor = Z80Sub(Valor And &H3F, AlturaC)
+            If Valor <> 0 Then Exit Function 'si no coincide la altura con la de (x,y), sale
+            '4536
+            'obtiene la altura de la posición (x-1,y-1)
+            Valor = LeerByteBufferAlturas(PunteroBufferAlturasIX - &H19)
+            Valor = Z80Inc(Z80Sub(Valor And &H3F, AlturaC))
+            If Valor <> DiferenciaAltura Then Exit Function 'si la diferencia de altura no coincide con la de (x-1,y), sale
+        Else
+            'aquí llega si la altura de pos (x,y) y de pos (x-1,y) coincide
+            '4541
+            'obtiene la altura de la posición (x,y-1)
+            Valor = LeerByteBufferAlturas(PunteroBufferAlturasIX - &H18)
+            DiferenciaAltura = Z80Inc(Z80Sub(Valor And &H3F, AlturaC))
+            If DiferenciaAltura >= 3 Then Exit Function 'si la diferencia de altura es muy grande, sale
+            '454B
+            'obtiene la altura de la posición (x-1,y-1)
+            Valor = LeerByteBufferAlturas(PunteroBufferAlturasIX - &H19)
+            Valor = Z80Inc(Z80Sub(Valor And &H3F, AlturaC))
+            If Valor <> DiferenciaAltura Then Exit Function 'si la diferencia de altura no coincide con la de (x,y-1), sale
+        End If
+        'aquí llega si la diferencia de altura entre las 4 posiciones consideradas es pequeña
+        '4555
+        SetBitBufferAlturas(PunteroBufferAlturasIX, 7) 'pone a 1 el bit 7 de la posición
+        If Not RutinaCompleta Then Exit Function
+        '455a
+        ClearBitBufferAlturas(PunteroBufferAlturasIX, 7) 'pone el bit 7 a 0 (no es una posición explorada)
+        Encontrado = LeerBitBufferAlturas(PunteroBufferAlturasIX, 6)
+        If Encontrado = 0 Then
+            'si no ha encontrado lo que busca
+            '4567
+            'pone el bit 7 a 1 (casilla explorada)
+            SetBitBufferAlturas(PunteroBufferAlturasIX, 7)
+            PushCamino(PosicionDE)
+        Else
+            'aquí llega si el bit 6 es 1 (ha encontrado lo que se buscaba)
+            '456f
+            ComprobarPosicionesVecinas_4517 = True 'hace que en la función llamante vuelva
+            ResultadoBusqueda_2DB6 = &HFF '0xff indica que la búsqueda fue fructífera
+        End If
+    End Function
+
+    Public Function ComprobarPosicionesVecinas_450E(ByVal PosicionDE As Integer, ByVal OrientacionA As Byte, AlturaBase_451C As Byte, PunteroBufferAlturasIX As Integer) As Boolean
+        'si no se había explorado esta posición, comprueba las 4 posiciones vecinas ((x,y),(x,y-1),(x-1,y)(x-1,y-1) y
+        'si no hay mucha diferencia de altura, pone el bit 7 de (x,y). también escribe la orientación final en 0x4418
+        'si devuelve true, la función llamante debe terminar
+        Dim AlturaC As Byte
+        Dim BufferAuxiliar As Boolean 'true: se usa el buffer secundario de 96F4
+        If PunteroBufferAlturas_2D8A <> &H01C0 Then BufferAuxiliar = True
+        ComprobarPosicionesVecinas_450E = False
+        'obtiene el valor del buffer de alturas de la posición actual
+        If Not BufferAuxiliar Then
+            AlturaC = TablaBufferAlturas_01C0(PunteroBufferAlturasIX - &H01C0)
+        Else
+            AlturaC = TablaBufferAlturas_96F4(PunteroBufferAlturasIX - &H96F4)
+        End If
+        TablaComandos_440C(&H4418 - &H440C) = OrientacionA 'graba la orientación final
+        'si la posición ya ha sido explorada, sale
+        If (AlturaC And &H80) <> 0 Then Exit Function
+        ComprobarPosicionesVecinas_450E = ComprobarPosicionesVecinas_4517(PosicionDE, PunteroBufferAlturasIX, AlturaC, AlturaBase_451C, True)
+    End Function
+
+    Public Sub SetBitBufferAlturas(ByVal Puntero As Integer, ByVal NBit As Byte)
+        If PunteroBufferAlturas_2D8A = &H01C0 Then 'buffer principal con la pantalla actual
+            SetBitArray(TablaBufferAlturas_01C0, Puntero - &H01C0, NBit)
+        Else 'buffer auxiliar para la búsqueda de caminos
+            SetBitArray(TablaBufferAlturas_96F4, Puntero - &H96F4, NBit)
+        End If
+    End Sub
+
+    Public Sub ClearBitBufferAlturas(ByVal Puntero As Integer, ByVal NBit As Byte)
+        If PunteroBufferAlturas_2D8A = &H01C0 Then 'buffer principal con la pantalla actual
+            ClearBitArray(TablaBufferAlturas_01C0, Puntero - &H01C0, NBit)
+        Else 'buffer auxiliar para la búsqueda de caminos
+            ClearBitArray(TablaBufferAlturas_96F4, Puntero - &H96F4, NBit)
+        End If
+    End Sub
+
+    Public Function LeerByteBufferAlturas(ByVal Puntero As Integer) As Byte
+        On Error Resume Next
+        If PunteroBufferAlturas_2D8A = &H01C0 Then 'buffer principal con la pantalla actual
+            LeerByteBufferAlturas = TablaBufferAlturas_01C0(Puntero - &H01C0)
+        Else 'buffer auxiliar para la búsqueda de caminos
+            LeerByteBufferAlturas = TablaBufferAlturas_96F4(Puntero - &H96F4)
+        End If
+    End Function
+    Public Function EscribirByteBufferAlturas(ByVal Puntero As Integer, ByVal Valor As Byte)
+        If PunteroBufferAlturas_2D8A = &H01C0 Then 'buffer principal con la pantalla actual
+            TablaBufferAlturas_01C0(Puntero - &H01C0) = Valor
+        Else 'buffer auxiliar para la búsqueda de caminos
+            TablaBufferAlturas_96F4(Puntero - &H96F4) = Valor
+        End If
+    End Function
+
+    Public Function LeerBitBufferAlturas(ByVal Puntero As Integer, NBit As Byte) As Byte
+        If PunteroBufferAlturas_2D8A = &H01C0 Then 'buffer principal con la pantalla actual
+            LeerBitBufferAlturas = LeerBitArray(TablaBufferAlturas_01C0, Puntero - &H01C0, NBit)
+        Else 'buffer auxiliar para la búsqueda de caminos
+            LeerBitBufferAlturas = LeerBitArray(TablaBufferAlturas_96F4, Puntero - &H96F4, NBit)
+        End If
+    End Function
+
+    Public Sub PushCamino(ByVal Valor As Integer)
+        'escribe un valor de 16 bits en el buffer de sprites cuando se utiliza como pila
+        'para el cálculo de caminos
+        PunteroPilaCamino = PunteroPilaCamino - 2
+        Escribir16(BufferSprites_9500, PunteroPilaCamino - &H9500, Valor)
+        'PilaDebug(UBound(PilaDebug) - (&H9CFC - PunteroPilaCamino) / 2) = Valor
+    End Sub
+
+    Public Function PopCamino() As Integer
+        'lee un valor de 16 bits del buffer de sprites cuando se utiliza como pila
+        'para el cálculo de caminos
+        PopCamino = Leer16(BufferSprites_9500, PunteroPilaCamino - &H9500)
+        PunteroPilaCamino = PunteroPilaCamino + 2
+        If PunteroPilaCamino > &H9CFE Then Stop 'final del buffer de sprites
+    End Function
+
+    Public Function LeerPilaCamino(ByVal PunteroPilaCaminoHL As Integer) As Integer
+        'lee un valor de 16 bits del buffer de sprites cuando se utiliza como pila
+        'para el cálculo de caminos, utilizando un puntero diferente al actual
+        LeerPilaCamino = Leer16(BufferSprites_9500, PunteroPilaCaminoHL - &H9500)
+    End Function
+
+
+
+    Public Function BuscarCamino_446A(ByRef PunteroPilaHL As Integer) As Boolean
+        'rutina de búsqueda de caminos desde la posición que hay en 0x2db2 (destino) a la posicion del buffer de altura que tenga el bit 6 (orígen)
+        'sale con true para indicar que ha encontrado el camino
+        'devuelve en PunteroPilaHL el puntero al movimiento de la pila que dio la solución
+        Dim PunteroBufferAlturasDE As Integer 'puntero a la última línea del buffer de alturas
+        Dim PunteroBufferAlturasHL As Integer 'puntero a la primera línea del buffer de alturas
+        Dim PunteroBufferAlturasIX As Integer 'puntero al borde izquierdo del buffer de alturas
+        'Dim PunteroPilaHL As Integer
+        Dim Contador As Integer
+        Dim PosicionDE As Integer
+        Dim OrientacionA As Byte
+        Dim AlturaBase_451C As Byte
+        BuscarCamino_446A = False
+        PunteroBufferAlturasDE = PunteroBufferAlturas_2D8A + &H0228 'de = posición (X = 0, Y = 23) del buffer de alturas
+        PunteroBufferAlturasIX = PunteroBufferAlturas_2D8A 'de = posición (X = 0, Y = 23) del buffer de alturas
+        PunteroBufferAlturasHL = PunteroBufferAlturas_2D8A 'hl = posición (X = 0, Y = 0) del buffer de alturas
+        For Contador = 0 To 23 'recorre todas las filas/columnas del buffer de alturas
+            '447a
+            SetBitBufferAlturas(PunteroBufferAlturasHL, 7) 'pone el bit 7 de la posición en el borde superior
+            SetBitBufferAlturas(PunteroBufferAlturasIX, 7) 'pone el bit 7 de la posición en el borde izquierdo
+            SetBitBufferAlturas(PunteroBufferAlturasIX + 23, 7) 'pone el bit 7 de la posición en el borde izquierdo
+            SetBitBufferAlturas(PunteroBufferAlturasDE, 7) 'pone el bit 7 de la posición en el borde inferior
+            PunteroBufferAlturasIX = PunteroBufferAlturasIX + 24 'avanza ix a la siguiente línea
+            PunteroBufferAlturasDE = PunteroBufferAlturasDE + 1 'pasa a la siguiente columna de la última línea del buffer de alturas
+            PunteroBufferAlturasHL = PunteroBufferAlturasHL + 1 'pasa a la siguiente columna de la primera línea del buffer de alturas
+        Next 'repite hasta haber puesto el bit 7 de todas las posiciones del borde del buffer de alturas
+        'ModFunciones.GuardarArchivo("Buffer0", TablaBufferAlturas_01C0) '&H23F
+        ModFunciones.GuardarArchivo("Buffer0", TablaBufferAlturas_96F4) '&H23F
+
+        '4493
+        PunteroPilaCamino = &H9CFE 'pone la pila al final del buffer de sprites
+        TablaComandos_440C(&H4419 - &H440C) = 1 'inicia el nivel de recursión
+        PunteroBufferAlturasDE = PosicionOrigen_2DB2 'obtiene la posición inicial ajustada al buffer de alturas
+        PushCamino(PunteroBufferAlturasDE) 'guarda en la pila la posición inicial
+        'indexa en la tabla de alturas con de y devuelve la dirección correspondiente en ix
+        '0cd4
+        PunteroBufferAlturasIX = ((PunteroBufferAlturasDE And &H0000FF00) >> 8) * 24 + (PunteroBufferAlturasDE And &H000000FF) + PunteroBufferAlturas_2D8A
+        '44A8
+        SetBitBufferAlturas(PunteroBufferAlturasIX, 7) 'marca la posición inicial como explorada
+        PushCamino(&HFFFF) 'mete en la pila -1
+        PunteroPilaHL = &H9CFE 'hl apunta al final de la pila
+        Do
+            '44b3
+            PunteroPilaHL = PunteroPilaHL - 2
+            PosicionDE = Leer16(BufferSprites_9500, PunteroPilaHL - &H9500) 'de = valor sacado de la pila
+            '44ba
+            If PosicionDE <> &HFFFF Then 'si no recuperó -1, salta a explorar las posiciones vecinas
+                'aqui llega si no se leyó -1 de la pila
+                '44d0
+                'indexa en la tabla de alturas con de y devuelve la dirección correspondiente en ix
+                '0cd4
+                PunteroBufferAlturasIX = ((PosicionDE And &H0000FF00) >> 8) * 24 + (PosicionDE And &H000000FF) + PunteroBufferAlturas_2D8A
+                AlturaBase_451C = LeerByteBufferAlturas(PunteroBufferAlturasIX) And &H0F
+                'trata de explorar las posiciones que rodean al valor de posición que ha sacado de la pila (si no hay mucha diferencia de altura)
+                '44E0
+                OrientacionA = 2 'orientación izquierda
+                'pasa a la posición (x+1,y)
+                'si no estaba puesto el bit 7 de la posición actual, comprueba las 4 posiciones relacionadas con ix
+                '((x,y),(x,y-1),(x-1,y)(x-1,y-1) y si no hay mucha diferencia de altura, pone el bit 7 de (x,y)
+                If ComprobarPosicionesVecinas_450E(PosicionDE + 1, OrientacionA, AlturaBase_451C, PunteroBufferAlturasIX + 1) Then
+                    BuscarCamino_446A = True
+                    Exit Function
+                End If
+                '44E8
+                OrientacionA = 3 'orientación arriba
+                'pasa a la posición (x,y-1)
+                'si no estaba puesto el bit 7 de la posición actual, comprueba las 4 posiciones relacionadas con ix
+                '((x,y),(x,y-1),(x-1,y)(x-1,y-1) y si no hay mucha diferencia de altura, pone el bit 7 de (x,y)
+                If ComprobarPosicionesVecinas_450E(PosicionDE - &H100, OrientacionA, AlturaBase_451C, PunteroBufferAlturasIX - 24) Then
+                    BuscarCamino_446A = True
+                    Exit Function
+                End If
+                '44f4
+                OrientacionA = 0 'orientación derecha
+                'pasa a la posición (x-1,y)
+                'si no estaba puesto el bit 7 de la posición actual, comprueba las 4 posiciones relacionadas con ix
+                '((x,y),(x,y-1),(x-1,y)(x-1,y-1) y si no hay mucha diferencia de altura, pone el bit 7 de (x,y)
+                If ComprobarPosicionesVecinas_450E(PosicionDE - 1, OrientacionA, AlturaBase_451C, PunteroBufferAlturasIX - 1) Then
+                    BuscarCamino_446A = True
+                    Exit Function
+                End If
+                '4500
+                OrientacionA = 1 'orientación abajo
+                'pasa a la posición (x,y+1)
+                'si no estaba puesto el bit 7 de la posición actual, comprueba las 4 posiciones relacionadas con ix
+                '((x,y),(x,y-1),(x-1,y)(x-1,y-1) y si no hay mucha diferencia de altura, pone el bit 7 de (x,y)
+                If ComprobarPosicionesVecinas_450E(PosicionDE + &H100, OrientacionA, AlturaBase_451C, PunteroBufferAlturasIX + 24) Then
+                    BuscarCamino_446A = True
+                    Exit Function
+                End If
+            Else
+                'aquí llega si ha terminado una iteración
+                '44bc
+                If PunteroPilaHL = PunteroPilaCamino Then
+                    'si se han procesado todos los elementos, sale
+                    '4575
+                    ResultadoBusqueda_2DB6 = 0 'escribe el resultado de la búsqueda
+                    Exit Function
+                Else
+                    'en otro caso, mete un -1 para indicar que termina un nivel
+                    '44C6
+                    PushCamino(&HFFFF)
+                    TablaComandos_440C(&H4419 - &H440C) = TablaComandos_440C(&H4419 - &H440C) + 1 'incrementa el nivel de recursión
+                End If
+            End If
+        Loop
+    End Function
+
+    Public Function BuscarCamino_4435(ByRef PunteroPilaHL As Integer) As Boolean
+        'rutina llamada para buscar la ruta desde la posición que se le pasa en 0x2db2-0x2db3 a la que hay en 0x2db4-0x2db5 comprobando si es alcanzable
+        'sale con true para indicar que ha encontrado el camino
+        'devuelve en PunteroPilaHL el puntero al movimiento de la pila que dio la solución
+        Dim PunteroBufferAlturasIX As Integer
+        Dim AlturaBase_451C As Byte
+        BuscarCamino_4435 = False
+        'indexa en la tabla de alturas con PosicionDestino_2DB4 y devuelve la dirección correspondiente en ix
+        '0cd4
+        PunteroBufferAlturasIX = ((PosicionDestino_2DB4 And &H0000FF00) >> 8) * 24 + (PosicionDestino_2DB4 And &H000000FF) + PunteroBufferAlturas_2D8A
+        'lee la altura de esa posición
+        AlturaBase_451C = LeerByteBufferAlturas(PunteroBufferAlturasIX) And &H0F
+        If AlturaBase_451C < &H0E Then
+            '444f
+            'comprueba 4 posiciones relativas a ix ((x,y),(x,y-1),(x-1,y)(x-1,y-1) y si no hay mucha diferencia de altura, pone el bit 7 de (x,y)
+            ComprobarPosicionesVecinas_4517(0, PunteroBufferAlturasIX, AlturaBase_451C, AlturaBase_451C, False)
+            If LeerBitBufferAlturas(PunteroBufferAlturasIX, 7) Then 'si se puede alcanzar el destino
+                ClearBitBufferAlturas(PunteroBufferAlturasIX, 7) 'quita marca de posición explorada
+                SetBitBufferAlturas(PunteroBufferAlturasIX, 6) 'marca la posición como objetivo de la búsqueda
+                'rutina de búsqueda de caminos desde la posición que hay en 0x2db2 (destino) a la posicion del buffer de altura que tenga el bit 6 (orígen)
+                BuscarCamino_4435 = BuscarCamino_446A(PunteroPilaHL)
+                Exit Function
+            End If
+        End If
+        'si no se puede alcanzar el destino, sale
+        '4575
+        ResultadoBusqueda_2DB6 = 0
+    End Function
+
+    Public Function BuscarCamino_4429(ByRef PunteroPilaHL As Integer) As Boolean
+        'rutina llamada para buscar la ruta desde la posición que se le pasa en 0x2db2-0x2db3 a la que hay en 0x2db4-0x2db5
+        'sale con true para indicar que ha encontrado el camino
+        'devuelve en PunteroPilaHL el puntero al movimiento de la pila que dio la solución
+        Dim PunteroBufferAlturasIX As Integer
+        '0cd4
+        PunteroBufferAlturasIX = ((PosicionDestino_2DB4 And &H0000FF00) >> 8) * 24 + (PosicionDestino_2DB4 And &H000000FF) + PunteroBufferAlturas_2D8A
+        '442f
+        SetBitBufferAlturas(PunteroBufferAlturasIX, 6) 'marca la posición como objetivo de la búsqueda
+        BuscarCamino_4429 = BuscarCamino_446A(PunteroPilaHL)
+    End Function
+
+    Public Sub LimpiarRastrosBusquedaBufferAlturas_0BAE()
+        'elimina todos los rastros de la búsqueda del buffer de alturas
+        Dim Contador As Integer
+        If PunteroBufferAlturas_2D8A = &H01C0 Then 'buffer principal con la pantalla actual
+            For Contador = 0 To &H023F '24*24
+                '0BB7
+                TablaBufferAlturas_01C0(Contador) = TablaBufferAlturas_01C0(Contador) And &H3F
+            Next
+        Else 'buffer auxiliar para la búsqueda de caminos
+            For Contador = 0 To &H023F '24*24
+                '0BB7
+                TablaBufferAlturas_96F4(Contador) = TablaBufferAlturas_96F4(Contador) And &H3F
+            Next
+        End If
+    End Sub
+
+    Public Function LeerTablaPlantas_48B5(ByVal PosicionHL As Integer) As Integer
+        'dada la posición más significativa de un personaje en hl, indexa en la tabla de la planta y devuelve la entrada en ix
+        LeerTablaPlantas_48B5 = PunteroTablaConexiones_440A + ((PosicionHL And &HF00) >> 4 Or (PosicionHL And &H0F))
+    End Function
+
+    Public Function ComprobarPosicionCaminoHabitacion_489B(ByVal PosicionDE As Integer, ByVal PunteroTablaConexionesHabitacionesIX As Integer, ByVal MascaraBusquedaHabitacion_48A4 As Byte, ByVal OrientacionSalidaC As Byte, ByVal OrientacionCaminoB As Byte) As Boolean
+        'comprueba si la posición que se le pasa en ix puede ser accedida, y si es así, si ya se ha explorado anteriormente.
+        'si no se había explorado y era la que se buscaba, sale del algoritmo. En otro caso, la mete en pila para explorar desde esa posición
+        'MascaraBusquedaHabitacion_48A4 = número de bit a comprobar en la búsqueda de habitación (ojo: valor=0-7, no 7x)
+        'de=posición a analizar
+        'c = orientación por la que se quiere salir de la habitación
+        'b = orientación usada para ir del destino al origen
+        Dim DatosHabitacion As Byte
+        ComprobarPosicionCaminoHabitacion_489B = False
+        DatosHabitacion = TablaConexionesHabitaciones_05CD(PunteroTablaConexionesHabitacionesIX - &H05CD) 'obtiene los datos de la habitación
+        If (DatosHabitacion And OrientacionSalidaC) <> 0 Then Exit Function 'si no se puede salir de la habitación por la orientación que se le pasa, sale
+        '48a0
+        If ModFunciones.LeerBitArray(TablaConexionesHabitaciones_05CD, PunteroTablaConexionesHabitacionesIX - &H05CD, MascaraBusquedaHabitacion_48A4) Then
+            'si está puesto el bit que se busca, sale del algoritmo guardando la orientación de destino e indicando que la búsqueda fue fructífera
+            '456f
+            TablaComandos_440C(&H4418 - &H440C) = OrientacionCaminoB 'guarda la orientación final
+            ComprobarPosicionCaminoHabitacion_489B = True 'indica que la búsqueda fue fructífera
+            ResultadoBusqueda_2DB6 = &HFF '0xff indica que la búsqueda fue fructífera
+        Else
+            '48A8
+            If ModFunciones.LeerBitArray(TablaConexionesHabitaciones_05CD, PunteroTablaConexionesHabitacionesIX - &H05CD, 7) Then
+                'en otro caso, si la posición ya ha sido explorada, sale
+                Exit Function
+            Else
+                '48ad
+                'si la posición no se había explorado, la marca como explorada
+                ModFunciones.SetBitArray(TablaConexionesHabitaciones_05CD, PunteroTablaConexionesHabitacionesIX - &H05CD, 7)
+                PushCamino(PosicionDE) 'mete en la pila la posición actual
+            End If
+        End If
+    End Function
+
+    Public Function BuscarHabitacion_4830(ByVal MascaraBusquedaHabitacion_48A4 As Byte, ByRef PunteroPilaHL As Integer, ByRef ElementoActualPilaDE As Integer) As Boolean
+        'busca la pantalla indicada que cumpla una máscara que se especifica en 0x48a4, iniciando la búsqueda en la posición indicada en 0x2db2
+        'devuelve en ix la última posición del puntero de pila, y en de la última posición leída de la pila
+        Dim PunteroTablaConexionesHabitacionesIX As Integer
+        'Dim ElementoActualPilaDE As Integer
+        BuscarHabitacion_4830 = False
+        PunteroPilaCamino = &H9CFE 'pone como dirección la pila el final del buffer de sprites
+        '483B
+        PushCamino(PosicionOrigen_2DB2) 'guarda en la pila la posición inicial
+        'dada la posición más significativa de un personaje en hl, indexa en la tabla de la planta y devuelve la entrada en ix
+        PunteroTablaConexionesHabitacionesIX = LeerTablaPlantas_48B5(PosicionOrigen_2DB2)
+        ModFunciones.SetBitArray(TablaConexionesHabitaciones_05CD, PunteroTablaConexionesHabitacionesIX - &H05CD, 7) 'marca la posición inicial como explorada
+        PushCamino(&HFFFF) 'mete en la pila -1
+        PunteroPilaHL = &H9CFE 'apunta con hl a la parte procesada de la pila
+        Dim nose As Integer = 0
+        '484B
+        Do
+            PunteroPilaHL = PunteroPilaHL - 2
+            ElementoActualPilaDE = LeerPilaCamino(PunteroPilaHL)
+            If ElementoActualPilaDE = &HFFFF Then 'si no se ha completado una iteración
+                '4854
+                'comprueba si ha procesado todos los elementos de la pila
+                If PunteroPilaHL = PunteroPilaCamino Then
+                    '4575
+                    'si es así, sale
+                    ResultadoBusqueda_2DB6 = 0 'escribe el resultado de la búsqueda
+                    Exit Function
+                Else 'no se han procesado todos los elementos de la pila. marca el fín del nivel y continúa procesando
+                    '485E
+                    PushCamino(&HFFFF) 'mete en la pila -1
+                End If
+            Else 'aquí llega para procesar un elemento de la pila
+                '4861
+                'dada la posición más significativa de un personaje en hl, indexa en la tabla de la planta y devuelve la entrada en ix
+                PunteroTablaConexionesHabitacionesIX = LeerTablaPlantas_48B5(ElementoActualPilaDE)
+                '4869
+                'comprueba si la posición que se le pasa en ix puede ser accedida, y si es así, si ya se ha explorado anteriormente.
+                'si no se había explorado y era la que se buscaba, sale del algoritmo. En otro caso, la mete en pila para explorar desde esa posición
+                'pasa a la posición (x+1,y)
+                'orientación = 2, trata de ir por bit 2
+                If ComprobarPosicionCaminoHabitacion_489B(ElementoActualPilaDE + 1, PunteroTablaConexionesHabitacionesIX + 1, MascaraBusquedaHabitacion_48A4, 4, 2) Then
+                    ElementoActualPilaDE = ElementoActualPilaDE + 1
+                    BuscarHabitacion_4830 = True
+                    Exit Function
+                End If
+                '4872
+                'comprueba si la posición que se le pasa en ix puede ser accedida, y si es así, si ya se ha explorado anteriormente.
+                'si no se había explorado y era la que se buscaba, sale del algoritmo. En otro caso, la mete en pila para explorar desde esa posición
+                'pasa a la posición (x,y-1)
+                'orientación = 3, trata de ir por bit 3
+                If ComprobarPosicionCaminoHabitacion_489B(ElementoActualPilaDE - &H100, PunteroTablaConexionesHabitacionesIX - 16, MascaraBusquedaHabitacion_48A4, 8, 3) Then
+                    ElementoActualPilaDE = ElementoActualPilaDE - &H100
+                    BuscarHabitacion_4830 = True
+                    Exit Function
+                End If
+                '487F
+                'comprueba si la posición que se le pasa en ix puede ser accedida, y si es así, si ya se ha explorado anteriormente.
+                'si no se había explorado y era la que se buscaba, sale del algoritmo. En otro caso, la mete en pila para explorar desde esa posición
+                'pasa a la posición (x-1,y)
+                'orientación = 0, trata de ir por bit 1
+                If ComprobarPosicionCaminoHabitacion_489B(ElementoActualPilaDE - 1, PunteroTablaConexionesHabitacionesIX - 1, MascaraBusquedaHabitacion_48A4, 1, 0) Then
+                    ElementoActualPilaDE = ElementoActualPilaDE - 1
+                    BuscarHabitacion_4830 = True
+                    Exit Function
+                End If
+                '488c
+                'comprueba si la posición que se le pasa en ix puede ser accedida, y si es así, si ya se ha explorado anteriormente.
+                'si no se había explorado y era la que se buscaba, sale del algoritmo. En otro caso, la mete en pila para explorar desde esa posición
+                'pasa a la posición (x,y+1)
+                'orientación = 1, trata de ir por bit 2
+                If ComprobarPosicionCaminoHabitacion_489B(ElementoActualPilaDE + &H100, PunteroTablaConexionesHabitacionesIX + 16, MascaraBusquedaHabitacion_48A4, 2, 1) Then
+                    ElementoActualPilaDE = ElementoActualPilaDE + &H100
+                    BuscarHabitacion_4830 = True
+                    Exit Function
+                End If
+            End If
+        Loop
+    End Function
+
+    Public Function BuscarHabitacion_4826(ByVal MascaraBusquedaHabitacion_48A4 As Byte, ByRef PunteroPilaHL As Integer, ByRef ValorPilaDE As Integer) As Boolean
+        'busca la pantalla indicada en 0x2db4 empezando en la posición indicada en 0x2db2
+        Dim PunteroTablaConexionesHabitacionesIX As Integer
+        'dada la la pantalla que se busca en hl, indexa en la tabla de la planta y devuelve la entrada en ix
+        PunteroTablaConexionesHabitacionesIX = LeerTablaPlantas_48B5(PosicionDestino_2DB4)
+        'marca la pantalla buscada como el destino dentro de la planta
+        ModFunciones.SetBitArray(TablaConexionesHabitaciones_05CD, PunteroTablaConexionesHabitacionesIX - &H05CD, 6)
+        'busca la pantalla indicada que cumpla una máscara que se especifica en 0x48a4, iniciando la búsqueda en la posición indicada en 0x2db2
+        BuscarHabitacion_4826 = BuscarHabitacion_4830(MascaraBusquedaHabitacion_48A4, PunteroPilaHL, ValorPilaDE)
+    End Function
+
+    Public Function EsDistanciaPequeña_0C75(ByVal Coordenada1A As Byte, ByVal Coordenada2C As Byte, ByRef Distancia As Byte) As Boolean
+        'calcula la distancia entre la parte más significativa de las posiciones a y c, e indica si es >= 2
+        'en distancia devuelve el valor calculado
+        'deja en el nibble inferior de c la parte de la posición más significativa
+        Coordenada2C = Coordenada2C >> 4
+        'deja en el nibble inferior de a la parte de la posición más significativa
+        Coordenada1A = Coordenada1A >> 4
+        '0C85
+        Distancia = Z80Inc(Z80Sub(Coordenada1A, Coordenada2C))
+        If Distancia <= 2 And Distancia >= 0 Then 'si a = 0, 1 ó 2, CF = 1. Es decir, si la distancia era -1, 0 ó 1
+            EsDistanciaPequeña_0C75 = True
+        Else
+            EsDistanciaPequeña_0C75 = False
+        End If
+    End Function
+
+    Public Sub EscribirAlturaPuertaBufferAlturas_0E19(AlturaPuertaA As Byte, ByVal PunteroDatosIY As Integer)
+        'modifica el buffer de alturas con la altura de la puerta
+        Dim PunteroBufferAlturasIX As Integer
+        Dim DeltaBuffer As Integer
+        'lee en bc un valor relacionado con el desplazamiento de la puerta en el buffer de alturas
+        'si el objeto no es visible, sale. En otro caso, devuelve en ix un puntero a la entrada de la tabla de alturas de la posición correspondiente
+        If Not LeerDesplazamientoPuerta_0E2C(PunteroBufferAlturasIX, PunteroDatosIY, DeltaBuffer) Then Exit Sub
+        'marca la altura de esta posición del buffer de alturas
+        EscribirByteBufferAlturas(PunteroBufferAlturasIX, AlturaPuertaA)
+        'marca la altura de la siguiente posición del buffer de alturas
+        EscribirByteBufferAlturas(PunteroBufferAlturasIX + DeltaBuffer, AlturaPuertaA)
+        'marca la altura de la siguiente posición del buffer de alturas
+        EscribirByteBufferAlturas(PunteroBufferAlturasIX + 2 * DeltaBuffer, AlturaPuertaA)
+    End Sub
+
+    Public Sub RestaurarBufferAlturas_0B76()
+        'restaura el buffer de alturas de la pantalla actual
+        PunteroBufferAlturas_2D8A = &H01C0
+        '0B7E
+        'restaura los mínimos valores visibles de pantalla a los valores del personaje que sigue la cámara
+        CalcularMinimosVisibles_0B8F(&H2D73)
+        'fija la altura base de la planta con la altura del personaje al que sigue la cámara
+        'y lo graba en el motor
+        AlturaBasePlantaActual_2DBA = PosicionZPersonajeActual_2D77
+    End Sub
+
+    Public Sub ReorientarPersonaje_0A58(ByVal PunteroTablaPosicionesAlternativasIX As Integer, ByVal PersonajeIY As Integer)
+        'genera los comandos para obtener la orientación indicada en la posición alternativa
+        Dim OrientacionActual As Byte
+        Dim OrientacionRequerida As Byte
+        'lee la altura y la orientación de la posición de destino
+        OrientacionRequerida = TablaPosicionesAlternativas_0593(PunteroTablaPosicionesAlternativasIX + 2 - &H0593)
+        'se queda con la orientación en los 2 bits menos significativos
+        OrientacionRequerida = OrientacionRequerida >> 6
+        '0A5F
+        'lee la orientación del personaje que busca. si las orientaciones son iguales, sale
+        OrientacionActual = TablaCaracteristicasPersonajes_3036(PersonajeIY + 1 - &H3036)
+        If OrientacionActual = OrientacionRequerida Then Exit Sub
+        '0A65
+        'fija la primera posición del buffer de comandos
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + 9 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0B - &H3036) = 0
+        'escribe unos comandos para cambiar la orientación del personaje
+        GenerarComandosOrientacionPersonaje_47C3(PersonajeIY, OrientacionActual, OrientacionRequerida)
+        'escribe b bits del comando que se le pasa en hl del personaje pasado en iy
+        EscribirComando_0CE9(PersonajeIY, &H1000, &H0C)
+        '0a73
+        'fija la primera posición del buffer de comandos
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + 9 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0B - &H3036) = 0
+    End Sub
+
+
+    Public Function BuscarCamino_0B0E(ByVal PersonajeIY As Integer, ByVal Rutina4429 As Boolean) As Boolean
+        'busca la ruta desde la posición del personaje a lo grabado en 0x2db4-0x2db5
+        'Rutina4429=true, llama a la función de búsqueda 4429, y convierte a =0B0E en 0AFA
+        Dim PersonajeX As Byte
+        Dim PersonajeY As Byte
+        Dim PunteroPilaHL As Integer
+        Dim PosicionAlternativaX As Byte
+        Dim PosicionAlternativaY As Byte
+        BuscarCamino_0B0E = False
+        Do
+            'obtiene la posición del personaje
+            PersonajeY = TablaCaracteristicasPersonajes_3036(PersonajeIY + 3 - &H3036)
+            PersonajeX = TablaCaracteristicasPersonajes_3036(PersonajeIY + 2 - &H3036)
+            'ajusta la posición pasada en hl a las 20x20 posiciones centrales que se muestran
+            DeterminarPosicionCentral_279B(PersonajeX, PersonajeY)
+            'pone el origen de la búsqueda
+            PosicionOrigen_2DB2 = CInt(PersonajeY) << 8 Or PersonajeX
+            '0b1a
+            'rutina llamada para buscar la ruta desde la posición que se le pasa en 0x2db2-0x2db3 a la que tiene puesto el bit 6
+            If Not Rutina4429 Then
+                'rutina llamada para buscar la ruta desde la posición que se le pasa en 0x2db2-0x2db3 a la que tiene puesto el bit 6
+                BuscarCamino_4435(PunteroPilaHL)
+            Else
+                'rutina llamada para buscar la ruta desde la posición que se le pasa en 0x2db2-0x2db3 a la que hay en 0x2db4-0x2db5 y las que tengan el bit 6 a 1
+                BuscarCamino_4429(PunteroPilaHL)
+            End If
+            If ResultadoBusqueda_2DB6 = 0 Then 'si no se encontró un camino
+                '0b26
+                'aquí llega si no se encontró un camino
+                'avanza el puntero a la siguiente alternativa
+                PunteroAlternativaActual_05A3 = PunteroAlternativaActual_05A3 + 3
+                If TablaPosicionesAlternativas_0593(PunteroAlternativaActual_05A3 - &H0593) <> &HFF Then 'si no se han probado todas las alternativas
+                    '0B3B
+                    'elimina todos los rastros de la búsqueda del buffer de alturas
+                    LimpiarRastrosBusquedaBufferAlturas_0BAE()
+                    'obtiene la posición de la siguiente alternativa
+                    PosicionAlternativaX = TablaPosicionesAlternativas_0593(PunteroAlternativaActual_05A3 - &H0593)
+                    PosicionAlternativaY = TablaPosicionesAlternativas_0593(PunteroAlternativaActual_05A3 + 1 - &H0593)
+                    ResultadoBusqueda_2DB6 = &HFD 'indica que los personajes están en la misma habitación
+                    '0B49
+                    'si la posición de destino de la alternativa es la misma que la del personaje, genera los comandos para obtener la orientación correcta
+                    If TablaCaracteristicasPersonajes_3036(PersonajeIY + 2 - &H3036) = PosicionAlternativaX And
+                            TablaCaracteristicasPersonajes_3036(PersonajeIY + 3 - &H3036) = PosicionAlternativaY Then
+                        ReorientarPersonaje_0A58(PunteroAlternativaActual_05A3, PersonajeIY)
+                        '0B66
+                        RestaurarBufferAlturas_0B76()
+                        Exit Function
+                    End If
+                    '0B5A
+                    ResultadoBusqueda_2DB6 = 0 'indica que no se ha encontrado un camino
+                    'ajusta la posición pasada en hl a las 20x20 posiciones centrales que se muestran. Si la posición está fuera, CF=1
+                    DeterminarPosicionCentral_279B(PosicionAlternativaX, PosicionAlternativaY)
+                    'modifica la posición a la que debe ir el personaje
+                    PosicionDestino_2DB4 = CInt(PosicionAlternativaY) << 8 Or PosicionAlternativaX
+                Else 'si se han probado todas las alternativas
+                    '0B66
+                    RestaurarBufferAlturas_0B76()
+                    Exit Function
+                End If
+            Else 'aquí llega si se encontró un camino
+                '0B6B
+                'indica que se ha encontrado un camino en esta iteración del bucle principal
+                CaminoEncontrado_2DA9 = True
+                'elimina todos los rastros de la búsqueda del buffer de alturas
+                LimpiarRastrosBusquedaBufferAlturas_0BAE()
+                '0B73
+                'genera todos los comandos para ir desde el origen al destino
+                GenerarComandos_47E6(PersonajeIY, 0, &H4660, PunteroPilaHL)
+                'restaura el buffer de alturas de la pantalla actual
+                PunteroBufferAlturas_2D8A = &H1C0
+                'restaura los mínimos valores visibles de pantalla a los valores del personaje que sigue la cámara
+                CalcularMinimosVisibles_0B8F(&H2D73)
+                'fija la altura base de la planta con la altura del personaje y los graba en el motor
+                AlturaBasePlantaActual_2DBA = PosicionZPersonajeActual_2D77
+                '0B8D
+                BuscarCamino_0B0E = True
+                Exit Function
+            End If
+        Loop
+    End Function
+
+
+    Public Sub MarcarSalidaHabitacion0CA0(ByVal PunteroBufferAlturasBC As Integer, ByVal IncrementoDE As Integer)
+        'marca como punto de destino los 16 puntos indicados en bc, con el incremento de
+        Dim Contador As Byte
+        Dim nose As Integer
+        For Contador = 0 To 15 '16 posiciones
+            SetBitBufferAlturas(PunteroBufferAlturasBC + PunteroBufferAlturas_2D8A + Contador * IncrementoDE, 6)
+            nose = PunteroBufferAlturasBC + PunteroBufferAlturas_2D8A + Contador * IncrementoDE
+        Next
+    End Sub
+
+    Public Sub BuscarHabitacionDerecha_0CAC()
+        'marca como punto de destino cualquiera que vaya a la pantalla de la derecha
+        'salta a marcar las posiciones con incremento de +24
+        MarcarSalidaHabitacion0CA0(&H74, &H18) 'bc = 116 (X = 20, Y = 4)
+    End Sub
+
+    Public Sub BuscarHabitacionArriba_0C9A()
+        'marca como punto de destino cualquiera que vaya a la pantalla de arriba
+        'salta a marcar las posiciones con incremento de +1
+        MarcarSalidaHabitacion0CA0(&H4C, 1) 'bc = 76 (X = 4, Y = 3)
+    End Sub
+
+    Public Sub BuscarHabitacionIzquierda_0CB4()
+        'marca como punto de destino cualquiera que vaya a la pantalla de la izquierda
+        'salta a marcar las posiciones con incremento de +24
+        MarcarSalidaHabitacion0CA0(&H63, &H18) 'bc = 99 (X = 3, Y = 4)
+    End Sub
+
+    Public Sub BuscarHabitacionAbajo_0CB9()
+        'marca como punto de destino cualquiera que vaya a la pantalla de abajo
+        'salta a marcar las posiciones con incremento de +1
+        MarcarSalidaHabitacion0CA0(&H01E4, 1) 'bc = 484 (X = 4, Y = 20)
+    End Sub
+
+    Public Function Leer_PosicionPersonaje_0A8E(ByVal PersonajeIY As Integer) As Integer
+        'devuelve en la parte menos significativa de hl la parte más significativa de la posición del personaje que se le pasa en iy
+        Dim PosicionXL As Byte
+        Dim PosicionYH As Byte
+        'obtiene la posición x del personaje
+        PosicionXL = TablaCaracteristicasPersonajes_3036(PersonajeIY + 2 - &H3036)
+        'l = parte más significativa de la posición x del personaje en el nibble inferior
+        PosicionXL = (PosicionXL >> 4) And &H0F
+        'obtiene la posición y del personaje
+        PosicionYH = TablaCaracteristicasPersonajes_3036(PersonajeIY + 3 - &H3036)
+        'h = parte más significativa de la posición y del personaje en el nibble superior
+        PosicionYH = (PosicionYH >> 4) And &H0F
+        Leer_PosicionPersonaje_0A8E = CInt(PosicionYH) << 8 Or CInt(PosicionXL)
+    End Function
+
+    Public Sub LimpiarTablaConexionesHabitaciones_0AA3()
+        'limpia los bits usados para la búsqueda de recorridos en la tabla deconexionesentre habitaciones
+        Dim Contador As Integer
+        For Contador = 0 To UBound(TablaConexionesHabitaciones_05CD) '0x130 bytes
+            TablaConexionesHabitaciones_05CD(Contador) = TablaConexionesHabitaciones_05CD(Contador) And &H3F
+        Next
+    End Sub
+
+    Public Sub RellenarAlturasPersonaje_0BBF(ByVal PersonajeIY As Integer)
+        'rellena en un buffer las alturas de la pantalla actual del personaje indicado por iy, marca las casillas ocupadas por los personajes
+        'que están cerca de la pantalla actual y por las puertas y limpia las casillas que ocupa el personaje que llama a esta rutina
+        Dim PosicionXGuillermo As Byte
+        Dim PosicionYGuillermo As Byte
+        Dim PosicionXPersonaje As Byte
+        Dim PosicionYPersonaje As Byte
+        Dim AlturaGuillermo As Byte
+        Dim AlturaPersonaje As Byte
+        Dim GuillermoLejos As Boolean
+        Dim PersonajesMismaPlanta As Boolean
+        Dim MinimaXB As Byte
+        Dim MinimaYC As Byte
+        Dim NumeroPersonajes As Byte
+        Dim PunteroDatosPersonajesHL As Integer 'puntero a TablaDatosPersonajes_2BAE
+        Dim Contador As Byte
+        Dim PunteroDatosPersonajeDE As Integer
+        Dim PunteroDatosPuertaIY As Integer
+        PunteroBufferAlturas_2D8A = &H96F4 'cambia el puntero al buffer de alturas de la pantalla actual
+        'rellena el buffer de alturas con los datos recortados para la pantalla en la que está el personaje indicado por iy
+        RellenarBufferAlturas_2D22(PersonajeIY)
+        PosicionXGuillermo = TablaCaracteristicasPersonajes_3036(2) 'obtiene la posición x de guillermo
+        PosicionXPersonaje = TablaCaracteristicasPersonajes_3036(PersonajeIY + 2 - &H3036) 'obtiene la posición x del personaje
+        '0bcf
+        If EsDistanciaPequeña_0C75(PosicionXGuillermo, PosicionXPersonaje, MinimaXB) Then
+            PosicionYGuillermo = TablaCaracteristicasPersonajes_3036(3) 'obtiene la posición y de guillermo
+            PosicionYPersonaje = TablaCaracteristicasPersonajes_3036(PersonajeIY + 3 - &H3036) 'obtiene la posición y del personaje
+            '0BDB
+            If EsDistanciaPequeña_0C75(PosicionYGuillermo, PosicionYPersonaje, MinimaYC) Then
+                '0BE1
+                AlturaPersonaje = TablaCaracteristicasPersonajes_3036(PersonajeIY + 4 - &H3036) 'obtiene la altura del personaje
+                AlturaGuillermo = TablaCaracteristicasPersonajes_3036(4) 'obtiene la altura de guillermo
+                '0BF2
+                If LeerAlturaBasePlanta_2473(AlturaPersonaje) = LeerAlturaBasePlanta_2473(AlturaGuillermo) Then
+                    PersonajesMismaPlanta = True
+                End If
+            Else
+                GuillermoLejos = True
+            End If
+        Else
+            GuillermoLejos = True
+        End If
+        If GuillermoLejos Or Not PersonajesMismaPlanta Then
+            'mismo proceso que antes, pero entre el personaje actual y el personaje al que 
+            'sigue la cámara
+            '0BF4
+            'aquí llega si la distancia entre guillermo y el personaje es >= 2 en alguna coordenada, o no están en la misma planta
+            'si la distancia en x es >= 2, sale
+            If Not EsDistanciaPequeña_0C75(PosicionXPersonajeActual_2D75, PosicionXPersonaje, MinimaXB) Then
+                'cuando guillermo no está en la escena, no se tiene en cuenta la posición de los
+                'personajes en el mapa de alturas, ni el estado de las puertas, lo que 
+                'facilita el cálculo de caminos
+                Exit Sub
+            End If
+            '0BFF
+            'si la distancia en y es >= 2, salta
+            If Not EsDistanciaPequeña_0C75(PosicionYPersonajeActual_2D76, PosicionYPersonaje, MinimaYC) Then
+                'cuando guillermo no está en la escena, no se tiene en cuenta la posición de los
+                'personajes en el mapa de alturas, ni el estado de las puertas, lo que 
+                'facilita el cálculo de caminos
+                Exit Sub
+            End If
+            '0C0A
+            'si el personaje no está en la misma planta que el personaje la que sigue la cámara, sale
+            If LeerAlturaBasePlanta_2473(PosicionZPersonajeActual_2D77) <> AlturaPersonaje Then
+                'cuando guillermo no está en la escena, no se tiene en cuenta la posición de los
+                'personajes en el mapa de alturas, ni el estado de las puertas, lo que 
+                'facilita el cálculo de caminos
+                Exit Sub
+            End If
+        End If
+        '0C17
+        'aquí llega si al personaje y a guillermo les separa poca distancia en la misma planta, o al personaje y a quien muestra la cámara les separa poca distancia en la misma planta
+        'bc = distancia en x y en y del personaje que estaba cerca
+        'apunta a una dirección que contiene un puntero a los datos de posición de adso
+        PunteroDatosPersonajesHL = &H2BBA
+        NumeroPersonajes = 5 'comprueba 5 personajes
+        If MinimaXB = 1 Then 'distancia en x + 1=1 -> misma habitación en x que guillermo
+            '0C25
+            If MinimaYC = 1 Then 'distancia en y + 1=1 -> misma habitación que guillermo
+                '0C2A
+                'si el personaje que estaba cerca está en lamisma habitación que guillermo, empieza a dibujar en guillermo
+                'apunta a una dirección que contiene un puntero a los datos de posición guillermo
+                PunteroDatosPersonajesHL = &H2BBA
+                NumeroPersonajes = NumeroPersonajes + 1 'comprueba 6 personajes
+            End If
+        End If
+        '0C2E
+        For Contador = 0 To NumeroPersonajes - 1
+            'de = dirección de los datos de posición del personaje a comprobar
+            PunteroDatosPersonajeDE = Leer16(TablaDatosPersonajes_2BAE, PunteroDatosPersonajesHL - &H2BAE)
+            If PunteroDatosPersonajeDE <> PersonajeIY Then 'si no coincide con la del personaje
+                '0C3E
+                'aquí llega si el personaje que se le ha pasado a la rutina no es el que se está comprobando
+                'si la posición del sprite es central y la altura está bien, rellena en el buffer de alturas las posiciones ocupadas por el personaje
+                RellenarBufferAlturasPersonaje_28EF(PunteroDatosPersonajeDE, &H10)
+            End If
+            '0c48
+            PunteroDatosPersonajeDE = PunteroDatosPersonajeDE + 8
+        Next
+        '0C4F
+        PunteroDatosPuertaIY = &H2FE4 'iy apunta a los datos de las puertas
+        Do
+            If LeerBitArray(TablaDatosPuertas_2FE4, PunteroDatosPuertaIY - &H2FE4, 6) Then
+                'si la puerta está abierta, marca su posición en el buffer de alturas
+                '0x0f = altura en el buffer de alturas de una puerta cerrada
+                EscribirAlturaPuertaBufferAlturas_0E19(&H0F, PunteroDatosPuertaIY)
+            End If
+            '0C5F
+            'avanza a la siguiente puerta
+            PunteroDatosPuertaIY = PunteroDatosPuertaIY + 5 'cada entrada es de 5 bytes
+            If TablaDatosPuertas_2FE4(PunteroDatosPuertaIY - &H2FE4) = &HFF Then Exit Do
+            'repite hasta que se completen las puertas
+        Loop
+        '0C6B
+        'si la posición del sprite es central y la altura está bien, limpia las posiciones que ocupa del buffer de alturas
+        RellenarBufferAlturasPersonaje_28EF(PersonajeIY, 0)
+    End Sub
+    Public Sub LimitarAlternativasCamino_0F88()
+        'limita las alternativas de caminos a probar a la primera opción
+        PunteroAlternativaActual_05A3 = &H0593 'inicia el puntero al buffer de las alternativas
+        'marca el final del buffer después de la primera entrada
+        TablaPosicionesAlternativas_0593(3) = &HFF
+    End Sub
+
+    Public Function BuscarCaminoHabitacion_0AC4(ByVal PersonajeIY As Integer, ByVal PantallaDestinoHL As Integer, ByVal MascaraBusquedaHabitacion_48A4 As Byte) As Boolean
+        'busca un camino para ir de la habitación actual a la habitación destino. Si lo encuentra, recrea la habitación y genera la ruta para llegar a donde se quiere
+        'hl = pantalla de destino
+        'iy = datos de posición de personaje que quiere ir a la posición de destino
+        Dim PunteroPilaHL As Integer
+        Dim OrientacionA As Byte
+        Dim PunteroDestinoHL As Integer
+        Dim ValorPilaDE As Integer
+        Dim Rutina As Integer 'dirección de la rutina a llamar según la pantalla por la que hay que salir
+        BuscarCaminoHabitacion_0AC4 = False
+        PosicionOrigen_2DB2 = PantallaDestinoHL 'guarda la pantalla de destino
+        PosicionDestino_2DB4 = Leer_PosicionPersonaje_0A8E(PersonajeIY) 'guarda la pantalla de origen
+        'busca un camino para ir de la habitación actual a la habitación destino
+        BuscarHabitacion_4826(MascaraBusquedaHabitacion_48A4, PunteroPilaHL, ValorPilaDE)
+        LimpiarTablaConexionesHabitaciones_0AA3()
+        If ResultadoBusqueda_2DB6 = 0 Then Exit Function 'si no se ha encontrado el camino, sale
+        '0AD8
+        'obtiene la orientación que se ha de seguir para llegar al camino
+        OrientacionA = TablaComandos_440C(&H4418 - &H440C)
+        'hl apunta a una tabla auxiliar para marcar las posiciones a las que debe ir el personaje
+        PunteroDestinoHL = &H0C8A + 4 * OrientacionA 'cada entrada ocupa 4 bytes
+        '0AE4
+        Rutina = Leer16(TablaDestinos_0C8A, PunteroDestinoHL - &H0C8A) 'indexa en la tabla
+        PunteroDestinoHL = PunteroDestinoHL + 2
+        '0aed
+        LimitarAlternativasCamino_0F88() 'limita las opciones a probar a la primera opción
+        'guarda la posición de destino
+        PosicionDestino_2DB4 = Leer16(TablaDestinos_0C8A, PunteroDestinoHL - &H0C8A)
+        'rellena en un buffer las alturas de la pantalla actual del personaje indicado por iy, marca las casillas ocupadas por los personajes
+        'que están cerca de la pantalla actual y por las puertas y limpia las casillas que ocupa el personaje que llama a esta rutina
+        RellenarAlturasPersonaje_0BBF(PersonajeIY)
+        'rutina a llamar según la orientación a seguir
+        'esta rutina pone el bit 6 de las posiciones del buffer de alturas de la orientación que se debe seguir
+        'para pasar a la pantalla según calculo el buscador de caminos
+        Select Case Rutina
+            Case = &H0CAC
+                BuscarHabitacionDerecha_0CAC()
+            Case = &H0C9A
+                BuscarHabitacionArriba_0C9A()
+            Case = &H0CB4
+                BuscarHabitacionIzquierda_0CB4()
+            Case = &H0CB9
+                BuscarHabitacionAbajo_0CB9()
+        End Select
+        '0afd
+        BuscarCaminoHabitacion_0AC4 = BuscarCamino_0B0E(PersonajeIY, True)
+    End Function
+
+    Public Function BuscarCaminoGeneral_098A(ByVal PersonajeIY As Integer, ByVal PunteroPersonajeObjetoIX As Integer) As Boolean
+        'algoritmo de alto nivel para la búsqueda de caminos entre 2 posiciones
+        'iy apunta a los datos del personaje que busca a otro
+        'ix apunta a la posición del personaje/objeto que se busca dentro de la tabla de alternativas
+        Dim MascaraBusqueda As Byte 'número de bit que marca el destino en el algoritmo de búsqueda
+        Dim AlturaBaseOrigenE As Byte 'altura base de la planta en la que está el personaje de origen
+        Dim AlturaBaseDestinoB As Byte 'altura base de la planta en la que está el personaje/objeto de destino
+        Dim SubirOBajarC As Byte 'c = indicador de si hay que subir o bajar planta &H10=subir, &H20=bajar
+        Dim PosicionHabitacion As Byte 'coordenadas de la habitación buscada
+        Dim PunteroTablaConexionesHabitacionesDE As Integer
+        Dim PunteroPilaHL As Integer
+        Dim ValorPilaDE As Integer
+        Dim Escalera As Byte 'valor a buscar en el buffer de alturas cuando se busca un punto para subir o bajar
+        BuscarCaminoGeneral_098A = False
+        ResultadoBusqueda_2DB6 = &HFE 'indica que no se ha podido buscar un camino
+        'si está en la mitad de la animación, sale
+        If ContadorAnimacionGuillermo_0990 And 1 Then Exit Function
+        'si en esta iteración ya se ha encontrado un camino, sale (sólo se busca un camino por iteración)
+        If CaminoEncontrado_2DA9 <> 0 Then Exit Function
+        '0999
+        MascaraBusqueda = 6 'indica que hay que buscar una posición con el bit 6 en el algoritmo de búsqueda de caminos
+        ResultadoBusqueda_2DB6 = 0 'indica que de momento no se ha encontrado un camino
+        'obtiene la altura del personaje que busca a otro
+        AlturaBaseOrigenE = LeerAlturaBasePlanta_2473(TablaCaracteristicasPersonajes_3036(PersonajeIY + 4 - &H3036))
+        '09A9
+        'obtiene la altura base dela planta en la que está el personaje/objeto de destino
+        AlturaBaseDestinoB = LeerAlturaBasePlanta_2473(LeerBytePersonajeObjeto(PunteroPersonajeObjetoIX + 2) And &H3F)
+        '09B1
+        Select Case AlturaBaseOrigenE
+            Case = 0 'si el personaje que busca a otro está en la planta baja
+                PunteroTablaConexiones_440A = &H05CD 'apunta a tabla con las conexiones de la planta baja
+            Case = &H0B 'si el personaje que busca a otro está en la primera planta
+                PunteroTablaConexiones_440A = &H067D 'apunta a tabla con las conexiones de la primera baja
+            Case Else
+                PunteroTablaConexiones_440A = &H0685 'apunta a tabla con las conexiones de la segunda baja
+        End Select
+        '09C5
+        If AlturaBaseOrigenE <> AlturaBaseDestinoB Then
+            '09C8
+            'aquí llega si los personajes no están en la misma planta
+            If AlturaBaseOrigenE < AlturaBaseDestinoB Then
+                SubirOBajarC = &H10
+            Else
+                SubirOBajarC = &H20
+            End If
+            '09CE
+            'obtiene la posición y del personaje que busca a otro
+            PosicionHabitacion = TablaCaracteristicasPersonajes_3036(PersonajeIY + 3 - &H3036)
+            'se queda con la parte más significativa de la posición y
+            PosicionHabitacion = PosicionHabitacion And &HF0
+            'se queda con la parte más significativa de la posición x en el nibble inferior
+            'combina las posiciones para hallar en que habitación de la planta está
+            PosicionHabitacion = PosicionHabitacion Or ((TablaCaracteristicasPersonajes_3036(PersonajeIY + 2 - &H3036) >> 4) And &H0F)
+            'indexa en la tabla de la planta
+            PunteroTablaConexionesHabitacionesDE = PosicionHabitacion + PunteroTablaConexiones_440A
+            '09E2
+            If (TablaConexionesHabitaciones_05CD(PunteroTablaConexionesHabitacionesDE - &H05CD) And SubirOBajarC) = 0 Then
+                '09e7
+                'aquí llega si desde la habitación actual no se puede ni subir ni bajar
+                If SubirOBajarC = &H10 Then
+                    MascaraBusqueda = 4 'indica que hay que buscar una posición con el bit 4 en el algoritmo de búsqueda de caminos
+                Else
+                    MascaraBusqueda = 5 'indica que hay que buscar una posición con el bit 5 en el algoritmo de búsqueda de caminos
+                End If
+                '09f2
+                'guarda la posición más significativa del personaje que busca a otro
+                PosicionOrigen_2DB2 = Leer_PosicionPersonaje_0A8E(PersonajeIY)
+                'busca la orientación que hay que seguir para encontrar las escaleras más próximas en esta planta
+                BuscarHabitacion_4830(MascaraBusqueda, PunteroPilaHL, ValorPilaDE)
+                'limpia los bits usados para la búsqueda de recorridos en la tabla actual
+                LimpiarTablaConexionesHabitaciones_0AA3()
+                'restaura la instrucción para indicar que tiene que buscar el bit 6
+                MascaraBusqueda = 6
+                If ResultadoBusqueda_2DB6 = 0 Then Exit Function 'si no se encontró ningún camino, sale
+                '0A08
+                'aquí llega si desde la habitación actual no se puede ni subir ni bajar, pero ha encontrado un camino a una habitación de la planta con escaleras
+                BuscarCaminoGeneral_098A = BuscarCaminoHabitacion_0AC4(PersonajeIY, ValorPilaDE, MascaraBusqueda)
+                Exit Function
+            End If
+            '0a0c
+            'aquí llega si desde la habitación actual se puede subir o bajar
+            'si había que subir, a = 0x0d. si había que bajar a = 0x01;
+            If SubirOBajarC = &H10 Then
+                Escalera = &H0D
+            Else
+                Escalera = 1
+            End If
+            'rellena en un buffer las alturas de la pantalla actual del personaje indicado por iy, marca las casillas ocupadas por los personajes
+            'que están cerca de la pantalla actual y por las puertas y limpia las casillas que ocupa el personaje que llama a esta rutina
+            RellenarAlturasPersonaje_0BBF(PersonajeIY)
+            '0A1A
+            For contador = 0 To UBound(TablaBufferAlturas_96F4)
+                If TablaBufferAlturas_96F4(contador) = Escalera Then
+                    'marca la posición como un objetivo a buscar
+                    SetBitArray(TablaBufferAlturas_96F4, contador, 6)
+                End If
+
+            Next
+            '0A2D
+            PosicionDestino_2DB4 = 0 'pone a 0 la posición de destino
+            LimitarAlternativasCamino_0F88() 'limita las opciones a probar a la primera opción
+            'busca la ruta y pone las instrucciones para llegar a las escaleras
+            BuscarCaminoGeneral_098A = BuscarCamino_0B0E(PersonajeIY, True)
+            Exit Function
+        End If
+        '0A37
+        'aqui llega buscando un camino entre 2 personajes que están en la misma planta
+        'iy apunta a los datos del personaje que busca a otro
+        'ix apunta a los datos del personaje buscado
+        Dim OrigenX As Byte
+        Dim OrigenY As Byte
+        Dim OrigenZ As Byte
+        Dim OrigenOrientacion As Byte
+        Dim DestinoX As Byte
+        Dim DestinoY As Byte
+        Dim DestinoZ As Byte
+        Dim DestinoOrientacion As Byte
+        DestinoX = LeerBytePersonajeObjeto(PunteroPersonajeObjetoIX)
+        DestinoY = LeerBytePersonajeObjeto(PunteroPersonajeObjetoIX + 1)
+        OrigenX = TablaCaracteristicasPersonajes_3036(PersonajeIY + 2 - &H3036)
+        OrigenY = TablaCaracteristicasPersonajes_3036(PersonajeIY + 3 - &H3036)
+        If (DestinoX And &HF0) = (OrigenX And &HF0) Then 'si el número de habitación en x coincide
+            '0A46
+            If (DestinoY And &HF0) = (OrigenY And &HF0) Then 'si el número de habitación en y coincide
+                '0A4F
+                'aqui llega si están en la misma habitación
+                'indica origen y destino están en la misma habitación
+                ResultadoBusqueda_2DB6 = &HFD
+                If OrigenX = DestinoX And OrigenY = DestinoY Then
+                    '0a58
+                    'aquí llega si origen y destino son la misma posicion. sólo queda comprobar la orientación
+                    'lee la altura y la orientación de la posición de destino
+                    DestinoZ = LeerBytePersonajeObjeto(PunteroPersonajeObjetoIX + 2)
+                    'se queda con la orientación en los 2 bits menos significativos
+                    DestinoOrientacion = DestinoZ >> 6
+                    'lee la orientación del personaje que busca
+                    OrigenOrientacion = TablaCaracteristicasPersonajes_3036(PersonajeIY + 1 - &H3036)
+                    'si las orientaciones son iguales, sale
+                    If OrigenOrientacion = DestinoOrientacion Then Exit Function
+                    '0A65
+                    '0a73
+                    'fija la primera posición del buffer de comandos
+                    TablaCaracteristicasPersonajes_3036(PersonajeIY + 9 - &H3036) = 0
+                    TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0B - &H3036) = 0
+                    '0A68
+                    'escribe unos comandos para cambiar la orientación del personaje
+                    GenerarComandosOrientacionPersonaje_47C3(PersonajeIY, OrigenOrientacion, DestinoOrientacion)
+                    'escribe b bits del comando que se le pasa en hl del personaje pasado en iy
+                    EscribirComando_0CE9(PersonajeIY, &H1000, &H0C)
+                    '0a73
+                    'fija la primera posición del buffer de comandos
+                    TablaCaracteristicasPersonajes_3036(PersonajeIY + 9 - &H3036) = 0
+                    TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0B - &H3036) = 0
+                    Exit Function
+                Else
+                    '0a7c
+                    'llega cuando las 2 posiciones están dentro de la misma habitación pero en distinto lugar
+                    ResultadoBusqueda_2DB6 = 0 'indica que la búsqueda ha fallado
+                    'rellena en un buffer las alturas de la pantalla actual del personaje indicado por iy, marca las casillas ocupadas por los personajes
+                    'que están cerca de la pantalla actual y por las puertas y limpia las casillas que ocupa el personaje que llama a esta rutina
+                    RellenarAlturasPersonaje_0BBF(PersonajeIY)
+                    'ajusta la posición pasada en hl a las 20x20 posiciones centrales que se muestran. Si la posición está fuera, CF=1
+                    DeterminarPosicionCentral_279B(DestinoX, DestinoY)
+                    PosicionDestino_2DB4 = (CInt(DestinoY) << 8) Or DestinoX
+                    'rutina llamada para buscar la ruta desde la posición del personaje a lo grabado en 0x2db4-0x2db5
+                    BuscarCaminoGeneral_098A = BuscarCamino_0B0E(PersonajeIY, False)
+                    Exit Function
+                End If
+                Exit Function
+            End If
+        End If
+        '0AB4
+        'se queda con el nibble superior de las coordenadas, para formar el número de habitación
+        DestinoY = DestinoY >> 4
+        DestinoX = DestinoX >> 4
+        BuscarCaminoGeneral_098A = BuscarCaminoHabitacion_0AC4(PersonajeIY, (CInt(DestinoY) << 8) Or DestinoX, MascaraBusqueda)
+    End Function
+
+    Public Function CheckCamino1() As Byte
+        'camino original de severino desde el punto de inicio hasta su habitación
+        '0x3036-0x3044	características de guillermo
+        '0x3045-0x3053	características de adso
+        '0x3054-0x3062	características de malaquías
+        '0x3063-0x3071	características del abad
+        '0x3072-0x3080	características de berengario/bernardo gui/encapuchado/jorge
+        '0x3081-0x308f	características de severino/jorge
+        'guillermo
+        TablaCaracteristicasPersonajes_3036(&H3036 + 0 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H88
+        TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &HA8
+        TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 5 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 6 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 7 - &H3036) = &HFE
+        TablaCaracteristicasPersonajes_3036(&H3036 + 8 - &H3036) = &HDE
+        TablaCaracteristicasPersonajes_3036(&H3036 + 9 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 10 - &H3036) = &HFD
+        TablaCaracteristicasPersonajes_3036(&H3036 + 11 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 12 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 13 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 14 - &H3036) = &H10
+        'adso
+        TablaCaracteristicasPersonajes_3036(&H3045 + 0 - &H3036) = 2
+        TablaCaracteristicasPersonajes_3036(&H3045 + 1 - &H3036) = 1
+        TablaCaracteristicasPersonajes_3036(&H3045 + 2 - &H3036) = &H86
+        TablaCaracteristicasPersonajes_3036(&H3045 + 3 - &H3036) = &HA9
+        TablaCaracteristicasPersonajes_3036(&H3045 + 4 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3045 + 5 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3045 + 6 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3045 + 7 - &H3036) = &HFE
+        TablaCaracteristicasPersonajes_3036(&H3045 + 8 - &H3036) = &HE0
+        TablaCaracteristicasPersonajes_3036(&H3045 + 9 - &H3036) = 4
+        TablaCaracteristicasPersonajes_3036(&H3045 + 10 - &H3036) = &H10
+        TablaCaracteristicasPersonajes_3036(&H3045 + 11 - &H3036) = 1
+        TablaCaracteristicasPersonajes_3036(&H3045 + 12 - &H3036) = &HC0
+        TablaCaracteristicasPersonajes_3036(&H3045 + 13 - &H3036) = &HA2
+        TablaCaracteristicasPersonajes_3036(&H3045 + 14 - &H3036) = &H20
+        'malaquías
+        TablaCaracteristicasPersonajes_3036(&H3054 + 0 - &H3036) = 1
+        TablaCaracteristicasPersonajes_3036(&H3054 + 1 - &H3036) = 3
+        TablaCaracteristicasPersonajes_3036(&H3054 + 2 - &H3036) = &H26
+        TablaCaracteristicasPersonajes_3036(&H3054 + 3 - &H3036) = &H27
+        TablaCaracteristicasPersonajes_3036(&H3054 + 4 - &H3036) = &H0F
+        TablaCaracteristicasPersonajes_3036(&H3054 + 5 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3054 + 6 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3054 + 7 - &H3036) = &HFE
+        TablaCaracteristicasPersonajes_3036(&H3054 + 8 - &H3036) = &HDE
+        TablaCaracteristicasPersonajes_3036(&H3054 + 9 - &H3036) = 4
+        TablaCaracteristicasPersonajes_3036(&H3054 + &H0A - &H3036) = &HF0
+        TablaCaracteristicasPersonajes_3036(&H3054 + &H0B - &H3036) = 1
+        TablaCaracteristicasPersonajes_3036(&H3054 + &H0C - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3054 + &H0D - &H3036) = &HA2
+        TablaCaracteristicasPersonajes_3036(&H3054 + &H0E - &H3036) = &H10
+        'abad
+        TablaCaracteristicasPersonajes_3036(&H3063 + 0 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3063 + 1 - &H3036) = 3
+        TablaCaracteristicasPersonajes_3036(&H3063 + 2 - &H3036) = &H88
+        TablaCaracteristicasPersonajes_3036(&H3063 + 3 - &H3036) = &H84
+        TablaCaracteristicasPersonajes_3036(&H3063 + 4 - &H3036) = &H02
+        TablaCaracteristicasPersonajes_3036(&H3063 + 5 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3063 + 6 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3063 + 7 - &H3036) = &HFE
+        TablaCaracteristicasPersonajes_3036(&H3063 + 8 - &H3036) = &HDE
+        TablaCaracteristicasPersonajes_3036(&H3063 + 9 - &H3036) = 3
+        TablaCaracteristicasPersonajes_3036(&H3063 + &H0A - &H3036) = &H10
+        TablaCaracteristicasPersonajes_3036(&H3063 + &H0B - &H3036) = 1
+        TablaCaracteristicasPersonajes_3036(&H3063 + &H0C - &H3036) = &H30
+        TablaCaracteristicasPersonajes_3036(&H3063 + &H0D - &H3036) = &HA2
+        TablaCaracteristicasPersonajes_3036(&H3063 + &H0E - &H3036) = &H10
+        'berengario
+        TablaCaracteristicasPersonajes_3036(&H3072 + 0 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3072 + 1 - &H3036) = 3
+        TablaCaracteristicasPersonajes_3036(&H3072 + 2 - &H3036) = &H28
+        TablaCaracteristicasPersonajes_3036(&H3072 + 3 - &H3036) = &H48
+        TablaCaracteristicasPersonajes_3036(&H3072 + 4 - &H3036) = &H0F
+        TablaCaracteristicasPersonajes_3036(&H3072 + 5 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3072 + 6 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3072 + 7 - &H3036) = &HFE
+        TablaCaracteristicasPersonajes_3036(&H3072 + 8 - &H3036) = &HDE
+        TablaCaracteristicasPersonajes_3036(&H3072 + 9 - &H3036) = 3
+        TablaCaracteristicasPersonajes_3036(&H3072 + &H0A - &H3036) = &HF8
+        TablaCaracteristicasPersonajes_3036(&H3072 + &H0B - &H3036) = 1
+        TablaCaracteristicasPersonajes_3036(&H3072 + &H0C - &H3036) = &H60
+        TablaCaracteristicasPersonajes_3036(&H3072 + &H0D - &H3036) = &HA2
+        TablaCaracteristicasPersonajes_3036(&H3072 + &H0E - &H3036) = &H10
+        'severino
+        TablaCaracteristicasPersonajes_3036(&H3081 + 0 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3081 + 1 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3081 + 2 - &H3036) = &HC8
+        TablaCaracteristicasPersonajes_3036(&H3081 + 3 - &H3036) = &H28
+        TablaCaracteristicasPersonajes_3036(&H3081 + 4 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3081 + 5 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3081 + 6 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3081 + 7 - &H3036) = &HFE
+        TablaCaracteristicasPersonajes_3036(&H3081 + 8 - &H3036) = &HDE
+        TablaCaracteristicasPersonajes_3036(&H3081 + 9 - &H3036) = &H84
+        TablaCaracteristicasPersonajes_3036(&H3081 + &H0A - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3081 + &H0B - &H3036) = 1
+        TablaCaracteristicasPersonajes_3036(&H3081 + &H0C - &H3036) = &H90
+        TablaCaracteristicasPersonajes_3036(&H3081 + &H0D - &H3036) = &HA2
+        TablaCaracteristicasPersonajes_3036(&H3081 + &H0E - &H3036) = &H10
+
+        TablaPosicionesAlternativas_0593(0) = &H68
+        TablaPosicionesAlternativas_0593(1) = &H55
+        TablaPosicionesAlternativas_0593(2) = &H02
+        TablaPosicionesAlternativas_0593(3) = &H66
+        TablaPosicionesAlternativas_0593(4) = &H55
+        TablaPosicionesAlternativas_0593(5) = &H02
+        TablaPosicionesAlternativas_0593(6) = &H68
+        TablaPosicionesAlternativas_0593(7) = &H57
+        TablaPosicionesAlternativas_0593(8) = &H42
+        TablaPosicionesAlternativas_0593(9) = &H6A
+        TablaPosicionesAlternativas_0593(10) = &H55
+        TablaPosicionesAlternativas_0593(11) = &H82
+        TablaPosicionesAlternativas_0593(12) = &H68
+        TablaPosicionesAlternativas_0593(13) = &H53
+        TablaPosicionesAlternativas_0593(14) = &HC2
+
+        CaminoEncontrado_2DA9 = 0
+
+        BuscarCaminoGeneral_098A(&H3081, &H0593)
+        If BufferComandosMonjes_A200(&H90) <> &H5F Or BufferComandosMonjes_A200(&H91) <> &HC8 Or BufferComandosMonjes_A200(&H92) <> &H40 Then CheckCamino1 = 1 'error
+
+
+    End Function
+
+    Public Function CheckCamino2() As Byte
+        'adso buscando la posición en la que está en ese momento. ojo, hay que parchear el original
+        'para que se comporte así
+        'guillermo
+        TablaCaracteristicasPersonajes_3036(&H3036 + 0 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = 1
+        TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H86
+        TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H9D
+        TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 5 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 6 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 7 - &H3036) = &HFE
+        TablaCaracteristicasPersonajes_3036(&H3036 + 8 - &H3036) = &HDE
+        TablaCaracteristicasPersonajes_3036(&H3036 + 9 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 10 - &H3036) = &HFD
+        TablaCaracteristicasPersonajes_3036(&H3036 + 11 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 12 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 13 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 14 - &H3036) = &H10
+        'adso
+        TablaCaracteristicasPersonajes_3036(&H3045 + 0 - &H3036) = 2
+        TablaCaracteristicasPersonajes_3036(&H3045 + 1 - &H3036) = 1
+        TablaCaracteristicasPersonajes_3036(&H3045 + 2 - &H3036) = &H86
+        TablaCaracteristicasPersonajes_3036(&H3045 + 3 - &H3036) = &H9D
+        TablaCaracteristicasPersonajes_3036(&H3045 + 4 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3045 + 5 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3045 + 6 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3045 + 7 - &H3036) = &HFE
+        TablaCaracteristicasPersonajes_3036(&H3045 + 8 - &H3036) = &HE0
+        TablaCaracteristicasPersonajes_3036(&H3045 + 9 - &H3036) = &H85
+        TablaCaracteristicasPersonajes_3036(&H3045 + 10 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3045 + 11 - &H3036) = 1
+        TablaCaracteristicasPersonajes_3036(&H3045 + 12 - &H3036) = &HC0
+        TablaCaracteristicasPersonajes_3036(&H3045 + 13 - &H3036) = &HA2
+        TablaCaracteristicasPersonajes_3036(&H3045 + 14 - &H3036) = &H20
+
+        BuscarCaminoGeneral_098A(&H3045, &H3038)
+
+        If BufferComandosMonjes_A200(&HC0) <> &H42 Or
+            TablaCaracteristicasPersonajes_3036(&H3045 + 9 - &H3036) <> 0 Or
+            TablaCaracteristicasPersonajes_3036(&H3045 + &HB - &H3036) <> 0 Then CheckCamino2 = 1
+    End Function
+
+    Public Function CheckCamino3() As Byte
+        'adso buscando una posición de la primera planta. ojo, hay que parchear el original
+        'para que se comporte así
+        'guillermo
+        TablaCaracteristicasPersonajes_3036(&H3036 + 0 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = 0    'orientación
+        TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H4C 'x
+        TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H6A 'y
+        TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H0F 'z
+        TablaCaracteristicasPersonajes_3036(&H3036 + 5 - &H3036) = 0    'número de tiles
+        TablaCaracteristicasPersonajes_3036(&H3036 + 6 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 7 - &H3036) = &HFE
+        TablaCaracteristicasPersonajes_3036(&H3036 + 8 - &H3036) = &HDE
+        TablaCaracteristicasPersonajes_3036(&H3036 + 9 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 10 - &H3036) = &HFD
+        TablaCaracteristicasPersonajes_3036(&H3036 + 11 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 12 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 13 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3036 + 14 - &H3036) = &H10
+        'adso
+        TablaCaracteristicasPersonajes_3036(&H3045 + 0 - &H3036) = 2
+        TablaCaracteristicasPersonajes_3036(&H3045 + 1 - &H3036) = 1
+        TablaCaracteristicasPersonajes_3036(&H3045 + 2 - &H3036) = &H86
+        TablaCaracteristicasPersonajes_3036(&H3045 + 3 - &H3036) = &H9D
+        TablaCaracteristicasPersonajes_3036(&H3045 + 4 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3045 + 5 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3045 + 6 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3045 + 7 - &H3036) = &HFE
+        TablaCaracteristicasPersonajes_3036(&H3045 + 8 - &H3036) = &HE0
+        TablaCaracteristicasPersonajes_3036(&H3045 + 9 - &H3036) = &H85
+        TablaCaracteristicasPersonajes_3036(&H3045 + 10 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H3045 + 11 - &H3036) = 1
+        TablaCaracteristicasPersonajes_3036(&H3045 + 12 - &H3036) = &HC0
+        TablaCaracteristicasPersonajes_3036(&H3045 + 13 - &H3036) = &HA2
+        TablaCaracteristicasPersonajes_3036(&H3045 + 14 - &H3036) = &H20
+
+        TablaConexionesHabitaciones_05CD(&H0602 - &H05CD) = &H0F
+        BuscarCaminoGeneral_098A(&H3045, &H3038)
+        If BufferComandosMonjes_A200(&HC0) <> &HFF Or
+                BufferComandosMonjes_A200(&HC0 + 1) <> &HF2 Or
+                BufferComandosMonjes_A200(&HC0 + 2) <> &H10 Then CheckCamino3 = 1
+
+    End Function
+
+    Public Sub DescartarMovimientosPensados_08BE(ByVal PersonajeIY As Integer)
+        'descarta los movimientos pensados e indica que hay que pensar un nuevo movimiento
+        Dim PunteroComandosMonjesHL As Integer
+        'hl = dirección de datos de las acciones
+        PunteroComandosMonjesHL = Leer16(TablaCaracteristicasPersonajes_3036, PersonajeIY + &H0C - &H3036)
+        'escribe el comando para que ponga el bit 7,(9)
+        Escribir16(BufferComandosMonjes_A200, PunteroComandosMonjesHL - &HA200, &H0010)
+        'pone a cero el contador de comandos pendientes y el índice de comandos
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + 9 - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0B - &H3036) = 0
+    End Sub
+
+    Public Sub GenerarPropuestaMovimiento_07D2(ByVal OrientacionB As Byte, ByVal PersonajeObjetoIX As Integer, ByRef PunteroAlternativasIY As Integer)
+        'dados los datos de posición de ix, genera una propuesta para llegar 2 posiciones al lado del personaje según la orientación de b
+        'ix tiene la dirección de los datos de posición de un personaje o de un objeto al que se quiere llegar
+        'iy apunta a una posición vacía del buffer para buscar caminos alternativos
+        'b = orientación
+        'tabla de desplazamientos según la orientación
+        Dim TablaDesplazamientosOrientacion_05A5() As Integer = {2, 0, 0, -2, -2, 0, 0, 2}
+        '05A5: 	02 00 -> [+2 00]
+        '       00 FE -> [00 -2]
+        '       FE 00 -> [-2 00]
+        '       00 02 -> [00 +2]
+        Dim PunteroDesplazamientosOrientacion As Byte
+        Dim NuevaAlturaOrientacionC As Byte
+        Dim AntiguaAlturaOrientacion As Byte
+        Dim PosicionDestinoX As Integer
+        Dim PosicionDestinoY As Integer
+        Dim PunteroBufferAlturasIX As Integer
+        Dim DiferenciaAlturas As Byte
+        Dim PosicionCentral As Boolean
+        'ajusta la orientación para que esté entre las 4 válidas. cada entrada ocupa 2 bytes
+        PunteroDesplazamientosOrientacion = (OrientacionB And &H3) * 2
+        'pone los 2 bits de la orientación como los 2 bits más significativos de a
+        'invierte la orientación en x y en y
+        NuevaAlturaOrientacionC = ((OrientacionB And &H03) << 6) Xor &H80
+        '07E4
+        'combina con la altura/orientación de destino con la actual y la guarda en c
+        AntiguaAlturaOrientacion = LeerBytePersonajeObjeto(PersonajeObjetoIX + 4)
+        NuevaAlturaOrientacionC = NuevaAlturaOrientacionC Or AntiguaAlturaOrientacion
+        'copia la altura/orientación de destino deseada al buffer
+        TablaPosicionesAlternativas_0593(PunteroAlternativasIY + 4 - &H0593) = AntiguaAlturaOrientacion
+        '07EE
+        'obtiene la posición x del destino
+        PosicionDestinoX = LeerBytePersonajeObjeto(PersonajeObjetoIX + 2)
+        PosicionDestinoX = PosicionDestinoX + TablaDesplazamientosOrientacion_05A5(PunteroDesplazamientosOrientacion)
+        PunteroDesplazamientosOrientacion = PunteroDesplazamientosOrientacion + 1
+        'copia la posición x de destino más un pequeño desplazamiento según la orientación en el buffer
+        TablaPosicionesAlternativas_0593(PunteroAlternativasIY + 2 - &H0593) = CByte(PosicionDestinoX)
+        '07F6
+        'obtiene la posición y del destino
+        PosicionDestinoY = LeerBytePersonajeObjeto(PersonajeObjetoIX + 3)
+        PosicionDestinoY = PosicionDestinoY + TablaDesplazamientosOrientacion_05A5(PunteroDesplazamientosOrientacion)
+        'copia la posición y de destino más un pequeño desplazamiento según la orientación en el buffer
+        TablaPosicionesAlternativas_0593(PunteroAlternativasIY + 3 - &H0593) = CByte(PosicionDestinoY)
+        '07FD
+        'llamado con iy = dirección de los datos de posición asociados al personaje/objeto
+        'si la posición a la que ir no es una de las del centro de la pantalla que se muestra, CF=1
+        'en otro caso, devuelve en ix un puntero a la entrada de la tabla de alturas de la posición correspondiente
+        PosicionCentral = DeterminarPosicionCentral_0CBE(PunteroAlternativasIY, PunteroBufferAlturasIX)
+        TablaPosicionesAlternativas_0593(PunteroAlternativasIY + 4 - &H0593) = NuevaAlturaOrientacionC
+        If PosicionCentral Then
+            '080e
+            'aquí llega si en a se leyó la altura de la posición a la que ir porque es una de las posiciones que se muestran en pantalla
+            '0807
+            'lee el posible contenido del buffer de alturas
+            NuevaAlturaOrientacionC = LeerByteBufferAlturas(PunteroBufferAlturasIX)
+            'elimina de los datos del buffer de alturas el de los personajes que hay (excepto adso) (???)
+            NuevaAlturaOrientacionC = NuevaAlturaOrientacionC And &HEF
+            '0812
+            'obtiene la altura del destino
+            DiferenciaAlturas = AntiguaAlturaOrientacion
+            'le resta a la altura del destino la altura base de la planta
+            DiferenciaAlturas = Z80Sub(DiferenciaAlturas, LeerAlturaBasePlanta_2473(AntiguaAlturaOrientacion))
+            'le resta la altura en el buffer de alturas
+            DiferenciaAlturas = Z80Sub(DiferenciaAlturas, NuevaAlturaOrientacionC)
+            DiferenciaAlturas = Z80Inc(DiferenciaAlturas)
+            '081B
+            If DiferenciaAlturas > 6 Then 'si hay poca diferencia de altura
+                '820
+                'pone el marcador de fin al inicio de esta entrada (esta entrada queda descartada)
+                TablaPosicionesAlternativas_0593(PunteroAlternativasIY + 2 - &H0593) = &HFF
+                Exit Sub
+            End If
+        End If
+        '0825
+        'aquí llega si la posición a la que se quiere ir no es una de las del buffer de alturas de la pantalla
+        'pone el marcador de fin al final de esta entrada
+        PunteroAlternativasIY = PunteroAlternativasIY + 3
+        TablaPosicionesAlternativas_0593(PunteroAlternativasIY + 2 - &H0593) = &HFF
+    End Sub
+
+    Public Sub GenerarPropuestasMovimiento_07BD(ByVal PersonajeObjetoHL As Integer, ByVal PunteroAlternativasDE As Integer, ByVal PersonajeIY As Integer)
+        'genera una propuesta de movimiento al lado de la posición indicada por hl por cada orientación posible y la graba en el buffer de de
+        'hl tiene la dirección de los datos de posición de un personaje o de un objeto al que se quiere llegar
+        'de apunta a una posición vacía del buffer para buscar caminos alternativos
+        'iy apunta a los datos de posición del personaje que se quiere mover
+        Dim OrientacionB As Byte
+        'lee la orientación del personaje/objeto al que se quiere llegar
+        OrientacionB = LeerBytePersonajeObjeto(PersonajeObjetoHL + 1)
+        'dados los datos de posición de ix, genera una propuesta para llegar 2 posiciones al lado del personaje según la orientación de b
+        GenerarPropuestaMovimiento_07D2(OrientacionB, PersonajeObjetoHL, PunteroAlternativasDE)
+        GenerarPropuestaMovimiento_07D2(OrientacionB + 1, PersonajeObjetoHL, PunteroAlternativasDE)
+        GenerarPropuestaMovimiento_07D2(OrientacionB + 2, PersonajeObjetoHL, PunteroAlternativasDE)
+        GenerarPropuestaMovimiento_07D2(OrientacionB + 3, PersonajeObjetoHL, PunteroAlternativasDE)
+    End Sub
+
+    'Public Sub DescartarMovimientosPensados_08BE(ByVal PersonajeIY As Integer)
+    ' 'descarta los movimientos pensados e indica que hay que pensar un nuevo movimiento
+    'Dim PunteroComandosMonjesHL As Integer
+    '    PunteroComandosMonjesHL = Leer16(TablaCaracteristicasPersonajes_3036, PersonajeIY + &H0C - &H3036)
+    '    'escribe el comando para que ponga el bit 7,(9)
+    '    BufferComandosMonjes_A200(PunteroComandosMonjesHL - &HA200) = &H10
+    '    'reinicia las acciones del personaje
+    '    TablaCaracteristicasPersonajes_3036(PersonajeIY + &H09 - &H3036) = 0
+    '    TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0B - &H3036) = 0
+    'End Sub
+
+    Public Sub GenerarMovimiento_073C(ByVal PersonajeOrigenIY As Integer, ByVal PersonajeObjetoIX As Integer)
+        'aquí saltan todos los personajes que "piensan" para llenar su buffer de acciones
+        'ix = las variables de la lógica del personaje
+        'iy = datos de posición del personaje
+        Dim PersonajeA As Byte
+        Dim PersonajeDestinoHL As Integer
+        Dim PunteroAlternativasDE As Integer
+        Dim Contador As Integer
+        'si no tiene un movimiento pensado
+        If LeerBitArray(TablaCaracteristicasPersonajes_3036, PersonajeOrigenIY + 9 - &H3036, 7) Then
+            '0743
+            'si el personaje no tiene que ir a ninguna parte, sale
+            If TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) <> 0 Then Exit Sub
+            '0748
+            'lee a donde hay que ir
+            PersonajeA = LeerBytePersonajeObjeto(PersonajeObjetoIX - 1)
+            'apunta a la primera posición libre del buffer - 2
+            PunteroAlternativasDE = &H0591
+            Select Case PersonajeA
+                Case = &HFF 'si hay que ir a por guillermo
+                    PersonajeDestinoHL = &H3036
+                Case = &HFE 'si hay que ir a por el abad
+                    PersonajeDestinoHL = &H3063
+                Case = &HFD 'si hay que ir a por el libro
+                    PersonajeDestinoHL = &H3008
+                Case = &HFC 'si hay que ir a por el pergamino
+                    PersonajeDestinoHL = &H3036
+                Case Else 'aquí llega si en ix-1 no encontró 0xff, 0xfe, 0xfd ni 0xfc
+                    '075D
+                    'copia 3 bytes al buffer que se usa en los algoritmos de posición
+                    For Contador = 0 To 2
+                        'indexa en la tabla de sitios a donde suele ir el personaje
+                        TablaPosicionesAlternativas_0593(Contador) = LeerBytePersonajeObjeto(PersonajeObjetoIX + 3 * PersonajeA + Contador)
+                    Next
+                    '0772
+                    'marca el final de la entrada
+                    TablaPosicionesAlternativas_0593(3) = &HFF
+                    PersonajeDestinoHL = PersonajeObjetoIX + 3 * PersonajeA - 2
+                    'apunta a la siguiente posición libre del buffer -2
+                    PunteroAlternativasDE = &H0594
+            End Select
+            '07a4
+            'hl tiene la dirección de los datos de posición de un personaje o de un objeto al que se quiere llegar
+            'de apunta a una posición vacía del buffer para buscar caminos alternativos
+            'iy apunta a los datos de posición del personaje que se quiere mover
+            'genera una propuesta de movimiento a la posición indicada por hl por cada orientación posible y la graba en el buffer de de
+
+            GenerarPropuestasMovimiento_07BD(PersonajeDestinoHL, PunteroAlternativasDE, PersonajeOrigenIY)
+            'apunta a la primera entrada de datos del buffer
+            PunteroAlternativaActual_05A3 = &H0593
+            'si no hay ninguna alternativa a evaluar, sale
+            If TablaPosicionesAlternativas_0593(0) = &HFF Then Exit Sub
+            '077d
+            'aquí se salta para procesar una alternativa
+            'ix posición generada en el buffer
+            'iy apunta a los datos de posición del personaje
+            'va a por un personaje que no está en la misma zona de pantalla que se muestra (iy a por ix)
+            BuscarCaminoGeneral_098A(PersonajeOrigenIY, PunteroAlternativaActual_05A3)
+            'If ResultadoBusqueda_2DB6 = 0 Then Stop
+            'si no está en el destino, sale
+            If ResultadoBusqueda_2DB6 <> &HFD Then Exit Sub
+            '0788
+            'si ha llegado al sitio, lo indica
+            TablaVariablesLogica_3C85(PersonajeObjetoIX - 3 - &H3C85) = LeerBytePersonajeObjeto(PersonajeObjetoIX)
+        Else
+            '0872
+            'aquí llega si tiene un movimiento pensado
+            'si no hay movimiento
+            'descarta los movimientos pensados e indica que hay que pensar un nuevo movimiento
+            If Not MovimientoRealizado_2DC1 Then DescartarMovimientosPensados_08BE(PersonajeOrigenIY)
+        End If
+
+    End Sub
+
+    Public Sub RechazarPropuestasMovimiento_45FB(ByVal PersonajeIY As Integer)
+        'si llega aquí, el personaje no puede moverse a ninguna de las orientaciones propuestas
+        Dim AlturaC As Byte
+        AlturaC = TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0E - &H3036)
+        'si la posición del sprite es central y la altura está bien, pone c en las posiciones que ocupa del buffer de alturas
+        RellenarBufferAlturasPersonaje_28EF(PersonajeIY, AlturaC)
+    End Sub
+
+    Public Sub BuscarOrientacionAdso_45C7(ByVal PersonajeIY As Integer, ByVal EntradaTablaOrientacionesA As Byte, ByVal PunteroBufferAlturasAdsoIX As Integer, ByVal AlturaBase_451C As Byte, ByVal RutinaCompleta As Boolean)
+        'escribir los comandos para avanzar en la orientación a la que mira guillermo
+        'tabla de orientaciones a probar para moverse en un determinado sentido
+        'cada entrada ocupa 4 bytes. Se prueban las orientaciones de cada entrada de izquierda a derecha
+        'las entradas están ordenadas inteligentemente.
+        'se pueden distinguir 2 grandes grupos de entradas. El primer grupo de entradas (las 4 primeras)
+        'da más prioridad a los movimientos a la derecha y el segundo grupo de entradas (las 4 últimas)
+        'da más prioridad a los movimientos a la izquierda. Dentro de cada grupo de entradas, las 2 primeras
+        'entradas dan más prioridad a los movimientos hacia abajo, y las otras 2 entradas dan más prioridad
+        'a los movimientos hacia arriba
+        '461F: 	03 00 02 01	-> 0x00 -> (+y, +x, -x, -y) -> si adso está a la derecha y detrás de guillermo, con dist y >= dist x
+        '       00 03 01 02 -> 0x01 -> (+x, +y, -y, -x) -> si adso está a la derecha y detrás de guillermo, con dist y < dist x
+        '       01 00 02 03 -> 0x02 -> (-y, +x, -x, +y) -> si adso está a la derecha y delante de guillermo, con dist y >= dist x
+        '       00 01 03 02 -> 0x03 -> (+x, -y, +y, -x) -> si adso está a la derecha y delante de guillermo, con dist y < dist x
+
+        '       03 02 00 01 -> 0x04 -> (+y, -x, +x, -y) -> si adso está a la izquierda y detrás de guillermo, con dist y >= dist x
+        '       02 03 01 00 -> 0x05 -> (-x, +y, -y, +x) -> si adso está a la izquierda y detrás de guillermo, con dist y < dist x
+        '       01 02 00 03 -> 0x06 -> (-y, -x, +x, +y) -> si adso está a la izquierda y delante de guillermo, con dist y >= dist x
+        '       02 01 03 00 -> 0x07 -> (-x, -y, +y, +x) -> si adso está a la izquierda y delante de guillermo, con dist y < dist x
+        Dim Contador As Byte
+        Dim ValorTablaOrientacionesC As Integer
+        Dim ValorTablaDesplazamientosC As Integer
+        Dim ValorBufferAlturasC As Byte
+        Dim PunteroTablaOrientacionesDE As Integer
+        Dim PunteroTablaDesplazamientosHL As Integer
+        Dim PunteroBufferAlturasIX As Integer
+        Dim TablaDesplazamientosSegunOrientacion_4617() As Integer = {1, -24, -1, 24}
+        'tabla de desplzamientos dentro del buffer de alturas según la orientación (relacionada con 0x461f)
+        '4617: 	0001 = +01 -> 0x00
+        '       FFE8 = -24 -> 0x01
+        '       FFFF = -01 -> 0x02
+        '       0018 = +24 -> 0x03
+        'indexa en la tabla de orientaciones a probar para moverse. cada entrada ocupa 4 bytes
+        PunteroTablaOrientacionesDE = 4 * EntradaTablaOrientacionesA + &H461F
+        '45D0
+        'repite para 3 valores (la orientación contraria a la que se quiere mover no se prueba)
+        For Contador = 1 To 3
+            '45d2
+            'lee un valor de la tabla y lo guarda en c
+            ValorTablaOrientacionesC = TablaOrientacionesAdsoGuillermo_461F(PunteroTablaOrientacionesDE - &H461F)
+            'apunta a la tabla de desplazamientos en el buffer de altura según la orientación
+            PunteroTablaDesplazamientosHL = 1 * ValorTablaOrientacionesC + &H4617 'en el original es 2x, pero es tabla de enteros en lugar de bytes
+            'lee el desplazamiento según la orientación a probar
+            ValorTablaDesplazamientosC = TablaDesplazamientosSegunOrientacion_4617(PunteroTablaDesplazamientosHL - &H4617)
+            '45E2
+            'calcula la posición en el buffer de alturas
+            PunteroBufferAlturasIX = PunteroBufferAlturasAdsoIX + ValorTablaDesplazamientosC
+            '45e4
+            'quita el bit 7
+            ClearBitBufferAlturas(PunteroBufferAlturasIX, 7)
+            'obtiene lo que hay
+            ValorBufferAlturasC = LeerByteBufferAlturas(PunteroBufferAlturasIX)
+            'comprueba 4 posiciones relativas a ix ((x,y),(x,y-1),(x-1,y)(x-1,y-1) y si no hay mucha diferencia de altura, pone el bit 7 de (x,y)
+            ComprobarPosicionesVecinas_4517(PunteroTablaOrientacionesDE, PunteroBufferAlturasIX, ValorBufferAlturasC, AlturaBase_451C, RutinaCompleta)
+            'si la rutina anterior ha puesto el bit 7 (porque puede avanzarse en esa posición), salta
+            If LeerBitBufferAlturas(PunteroBufferAlturasIX, 7) Then
+                '4606
+                'el personaje va a moverse a la orientación que estaba probando
+                'quita el bit 7
+                ClearBitBufferAlturas(PunteroBufferAlturasIX, 7)
+                'escribe un comando para avanzar en la nueva orientación del personaje
+                GenerarComandos_47E6(PersonajeIY, ValorTablaOrientacionesC, &H464F, 0)
+                'deja la rutina anterior como estaba y pone las posiciones del buffer de alturas del personaje
+                RechazarPropuestasMovimiento_45FB(PersonajeIY)
+                'vuelve a llamar al comportamiento de adso
+                EjecutarComportamientoAdso_087B()
+                Exit Sub
+            End If
+            '45f4
+            'prueba con otra orientación de la tabla
+            PunteroTablaOrientacionesDE = PunteroTablaOrientacionesDE + 1
+        Next 'repite para las 3 orientaciones que hay
+        '45FB
+        RechazarPropuestasMovimiento_45FB(PersonajeIY)
+    End Sub
+
+
+
+    Public Sub LimpiarBufferAlturasAdso_4591(ByVal PersonajeIY As Integer, ByVal PunteroBufferAlturasIX As Integer, ByRef AlturaBase_451C As Byte, ByRef RutinaCompleta As Boolean)
+        'limpia las posiciones del buffer de alturas que ocupa adso y modifica un par de instrucciones
+        'si la posición del sprite es central y la altura está bien, pone c en las posiciones que ocupa del buffer de alturas
+        RellenarBufferAlturasPersonaje_28EF(PersonajeIY, 0)
+        RutinaCompleta = False
+        'obtiene la altura de la posición principal del personaje en el buffer de alturas
+        AlturaBase_451C = LeerByteBufferAlturas(PunteroBufferAlturasIX) And &H0F
+    End Sub
+
+    Public Sub DejarPasoGuillermo_45A4(ByVal PersonajeIY As Integer, ByVal PunteroBufferAlturasIX As Integer)
+        'llamado desde adso cuando éste le impide avanzar a guillermo
+        'aquí llega con ix apuntando al buffer de alturas de adso
+        Dim AlturaBase_451C As Byte
+        Dim RutinaCompleta As Boolean
+        Dim PosicionXGuillermo As Byte
+        Dim PosicionYGuillermo As Byte
+        Dim PosicionXAdso As Byte
+        Dim PosicionYAdso As Byte
+        Dim DistanciaX As Byte
+        Dim DistanciaY As Byte
+        Dim EntradaTablaOrientacionesC As Byte
+        'limpia las posiciones del buffer de alturas que ocupa adso y modifica un par de instrucciones
+        LimpiarBufferAlturasAdso_4591(PersonajeIY, PunteroBufferAlturasIX, AlturaBase_451C, RutinaCompleta)
+        'obtiene la posición de guillermo
+        PosicionXGuillermo = TablaCaracteristicasPersonajes_3036(2)
+        PosicionYGuillermo = TablaCaracteristicasPersonajes_3036(3)
+        '45AD
+        'obtiene la posición x de adso
+        PosicionXAdso = TablaCaracteristicasPersonajes_3036(&H3045 + 2 - &H3036)
+        If PosicionXAdso < PosicionXGuillermo Then 'si adso está a la izquierda de guillermo
+            '45b3
+            'indica que guillermo está a la derecha de adso
+            SetBit(EntradaTablaOrientacionesC, 2)
+            'distancia en x entre los 2 personajes
+            DistanciaX = PosicionXGuillermo - PosicionXAdso
+        Else
+            DistanciaX = PosicionXAdso - PosicionXGuillermo
+        End If
+        '45b8
+        'obtiene la posición y de adso
+        PosicionYAdso = TablaCaracteristicasPersonajes_3036(&H3045 + 3 - &H3036)
+        If PosicionYAdso < PosicionYGuillermo Then 'si adso está delante de guillermo
+            '45BE
+            'indica que guillermo está detrás de adso
+            SetBit(EntradaTablaOrientacionesC, 1)
+            'distancia en y entre los 2 personajes
+            DistanciaY = PosicionYGuillermo - PosicionYAdso
+        Else
+            DistanciaY = PosicionYAdso - PosicionYGuillermo
+        End If
+        '45C2
+        If DistanciaY < DistanciaX Then
+            '45c5
+            EntradaTablaOrientacionesC = EntradaTablaOrientacionesC + 1
+        End If
+        '45C7
+        BuscarOrientacionAdso_45C7(PersonajeIY, EntradaTablaOrientacionesC, PunteroBufferAlturasIX, AlturaBase_451C, RutinaCompleta)
+    End Sub
+
+    'Public Sub ComprobarAlturaPosicionesPersonaje_27CB(ByVal PersonajeIY As Integer, ByVal AlturaRelativaA As Byte)
+    '    'comprueba la altura de las posiciones a las que va a moverse el personaje y las devuelve en a y c
+    '    'en iy se pasan las características del personaje que se mueve hacia delante
+    '    'llamado al pulsar cursor arriba
+    '    Dim PosicionX As Byte
+    '    Dim PosicionY As Byte
+    '    Dim PunteroAlturasDE As Integer
+    '    Dim PunteroAlturasHL As Integer
+    '    Dim PunteroAlturasHLAnterior As Integer
+    '    Dim PunteroAvancesHL As Integer
+    '    Dim PunteroAvancesDE As Integer
+    '    Dim Desplazamiento1BC As Integer 'desplazamiento en el buffer de tiles del bucle interior
+    '    Dim Desplazamiento2BC As Integer 'desplazamiento en el buffer de tiles del bucle exterior
+    '    Dim Contador1 As Byte
+    '    Dim Contador2 As Byte
+    '    Dim Valor As Byte
+    '    'buffer auxiliar para mover el personaje (usado en la rutina para que guillermo avanza la posición)
+    '    Dim TablaAvancesGuillermo_2DC5() As Byte = {&H38, &HE1, &HD1, &HC1, &H23, &H13, &H10, &HE8, &HCD, &HA0, &H00, &H7C, &HB5, &HC8, &H3A, &H23}
+    '    'aquí llega con a = altura relativa dentro de la planta
+    '    'obtiene la posición global del personaje
+    '    PosicionY = TablaCaracteristicasPersonajes_3036(PersonajeIY + 3 - &H3036)
+    '    PosicionX = TablaCaracteristicasPersonajes_3036(PersonajeIY + 2 - &H3036)
+    '    'ajusta la posición pasada en hl a las 20x20 posiciones centrales que se muestran. Si la posición está fuera, sale
+    '    If Not DeterminarPosicionCentral_279B(PosicionX, PosicionY) Then Exit Sub
+    '    '27DB
+    '    'aquí llega si la posición es visible. en a y en b está el parámetro que se le pasó, pero ya no se usa
+    '    PunteroAlturasDE = PunteroBufferAlturas_2D8A + 24 * PosicionY + PosicionX
+    '    '27EE
+    '    PunteroAvancesHL = ObtenerPunteroPosicionVecinaPersonaje_2783(PersonajeIY)
+    '    'lee 4 valores de la tabla
+    '    Desplazamiento1BC = LeerDatoTablaAvancePersonaje(PunteroAvancesHL, 16)
+    '    Desplazamiento2BC = LeerDatoTablaAvancePersonaje(PunteroAvancesHL + 2, 16)
+    '    PunteroAvancesHL = PunteroAvancesHL + 4
+    '    '2805
+    '    'lee un desplazamiento de la tabla y la guarda en hl
+    '    PunteroAlturasHL = CInt(LeerDatoTablaAvancePersonaje(PunteroAvancesHL, 16))
+    '    PunteroAvancesHL = PunteroAvancesHL + 2
+    '    'suma a la posición actual en el buffer de alturas el desplazamiento leido
+    '    PunteroAlturasHL = PunteroAlturasHL + PunteroAlturasDE
+    '    '280A
+    '    'de apunta a un buffer auxiliar
+    '    PunteroAvancesDE = &H2DC5
+    '    '280E
+    '    For Contador1 = 0 To 4 'el bucle exterior realiza 4 iteraciones
+    '        '2810
+    '        PunteroAlturasHLAnterior = PunteroAlturasHL
+    '        For Contador2 = 0 To 4 'el bucle interior realiza 4 iteraciones
+    '            '2814
+    '            'lee el valor de la posición actual del buffer de alturas
+    '            Valor = LeerByteBufferAlturas(PunteroAlturasHL)
+    '            'comprueba si en esa posición hay algun personaje
+    '            If Valor >= &H10 Then
+    '                '281A
+    '                'si hay alguien en esa posición
+    '                'se queda sólo con los personajes que hay en la posición
+    '                Valor = Valor And &H30
+    '            Else
+    '                '281E
+    '                'si no hay nadie en esa posición
+    '                'le resta la altura del personaje relativa a la planta actual
+    '                Valor = Valor - AlturaRelativaA
+    '            End If
+    '            '2820
+    '            'guarda el personaje o la diferencia de altura en el buffer
+    '            TablaAvancesGuillermo_2DC5(PunteroAvancesDE - &H2DC5) = Valor
+    '            PunteroAvancesDE = PunteroAvancesDE + 1
+    '            'cambia la posición del buffer de alturas
+    '            PunteroAlturasHL = PunteroAlturasHL + Desplazamiento1BC
+    '            '2827
+    '        Next
+    '        PunteroAlturasHL = PunteroAlturasHLAnterior
+    '        'desplazamiento en el buffer de alturas del bucle exterior
+    '        PunteroAlturasHL = PunteroAlturasHL + Desplazamiento2BC
+    '        '282F
+    '    Next 'repite hasta completar 16 posiciones
+    '    '2831
+    '    PunteroAlturasHL = PunteroAlturasHLAnterior
+    '    PunteroAlturasHL = PunteroAlturasHL + 1
+    '    '2833
+    '    If LeerBitBufferAlturas(PersonajeIY + 5, 7) Then
+    '        '2839
+    '        'si el personaje ocupa 1 posición en el buffer de alturas
+
+    '    Else
+    '        '2841
+    '        'aquí llega si el personaje ocupa 4 posiciones en el buffer de alturas
+
+
+    '    End If
+    'End Sub
+
+    Public Sub AvanzarDireccionGuillermo_4582(ByVal PersonajeIY As Integer, ByVal PunteroBufferAlturasIX As Integer)
+        'llamado desde adso cuando se pulsa cursor abajo
+        'trata de avanzar en la orientación de guillermo
+        Dim AlturaBase_451C As Byte
+        Dim RutinaCompleta As Boolean
+        Dim OrientacionGuillermoA As Byte
+        'limpia las posiciones del buffer de alturas que ocupa adso y modifica un par de instrucciones
+        LimpiarBufferAlturasAdso_4591(PersonajeIY, PunteroBufferAlturasIX, AlturaBase_451C, RutinaCompleta)
+        'obtiene la orientación de guillermo y selecciona una entrada de la tabla según la orientación de guillermo
+        OrientacionGuillermoA = TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036)
+        OrientacionGuillermoA = OrientacionGuillermoA + 1
+        '0 -> 1
+        '1 -> 2
+        '2 -> 7
+        '3 -> 4
+        '4589
+        If OrientacionGuillermoA = 3 Then OrientacionGuillermoA = 7
+        'salta a escribir los comandos para avanzar en la orientación a la que mira guillermo
+        BuscarOrientacionAdso_45C7(PersonajeIY, OrientacionGuillermoA, PunteroBufferAlturasIX, AlturaBase_451C, RutinaCompleta)
+    End Sub
+
+    Public Sub ActualizarTablaPuertas_3EA4(ByVal MascaraPuertasC As Byte)
+        'modifica la tabla de 0x05cd con información de la tabla de las puertas y entre que habitaciones están
+        'c = máscara de las puertas que interesan de todas las que pueden abrirse
+        Dim PuertasAbriblesPersonajeA As Byte
+        Dim PunteroAccesoHabitacionesIX As Integer
+        Dim PunteroConexionesHabitacionesHL As Integer
+        Dim Contador As Byte
+        Dim Bit0 As Boolean
+        Dim ValorHabitacionesA As Byte
+        Dim ConexionesHabitacionE As Byte
+        ' tabla para modificar el acceso a las habitaciones según las llaves que se tengan. 6 entradas (una por puerta) de 5 bytes
+        ' byte 0: indice de la habitación en la matriz de habitaciones de la planta baja
+        ' byte 1: permisos para esa habitación
+        ' byte 2: indice de la habitación en la matriz de habitaciones de la planta baja
+        ' byte 3: permisos para esa habitación
+        ' byte 4: 0xff
+        '3C67: 	35 01 36 04 FF	; entre la habitación (3, 5) = 0x3e y la (3, 6) = 0x3d hay una puerta (la de la habitación del abad)
+        '		1B 08 2B 02 FF	; entre la habitación (1, b) = 0x00 y la (2, b) = 0x38 hay una puerta (la de la habitación de los monjes)
+        '		56 08 66 02 FF	; entre la habitación (5, 6) = 0x3d y la (6, 6) = 0x3c hay una puerta (la de la habitación de severino)
+        '		29 01 2A 04 FF	; entre la habitación (2, 9) = 0x29 y la (2, a) = 0x37 hay una puerta (la de la salida de las habitaciones hacia la iglesia)
+        '		27 01 28 04 FF	; entre la habitación (2, 7) = 0x28 y la (2, 8) = 0x26 hay una puerta (la del pasadizo de detrás de la cocina)
+        '		75 01 76 04 FF	; entre la habitación (7, 5) = 0x11 y la (7, 6) = 0x12 hay una puerta (la que cierra el paso a la parte izquierda de la planta baja)
+        'lee datos de movimiento de adso y guarda ese valor que luego usará como si fuera un valor aleatorio
+        TablaVariablesLogica_3C85(ValorAleatorio_3C9D - &H3C85) = BufferComandosMonjes_A200(&HA2C0 - &HA200)
+        'obtiene la máscara de las puertas que puede atravesar el personaje
+        PuertasAbriblesPersonajeA = PuertasAbribles_3CA6 And MascaraPuertasC
+        '3EB1
+        'apunta a la tabla con las habitaciones que comunican las puertas
+        PunteroAccesoHabitacionesIX = &H3C67
+        For Contador = 0 To 5 '6 puertas
+            '3EB7
+            'comprueba el bit0
+            If PuertasAbriblesPersonajeA Mod 2 Then
+                Bit0 = True
+            Else
+                Bit0 = False
+            End If
+            'desplaza c a la derecha
+            PuertasAbriblesPersonajeA = PuertasAbriblesPersonajeA >> 1
+            Do
+                '3EC1
+                'apunta a las conexiones de las habitaciones de la planta baja
+                PunteroConexionesHabitacionesHL = &H05CD
+                'lee el índice en la matriz de habitaciones de la planta baja
+                ValorHabitacionesA = TablaAccesoHabitaciones_3C67(PunteroAccesoHabitacionesIX - &H3C67)
+                PunteroAccesoHabitacionesIX = PunteroAccesoHabitacionesIX + 1
+                'si encuentra 0xff pasa a la siguiente iteración
+                If ValorHabitacionesA = &HFF Then Exit Do
+                '3ECD
+                PunteroConexionesHabitacionesHL = PunteroConexionesHabitacionesHL + ValorHabitacionesA
+                'lee el valor para esa habitación
+                ValorHabitacionesA = TablaAccesoHabitaciones_3C67(PunteroAccesoHabitacionesIX - &H3C67)
+                PunteroAccesoHabitacionesIX = PunteroAccesoHabitacionesIX + 1
+                'obtiene las conexiones de esa habitación
+                ConexionesHabitacionE = TablaConexionesHabitaciones_05CD(PunteroConexionesHabitacionesHL - &H05CD)
+                '3ED7
+                If Bit0 Then 'si cf = 1 a = ~a & e
+                    ValorHabitacionesA = (255 - ValorHabitacionesA) And ConexionesHabitacionE
+                Else 'si cf = 0 (es decir, si no puede ir a esa puerta), a = a | e
+                    ValorHabitacionesA = ValorHabitacionesA Or ConexionesHabitacionE
+                End If
+                '3EDB
+                'modifica el valor de esa habitación
+                TablaConexionesHabitaciones_05CD(PunteroConexionesHabitacionesHL - &H05CD) = ValorHabitacionesA
+                '3EDC
+            Loop
+            '3EDE
+        Next 'repite hasta acabar las 6 entradas 
+    End Sub
+
+    Public Sub ProcesarLogicaAdso_5DA1()
+        '### pendiente
+        TablaVariablesLogica_3C85(DondeVaAdso_3d13 - &H3C85) = &HFF 'sigue a guillermo
+
+        'TablaVariablesLogica_3C85(DondeVaAdso_3d13 - &H3C85) = &H1 'va al refectorio. 
+        'TablaVariablesLogica_3C85(DondeVaAdso_3d13 - &H3C85) = &H0 'va a la iglesia
+
+        'cambio de posición predefinida 0
+        'TablaVariablesLogica_3C85(&H3D14 - &H3C85) = &H88
+        'TablaVariablesLogica_3C85(&H3D15 - &H3C85) = &H88
+        'TablaVariablesLogica_3C85(&H3D16 - &H3C85) = &H02
+
+    End Sub
+
+
+
+
+
+    Public Function LeerComandoPersonaje_2C10(ByVal PersonajeIY As Integer) As Byte
+        'lee un bit de datos de los comandos del personaje y lo mete en el CF
+        Dim PunteroComandosMonjes As Integer
+        LeerComandoPersonaje_2C10 = 0
+        'si no quedan comandos pendientes
+        If TablaCaracteristicasPersonajes_3036(PersonajeIY + 9 - &H3036) = 0 Then
+            '2C16
+            'aquí entra si el contador de los bits 0-2 de iy+09 es 0, y el bit 7 de iy+0x09 no es 1
+            'en 0x0b está el índice dentro de los comandos
+            PunteroComandosMonjes = TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0B - &H3036)
+            'en 0x0c y 0x0d se guarda un puntero a los datos de los comandos de movimiento del personaje
+            PunteroComandosMonjes = PunteroComandosMonjes + Leer16(TablaCaracteristicasPersonajes_3036, PersonajeIY + &H0C - &H3036)
+            TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0B - &H3036) = TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0B - &H3036) + 1
+            'obtiene un nuevo byte de comandos y lo graba
+            TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0A - &H3036) = BufferComandosMonjes_A200(PunteroComandosMonjes - &HA200)
+        End If
+        '2c29
+        'incrementa el contador de los bits 0-2
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + &H09 - &H3036) = (TablaCaracteristicasPersonajes_3036(PersonajeIY + &H09 - &H3036) + 1) And &H7
+        If LeerBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + &HA - &H3036, 7) Then LeerComandoPersonaje_2C10 = 1
+        'desplaza los bits de los comandos a la izquierda una posición
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0A - &H3036) = TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0A - &H3036) << 1
+    End Function
+
+    Public Sub LeerComandosPersonaje_2CB8(ByVal PersonajeIY As Integer, ByRef Volver As Boolean, ByRef ResultadoC As Byte)
+        'lee e interpreta los comandos que se le han pasado al personaje. Según los bits que lea, se devuelven valores:
+        '* si el personaje ocupa de 4 posiciones
+        '  si lee 1 -> devuelve c = 1 -> trata de avanzar una posición hacia delante (con a = 0 y c = -1) -> avanza
+        '  si lee 010 -> devuelve c = 2 -> gira a la derecha
+        '  si lee 011 -> devuelve c = 3 -> gira a la izquierda
+        '  si lee 0010 -> devuelve c = 4 -> trata de avanzar una posición hacia delante (con a = 1 y c = -1) -> sube (y pasa a ocupar una posición)
+        '  si lee 0011 -> devuelve c = 5 -> trata de avanzar una posición hacia delante (con a = -1 y c = -1) -> baja (y pasa a ocupar una posición)
+        '  si lee 0001 -> pone el bit 7,(9) y sale 2 rutinas para fuera
+        '  si lee 0000 -> reinicia el contador, el índice, habilita los comandos, y procesa otro comando
+        '* si el personaje ocupa de 1 posición:
+        '  si lee 10 -> devuelve c = 0 -> 	si bit 5 = 1, trata de avanzar una posición hacia delante (con a = 0 y c = 0) -> avanza
+        '								si bit 5 = 0, sube (y sigue ocupando una posición) (con a = 1 y c = 2)
+        '  si lee 11 -> devuelve c = 1 -> baja (y sigue ocupando una posición) (con a = -1 y c = -2)
+        '  si lee 010 -> devuelve c = 2 -> gira a la derecha
+        '  si lee 011 -> devuelve c = 3 -> gira a la izquierda
+        '  si lee 0010 -> devuelve c = 4 -> sube (y pasa a ocupar 4 posiciones) (con a = 1 y c = 1)
+        '  si lee 0011 -> devuelve c = 5 -> baja (y pasa a ocupar 4 posiciones) (con a = -1 y c = -1)
+        '  si lee 0001 -> pone el bit 7,(9) y sale 2 rutinas para fuera
+        '  si lee 0000 -> sale con c = 0
+        Dim ComandoC As Byte
+        Do
+            'comprueba si el personaje ocupa 1 ó 4 posiciones en el buffer de alturas
+            If LeerBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 5 - &H3036, 7) Then
+                '2CBE
+                'aqui llega si el personaje ocupa una posicion en el buffer de alturas
+                'lee un bit de datos de los comandos del personaje y lo mete en el CF
+                ComandoC = LeerComandoPersonaje_2C10(PersonajeIY)
+                If ComandoC Then
+                    '2CC3
+                    'lee un bit de datos de los comandos del personaje y lo mete en el CF
+                    ResultadoC = LeerComandoPersonaje_2C10(PersonajeIY)
+                    Exit Sub
+                Else
+                    'si ha leido un 0, salta a procesar el resto como si fuera de 4 posiciones
+                End If
+            Else
+                '2CCB
+                'aqui llega si el personaje ocupa 4 posiciones en el buffer de alturas
+                'lee un bit de datos de los comandos del personaje y lo mete en el CF
+                ComandoC = LeerComandoPersonaje_2C10(PersonajeIY)
+            End If
+            '2CCE
+            ResultadoC = 1
+            'si ha leido un 1, sale
+            If ComandoC Then Exit Sub
+            '2CD1
+            'lee un bit de datos de los comandos del personaje y lo mete en el CF
+            ComandoC = LeerComandoPersonaje_2C10(PersonajeIY)
+            If ComandoC Then
+                '2CD6
+                'lee un bit de datos de los comandos del personaje y lo mete en el CF
+                ResultadoC = ResultadoC << 1 Or LeerComandoPersonaje_2C10(PersonajeIY)
+                Exit Sub
+            End If
+            '2CDC
+            ResultadoC = ResultadoC << 1 Or ComandoC
+            If LeerComandoPersonaje_2C10(PersonajeIY) Then
+                '2CD6
+                'lee un bit de datos de los comandos del personaje y lo mete en el CF
+                ResultadoC = ResultadoC << 1 Or LeerComandoPersonaje_2C10(PersonajeIY)
+                Exit Sub
+            End If
+            '2CE3
+            'lee un bit de datos de los comandos del personaje y lo mete en el CF
+            ComandoC = LeerComandoPersonaje_2C10(PersonajeIY)
+            If ComandoC Then 'si ha leido un 1
+                '2cf9
+                'indica que se han acabado los comandos y sale 2 rutinas fuera
+                SetBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 9 - &H3036, 7)
+                Volver = True
+                Exit Sub
+            End If
+            '2ce8
+            ResultadoC = 0
+            'si es un personaje que ocupa solo una posición en el buffer de posiciones, sale
+            If LeerBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 5 - &H3036, 7) Then Exit Sub
+            '2CEF
+            'reinicia el contador, el índice y habilita los comandos
+            TablaCaracteristicasPersonajes_3036(PersonajeIY + &H0B - &H3036) = 0
+            TablaCaracteristicasPersonajes_3036(PersonajeIY + &H09 - &H3036) = 0
+        Loop
+    End Sub
+
+    Public Sub EjecutarComportamientoPersonaje_2C3A(ByVal PunteroSpriteIX As Integer, ByVal PersonajeIY As Integer)
+        'ejecuta los comandos de movimiento para adso y para los monjes
+        'ix que apunta al sprite del personaje
+        'iy apunta a los datos de posición del personaje
+        Dim PunteroHL As Integer
+        Dim Contador As Byte
+        Dim ComandoC As Byte
+        Dim Altura1A As Byte
+        Dim Altura2C As Byte
+        Dim Volver As Boolean = False
+        'si no hay comandos en el buffer, sale
+        If LeerBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 9 - &H3036, 7) Then Exit Sub
+        '2C3F
+        'devuelve la dirección para calcular la altura de las posiciones vecinas según el tamaño de la posición del personaje y la orientación
+        PunteroHL = ObtenerPunteroPosicionVecinaPersonaje_2783(PersonajeIY)
+        'apunta a la cantidad a sumar a la posición si el personaje sigue avanzando en ese sentido
+        PunteroHL = PunteroHL + 6
+        '2C46
+        '2d5c
+        For Contador = 0 To &H0A - 1 'longitud de los datos
+            BufferAuxiliar_2D68(Contador) = TablaCaracteristicasPersonajes_3036(PersonajeIY + 2 + Contador - &H3036)
+        Next
+        '2C4C
+        'lee en c un comando del personaje
+        LeerComandosPersonaje_2CB8(PersonajeIY, Volver, ComandoC)
+        If Volver Then Exit Sub
+        Altura2C = 1 'c = +1
+        '2C53
+        If ComandoC = 3 Then 'si obtuvo un 3, se gira a la izquierda
+            ActualizarDatosPersonajeCursorIzquierdaDerecha_2A0C(True, PunteroSpriteIX, PersonajeIY)
+            Exit Sub
+        Else
+            '2C58
+            Altura2C = &HFF 'c = -1
+            If ComandoC = 2 Then 'si obtuvo un 2, se gira a la derecha
+                ActualizarDatosPersonajeCursorIzquierdaDerecha_2A0C(False, PunteroSpriteIX, PersonajeIY)
+                Exit Sub
+            End If
+        End If
+        '2C5F
+        'si el personaje ocupa 4 posiciones en el buffer de alturas
+        If Not LeerBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 5 - &H3036, 7) Then
+            '2C65
+            'aquí llega si el personaje ocupa 4 posiciones en el buffer de alturas, y con c = -1
+            If ComandoC = 1 Then
+                '2C69
+                Altura1A = 0
+            Else
+                '2C6D
+                'aquí llega con c = -1 si el personaje ocupa una sola posición en el buffer de alturas o si obtuvo algo distinto de un uno y el personaje ocupa 4 posiciones del buffer de tiles
+                If ComandoC = 5 Then
+                    '2C6F
+                    Altura1A = &HFF
+                Else
+                    '2C73
+                    Altura1A = 1
+                End If
+            End If
+        Else
+            '2C77
+            'aqui llega con c = -1 si el personaje ocupa una sola posición en el buffer de alturas
+            If ComandoC = 0 Then
+                '2C7A
+                If LeerBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 5 - &H3036, 5) Then
+                    '2c80
+                    'si el bit 5 es 1 (si está girado en un desnivel)
+                    Altura1A = 0
+                    Altura2C = 0
+                Else
+                    '2C84
+                    'aquí llega si el personaje ocupa una posición, obtuvo un 0 y el bit 5 era 0 (si no está girado en un desnivel)
+                    Altura1A = 1
+                    Altura2C = 2
+                End If
+            Else
+                '2C8A
+                'aquí llega si el personaje ocupa una posición, y no obtuvo un 0
+                If ComandoC = 1 Then
+                    '2c8e
+                    Altura2C = &HFE
+                    Altura1A = &HFF
+                Else
+                    '2c94
+                    If ComandoC = 4 Then
+                        '2c98
+                        Altura2C = 1
+                        Altura1A = 1
+                    Else
+                        '2c9d
+                        Altura2C = &HFF
+                        Altura1A = &HFF
+                    End If
+                End If
+            End If
+        End If
+        '2ca0
+        'comprueba si se puede mover en esa dirección y si no es así, restaura el estado de posición del personaje
+        'en a pasa la diferencia de altura a donde se mueve, que se usará si el personaje no está en la pantalla actual
+        'indica que de momento no hay movimiento
+        MovimientoRealizado_2DC1 = False
+        Dim Salida1A As Integer
+        Dim Salida2C As Integer
+        Dim Salida3HL As Integer
+        '2CA6
+        'comprueba la altura de las posiciones a las que va a moverse el personaje y las devuelve en a y c
+        'si el personaje no está en la pantalla que se muestra, a, c = lo que se pasó
+        Salida3HL = PunteroHL
+        ObtenerAlturaDestinoPersonaje_27B8(Altura1A, Altura2C, PersonajeIY, Salida1A, Salida2C, Salida3HL)
+        'If Salida3HL = 0 Then Stop
+        'si puede moverse hacia delante, actualiza el sprite del personaje
+        If Salida1A = &HFF Then Salida1A = -1
+        If Salida2C = &HFF Then Salida2C = -1
+        AvanzarPersonaje_2954(PunteroSpriteIX, PersonajeIY, Salida1A, Salida2C, Salida3HL)
+        'si el personaje se ha movido, sale
+        If MovimientoRealizado_2DC1 Then Exit Sub
+        '2CB1
+        'en otro caso, restaura la copia de datos del personaje del buffer
+        '2d5c
+        For Contador = 0 To &H0A - 1 'longitud de los datos
+            TablaCaracteristicasPersonajes_3036(PersonajeIY + 2 + Contador - &H3036) = BufferAuxiliar_2D68(Contador)
+        Next
+    End Sub
+
+    Public Sub EjecutarComportamientoAdso_087B()
+        'comportamiento de adso
+        Dim PersonajeIY As Integer
+        Dim PunteroDatosAdsoIX As Integer
+        Dim PunteroVariablesAuxiliaresHL As Integer
+        Dim PunteroBufferAlturasIX As Integer
+        Dim PunteroAuxiliarHL As Integer
+        Dim PosicionXAdsoL As Byte
+        Dim PosicionYAdsoH As Byte
+        Dim PosicionXGuillermoL As Byte
+        Dim PosicionYGuillermoH As Byte
+        Dim PunteroPilaHL As Integer
+        Dim MarcaGuillermoC As Byte 'identificador de Guillermo en el buffer de alturas
+        Dim MarcaAdsoC As Byte 'identificador de Guillermo en el buffer de alturas
+        Dim MinimasIteracionesC As Byte
+        Dim OrientacionNuevaC As Byte
+        Dim flipe As Byte = 0
+        Do
+            PersonajeIY = &H3045 'apunta a los datos de posición de adso
+            PunteroDatosAdsoIX = &H3D14 'apunta a los datos de estado de adso
+            'indica que el personaje inicialmente si quiere moverse
+            TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 0
+            ProcesarLogicaAdso_5DA1() 'procesa el comportamiento de adso
+            'modifica la tabla de 0x05cd con información de la tabla de las puertas y entre que habitaciones están
+            ActualizarTablaPuertas_3EA4(&H3C)
+            '088F
+            'apunta a la tabla para mover a adso
+            'comprueba si el personaje puede moverse a donde quiere y actualiza su sprite y el buffer de alturas
+            ActualizarDatosPersonaje_291D(&H2BB8)
+            '0895
+            'lee a donde debe ir adso
+            If TablaVariablesLogica_3C85(DondeVaAdso_3d13 - &H3C85) = &HFF Then
+                '08a1
+                'adso tiene que seguir a guillermo
+                'lee el personaje al que sigue la cámara
+                If TablaVariablesLogica_3C85(PersonajeSeguidoPorCamara_3C8F - &H3C85) >= 2 Then Exit Sub 'si la cámara no sigue a guillermo o a adso, sale
+                '08A7
+                'comprueba si tiene un movimiento pensado
+                If Not LeerBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + &H9 - &H3036, 7) Then
+                    '08AD
+                    'aquí llega si tenía un movimiento pensado
+                    'apunta al contador de movimientos frustados
+                    'PunteroVariablesAuxiliaresHL = &H2DAA
+                    '08B0
+                    'si el personaje se pudo mover hacia donde quería, sale
+                    If MovimientoRealizado_2DC1 Then Exit Sub
+                    '08B6
+                    'obtiene el contador de movimientos frustados y lo incrementa
+                    ContadorMovimientosFrustrados_2DAA = ContadorMovimientosFrustrados_2DAA + 1
+                    'TablaVariablesAuxiliares_2D8D(PunteroVariablesAuxiliaresHL - &H2D8D) = TablaVariablesAuxiliares_2D8D(PunteroVariablesAuxiliaresHL - &H2D8D) + 1
+                    'si es < 10, sale
+                    If ContadorMovimientosFrustrados_2DAA < 10 Then Exit Sub
+                    'mantiene el valor entre 0 y 9
+                    ContadorMovimientosFrustrados_2DAA = 0
+                    'descarta los movimientos pensados e indica que hay que pensar un nuevo movimiento
+                    DescartarMovimientosPensados_08BE(PersonajeIY)
+                    Exit Sub
+                Else
+                    '08CF
+                    'aquí llega si no tenía un movimiento pensado
+                    'si tiene el control pulsado, adso se queda quieto
+                    If TeclaPulsadaNivel_3482(&H2F) And Depuracion.PararAdsoCTRL Then Exit Sub
+                    '08D8
+                    'indica que de momento no ha encontrado una ruta hasta guillermo
+                    ResultadoBusqueda_2DB6 = 0
+                    '08E3
+                    'si la posición no es una de las del centro de la pantalla que se muestra, CF=1
+                    'en otro caso, devuelve en ix un puntero a la entrada de la tabla de alturas de la posición correspondiente
+                    If DeterminarPosicionCentral_0CBE(PersonajeIY, PunteroBufferAlturasIX) Then
+                        '08E6
+                        'adso está en la pantalla que se muestra
+                        If TeclaPulsadaNivel_3482(0) Then 'si se pulsa cursor arriba
+                            '08ed
+                            'aquí llega si adso está en el centro de la pantalla y se pulsa cursor arriba
+                            'comprueba la altura de las posiciones a las que va a moverse guillermo y las devuelve en a y c
+                            'si el personaje no está visible, se devuelve lo mismo que se pasó en a
+                            Dim Salida1A As Integer
+                            Dim Salida2C As Integer
+                            Dim Salida3HL As Integer
+                            Dim ValorAlturaA As Integer
+                            ObtenerAlturaDestinoPersonaje_27CB(0, 0, 0, &H3036, Salida1A, Salida2C, Salida3HL)
+                            'apunta al buffer auxiliar para el cálculo de las alturas a los movimientos usado por la rutina anterior
+                            PunteroAuxiliarHL = &H2DC6
+                            '08FB
+                            'combina el contenido de las 2 casillas por las que va a moverse guillermo
+                            ValorAlturaA = BufferAuxiliar_2DC5(PunteroAuxiliarHL - &H2DC5)
+                            ValorAlturaA = ValorAlturaA Or BufferAuxiliar_2DC5(PunteroAuxiliarHL + 1 - &H2DC5)
+                            PunteroAuxiliarHL = PunteroAuxiliarHL + 1
+                            '08FE
+                            'pasa a la siguiente línea
+                            PunteroAuxiliarHL = PunteroAuxiliarHL + 3
+                            ValorAlturaA = ValorAlturaA Or BufferAuxiliar_2DC5(PunteroAuxiliarHL - &H2DC5)
+                            ValorAlturaA = ValorAlturaA Or BufferAuxiliar_2DC5(PunteroAuxiliarHL + 1 - &H2DC5)
+                            PunteroAuxiliarHL = PunteroAuxiliarHL + 1
+                            '0904
+                            If ValorAlturaA And &H20& Then
+                                'si adso no está en alguna de esas, escribe comandos para moverse hacia ellas
+                                DejarPasoGuillermo_45A4(PersonajeIY, PunteroBufferAlturasIX)
+                                Exit Sub
+                            End If
+                        End If
+                        '0909
+                        'aquí llega si no se pulsa cursor arriba o si adso no molestaba a guillermo para avanzar
+                        If TeclaPulsadaNivel_3482(&H02) Then 'si se pulsa cursor abajo
+                            '4582
+                            AvanzarDireccionGuillermo_4582(PersonajeIY, PunteroBufferAlturasIX)
+                            Exit Sub
+                        End If
+                        '0911
+                        'apunta a los datos posición de guillermo
+                        'si la posición del sprite es central y la altura está bien, limpia las posiciones que ocupa guillermo en el buffer de alturas
+                        RellenarBufferAlturasPersonaje_28EF(&H3036, 0)
+                        'si la posición del sprite es central y la altura está bien, limpia las posiciones que ocupa adso en el buffer de alturas
+                        RellenarBufferAlturasPersonaje_28EF(&H3045, 0)
+                        '0923
+                        'obtiene la posición de adso
+                        PosicionXAdsoL = TablaCaracteristicasPersonajes_3036(&H3047 - &H3036)
+                        PosicionYAdsoH = TablaCaracteristicasPersonajes_3036(&H3048 - &H3036)
+                        'ajusta la posición pasada en hl a las 20x20 posiciones centrales que se muestran. Si la posición está fuera, CF=1
+                        DeterminarPosicionCentral_279B(PosicionXAdsoL, PosicionYAdsoH)
+                        '0929
+                        'guarda la posición relativa de adso
+                        PosicionDestino_2DB4 = CInt(PosicionYAdsoH) << 8 Or PosicionXAdsoL
+                        '092C
+                        'obtiene la posición de guillermo
+                        PosicionXGuillermoL = TablaCaracteristicasPersonajes_3036(&H3038 - &H3036)
+                        PosicionYGuillermoH = TablaCaracteristicasPersonajes_3036(&H3039 - &H3036)
+                        'ajusta la posición pasada en hl a las 20x20 posiciones centrales que se muestran. Si la posición está fuera, CF=1
+                        DeterminarPosicionCentral_279B(PosicionXGuillermoL, PosicionYGuillermoH)
+                        'guarda la posición relativa de guillermo
+                        PosicionOrigen_2DB2 = CInt(PosicionYGuillermoH) << 8 Or PosicionXGuillermoL
+                        '0935
+                        'busca el camino para ir de guillermo a adso (o viceversa)
+                        BuscarCamino_4429(PunteroPilaHL)
+                        'elimina todos los rastros de la búsqueda del buffer de alturas
+                        LimpiarRastrosBusquedaBufferAlturas_0BAE()
+                        '093E
+                        'obtiene la altura usada en el buffer de alturas para indicar que está Guillermo
+                        MarcaGuillermoC = TablaCaracteristicasPersonajes_3036(&H3036 + &H0E - &H3036)
+                        'si la posición del sprite es central y la altura está bien, pone c en las posiciones que ocupa del buffer de alturas
+                        RellenarBufferAlturasPersonaje_28EF(&H3036, MarcaGuillermoC)
+                        '0948
+                        'obtiene la altura usada en el buffer de alturas para indicar que está Adso
+                        MarcaAdsoC = TablaCaracteristicasPersonajes_3036(&H3045 + &H0E - &H3036)
+                        'si la posición del sprite es central y la altura está bien, pone c en las posiciones que ocupa del buffer de alturas
+                        RellenarBufferAlturasPersonaje_28EF(&H3045, MarcaAdsoC)
+                        '0952
+                        'si no encontró un camino del origen al destino, sale
+                        If ResultadoBusqueda_2DB6 = 0 Then Exit Sub
+                        '0957
+                        'aquí llega si se encontró un camino del origen al destino
+                        'iy apunta a los datos de posición de adso
+                        'mínimo número de iteraciones del algoritmo
+                        MinimasIteracionesC = 4
+                        If Not LeerBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 5 - &H3036, 7) Then
+                            '095f
+                            'si el personaje ocupa cuatro posiciones en el buffer de alturas
+                            'si ocupa 4 posiciones, se permite una iteración menos
+                            MinimasIteracionesC = MinimasIteracionesC - 1
+                            If PosicionXGuillermoL <> PosicionXAdsoL And PosicionYGuillermoH <> PosicionYAdsoH Then
+                                'si ninguna de las 2 coordenadas son iguales, se incrementa el número de iteraciones mínimas del algoritmo
+                                '096f
+                                MinimasIteracionesC = MinimasIteracionesC + 1
+                            End If
+                        End If
+                        '0970
+                        'obtiene el nivel de recursión de la rutina de búsqueda
+                        'si el número de iteraciones es menor que el tolerable, sale
+                        If TablaComandos_440C(&H4419 - &H440C) < MinimasIteracionesC Then Exit Sub
+                        '0975
+                        'obtiene la última orientación que se utilizó para encontrar al personaje en la rutina de búsqueda
+                        OrientacionNuevaC = TablaComandos_440C(&H4418 - &H440C)
+                        'escribe un comando para avanzar en la nueva orientación del personaje
+                        'If PunteroPilaHL = &H9CD0 Then Stop
+                        GenerarComandos_47E6(PersonajeIY, OrientacionNuevaC, &H464F, PunteroPilaHL)
+                        'vuelve a llamar al comportamiento de adso
+                    Else
+                        '097f
+                        'aquí llega si adso no está en zona de la pantalla que se muestra
+                        'va a por Guillermo, que no está en la misma zona de pantalla que se muestra (iy a por ix)
+                        If Not BuscarCaminoGeneral_098A(PersonajeIY, &H3038) Then Exit Sub
+                        'si encontró un camino, vuelve a ejecutar el movimiento de adso
+                        flipe = flipe + 1
+                        If flipe > 5 Then
+                            Stop
+                            Exit Sub
+                        End If
+                    End If
+                End If
+            Else
+                '073C
+                GenerarMovimiento_073C(PersonajeIY, PunteroDatosAdsoIX)
+                Exit Sub
+            End If
+        Loop
+    End Sub
+
+    Public Sub RotarGraficosMonjes_36C4()
+        'si hay que girar el gráfico de algún monje, lo hace
+        Dim PersonajeIY As Integer
+        Dim PunteroCarasMonjesHL As Integer
+        Dim PunteroCaraMonjeDE As Integer
+        Dim Contador As Byte
+        PersonajeIY = &H3054 'apunta a las caracteristicas de malaquías
+        PunteroCarasMonjesHL = &H3097 'apunta a la tabla con las caras de los monjes
+        'repite 4 veces (para malaquías, el abad, berengario y severino)
+        '36CD
+        For Contador = 0 To 3
+            '36cf
+            'lee una dirección y la guarda en de
+            PunteroCaraMonjeDE = Leer16(TablaPunterosCarasMonjes_3097, PunteroCarasMonjesHL - &H3097)
+            PunteroCarasMonjesHL = PunteroCarasMonjesHL + 2
+            '36D5
+            'si hay que girar el monje
+            If TablaCaracteristicasPersonajes_3036(PersonajeIY + 6 - &H3036) Then
+                '36DB
+                'indica que los gráficos no están girados
+                TablaCaracteristicasPersonajes_3036(PersonajeIY + 6 - &H3036) = 0
+                'gira en xy una serie de datos gráficos que se le pasan en hl
+                'ancho = 5, numero = 20
+                GirarGraficosRespectoX_3552(DatosMonjes_AB59, PunteroCaraMonjeDE - &HAB59, 5, &H14)
+            End If
+            '36E6
+            PersonajeIY = PersonajeIY + &H0F 'avanza a la siguiente entrada
+            '36ED
+        Next
+    End Sub
+
+    Public Sub RotarGraficosCambiarCaraCambiarPosicion_40A2(ByVal PunteroCaraHL As Integer, ByVal PunteroMonjesDE As Integer, ByVal PersonajeObjetoHL As Integer, ByVal Bytes() As Byte)
+        'rota los gráficos de los monjes si fuera necesario y modifica la cara apuntada por hl con 
+        'la que se le pasa en de. además, cambia la posición del personaje indicado
+        RotarGraficosMonjes_36C4() 'rota los gráficos de los monjes si fuera necesario
+        '409D
+        '[hl] = de
+        Escribir16(TablaPunterosCarasMonjes_3097, PunteroCaraHL - &H3097, PunteroMonjesDE)
+        CopiarDatosPersonajeObjeto_4145(PersonajeObjetoHL, Bytes)
+    End Sub
+
+    Public Sub CopiarDatosPersonajeObjeto_4145(ByVal PersonajeObjetoHL As Integer, ByVal Bytes() As Byte)
+        Dim Contador As Byte
+        'copia a la dirección indicada despues de la pila 5 bytes que siguen a la dirección (pero del llamante)
+        For Contador = 0 To 4
+            EscribirBytePersonajeObjeto(PersonajeObjetoHL + Contador, Bytes(Contador))
+        Next
+    End Sub
+
+    Public Sub InicializarLampara_3FF7()
+        'le quita la lámpara a adso y reinicia los contadores de la lámpara
+        Dim MalaquiasTieneLamparaA As Boolean
+        Dim TiempoUsoLamparaHL As Integer
+        'lee si malaquías tiene la 
+        If LeerBitArray(TablaObjetosPersonajes_2DEC, &H2DFA - &H2DEC, 7) Then MalaquiasTieneLamparaA = True
+        'obtiene el tiempo de uso de la lámpara
+        TiempoUsoLamparaHL = Leer16(TablaVariablesLogica_3C85, TiempoUsoLampara_3C87 - &H3C85)
+        '3FFF
+        'si malaquías no tiene la lámpara y no se ha usado, sale
+        If Not MalaquiasTieneLamparaA And TiempoUsoLamparaHL = 0 Then Exit Sub
+        '4002
+        'indica que se ha usado la lámpara
+        TablaVariablesLogica_3C85(LamparaEnCocina_3C91 - &H3C85) = 0
+        'ponea a 0 el contador de uso de la lámpara
+        Escribir16(TablaVariablesLogica_3C85, TiempoUsoLampara_3C87 - &H3C85, 0)
+        'indica que no se está usando la lámpara
+        TablaVariablesLogica_3C85(LamparaEncendida_3C8B - &H3C85) = 0
+        'indica que adso no tiene la lámpara
+        ClearBitArray(TablaObjetosPersonajes_2DEC, &H2DF3 - &H2DEC, 7)
+        'indica que malaquías no tiene la lámpara
+        ClearBitArray(TablaObjetosPersonajes_2DEC, &H2DFA - &H2DEC, 7)
+        'copia en 0x3030 -> 00 00 00 00 00 (limpia los datos de posición de la lámpara)
+        CopiarDatosPersonajeObjeto_4145(&H3030, {0, 0, 0, 0, 0})
+    End Sub
+
+    Public Sub ImprimirCaracter_3B19(ByVal CaracterA As Byte, ByVal AjusteColorC As Byte)
+        'imprime el carácter que se le pasa en a en la pantalla
+        'usa la posición de pantalla que hay en 0x2d97
+        Dim PunteroCaracteresDE As Integer
+        Dim PunteroPantallaHL As Integer
+        Dim Espacio As Boolean
+        Dim X As Byte
+        Dim Y As Byte
+        Dim Contador As Byte
+        Dim DatoCaracterA As Byte
+        Dim Valor As Byte
+        'se asegura de que el caracter esté entre 0 y 127
+        CaracterA = CaracterA And &H7F
+        '3b20
+        If CaracterA <> &H20 Then
+            '3b22
+            'si el carácter a imprimir es < 0x2d, no es imprimible y sale
+            If CaracterA < &H2D Then Exit Sub
+            '3b25
+            'cada caracter de la tabla de caracteres ocupa 8 bytes
+            'la tabla de los gráficos de los caracteres empieza en 0xb400
+            PunteroCaracteresDE = 8 * (CaracterA - &H2D) + &HB400
+        Else
+            Espacio = True
+        End If
+        '3b30
+        'lee la dirección de pantalla por la que va escribiendo actualmente (h = y en pixels, l = x en bytes)
+        Integer2Nibbles(PunteroCaracteresPantalla_2D97, Y, X)
+        'convierte hl a direccion de pantalla
+        PunteroPantallaHL = ObtenerDesplazamientoPantalla_3C42(X, Y)
+        '3B37
+        For Contador = 0 To 7 '8 líneas
+            '3B39
+            'lee un byte que forma el caracter
+            If Not Espacio Then
+                DatoCaracterA = TablaCaracteresPalabrasFrases_B400(PunteroCaracteresDE - &HB400)
+            Else
+                DatoCaracterA = 0
+            End If
+            'se queda con los 4 bits superiores (4 pixels izquierdos del carácter)
+            'y opera con el ajuste de color
+            Valor = (DatoCaracterA And &HF0) Xor AjusteColorC
+            '3B3D
+            'graba el byte en pantalla
+            PantallaCGA(PunteroPantallaHL - &HC000) = Valor
+            PantallaCGA2PC(PunteroPantallaHL - &HC000, Valor)
+            'se queda con los 4 bits superiores (4 pixels izquierdos del carácter)
+            Valor = (DatoCaracterA << 4) Xor AjusteColorC
+            '3B45
+            'graba el byte en pantalla
+            PantallaCGA(PunteroPantallaHL + 1 - &HC000) = Valor
+            PantallaCGA2PC(PunteroPantallaHL + 1 - &HC000, Valor)
+            PunteroPantallaHL = &HC000 + DireccionSiguienteLinea_3A4D_68F2(PunteroPantallaHL - &HC000)
+            PunteroCaracteresDE = PunteroCaracteresDE + 1
+        Next
+        'avanza 8 pixels para la próxima ejecución
+        PunteroCaracteresPantalla_2D97 = PunteroCaracteresPantalla_2D97 + 2
+    End Sub
+
+    Public Sub ImprimirFrase_4FEE(ByVal Bytes() As Byte)
+        'imprime la frase que sigue a la llamada en la posición de pantalla actual
+        Dim Contador As Byte
+        For Contador = 0 To UBound(Bytes)
+            'ajusta el caracter entre 0 y 127
+            ImprimirCaracter_3B19(Bytes(Contador) And &H7F, &HFF)
+        Next
+    End Sub
+
+    Public Sub EscribirBorrar_S_N_5065()
+        'imprime S:N o borra S:N dependiendo de 0x3c99
+        'coloca la posición (116, 164)
+        PunteroCaracteresPantalla_2D97 = &HA41D
+        If TablaVariablesLogica_3C85(ContadorRespuestaSN_3C99 - &H3C85) And &H01 Then
+            ImprimirFrase_4FEE({&H20, &H20, &H20})
+        Else
+            ImprimirFrase_4FEE({&H53, &H3A, &H4E})
+        End If
+    End Sub
+
+    Public Function EscribirFraseMarcador_5026(ByVal NumeroFrase As Byte) As Boolean
+        'pone una frase en pantalla e inicia su sonido (siempre y cuando no esté poniendo una)
+        'parámetro = byte leido después de la dirección desde la que se llamó a la rutina
+        Dim PunteroNotasHL As Integer
+        Dim PunteroFrasesHL As Integer
+        Dim NotaOctavaA As Byte
+        Dim Contador As Byte
+        Dim Valor As Byte
+        EscribirFraseMarcador_5026 = False
+        'si se está reproduciendo alguna frase, sale
+        If ReproduciendoFrase_2DA1 Then Exit Function
+        '502E
+        'apunta a la tabla de octavas y notas para las frases del juego
+        PunteroNotasHL = &H5659 + NumeroFrase
+        'lee la nota y octava de la voz y la graba
+        NotaOctavaA = TablaNotasOctavasFrases_5659(PunteroNotasHL - &H5659)
+        'modifican la nota y la octava de la voz del canal3
+        TablaTonosNotasVoces_1388(&H14B7 - &H1388) = NotaOctavaA
+        '503F
+        'inicia la reproducción de la voz
+        ReproduciendoFrase_2DA1 = True
+        ReproduciendoFrase_2DA2 = True
+        PalabraTerminada_2DA0 = True
+        '504A
+        'apunta a la tabla de frases
+        PunteroFrasesHL = &HBB00
+        '505C
+        'avanza hasta la frase que se va a decir
+        For Contador = 0 To NumeroFrase - 1
+            Do
+                Valor = TablaCaracteresPalabrasFrases_B400(PunteroFrasesHL - &HB400)
+                PunteroFrasesHL = PunteroFrasesHL + 1
+            Loop While Valor <> &HFF
+        Next
+        '5052
+        'guarda el puntero a la frase
+        punteroFraseActual_2D9E = PunteroFrasesHL
+        'pone a 0 los caracteres en blanco que quedan por salir para que la frase haya salido totalmente por pantalla
+        CaracteresPendientesFrase_2D9B = 0
+        EscribirFraseMarcador_5026 = False = True
+    End Function
+
+    Public Sub LimpiarFrasesMarcador_5001()
+        'limpia la parte del marcador donde se muestran las frases
+        Dim Contador As Byte
+        Dim Contador2 As Byte
+        Dim PunteroPantallaHL As Integer
+        PunteroPantallaHL = &HE658 'apunta a pantalla (96, 164)
+        For Contador = 0 To 7 '8 líneas de alto
+            For Contador2 = 0 To &H20 - 1 'repite hasta rellenar 128 pixels de esta línea
+                '5008
+                PantallaCGA(PunteroPantallaHL + Contador2 - &HC000) = &HFF
+                PantallaCGA2PC(PunteroPantallaHL + Contador2 - &HC000, &HFF)
+            Next
+            '5013
+            'pasa a la siguiente línea de pantalla
+            PunteroPantallaHL = &HC000 + DireccionSiguienteLinea_3A4D_68F2(PunteroPantallaHL - &HC000)
+            '5018
+        Next
+    End Sub
+
+    Public Function EscribirFraseMarcador_501B(ByVal NumeroFrase As Byte) As Boolean
+        'pone una frase en pantalla e inicia su sonido (si hay otra frase puesta, se interrumpe)
+        'parámetro = byte leido después de la dirección desde la que se llamó a la rutina
+        'indica que no se está reproduciendo ninguna voz
+        ReproduciendoFrase_2DA1 = False
+        ReproduciendoFrase_2DA2 = False
+        'limpia la parte del marcador donde se muestran las frases
+        LimpiarFrasesMarcador_5001()
+        'pone una frase en pantalla e inicia su sonido (siempre y cuando no esté poniendo una)
+        EscribirFraseMarcador_501B = EscribirFraseMarcador_5026(NumeroFrase)
+    End Function
+
+    Public Function CompararDistanciaGuillermo_3E61(ByVal PersonajeIY As Integer) As Byte
+        'compara la distancia entre guillermo y el personaje que se le pasa en iy
+        'si está muy cerca, devuelve 0, en otro caso devuelve algo != 0
+        'parametros: iy = datos del personaje
+
+        'tabla de valores para el computo de la distancia entre personajes, indexada según la orientación del personaje.
+        'Cada entrada tiene 4 bytes
+        'byte 0: valor a sumar a la distancia en x del personaje
+        'byte 1: valor umbral para para decir que el personaje está cerca en x
+        'byte 2: valor a sumar a la distancia en y del personaje
+        'byte 3: valor umbral para para decir que el personaje está cerca en y
+        '3D9F: 	06 18 06 0C -> usado cuando la orientación del personaje es 0 (mirando hacia +x)
+        '		06 0C 0C 18 -> usado cuando la orientación del personaje es 1 (mirando hacia -y)
+        '		0C 18 06 0C -> usado cuando la orientación del personaje es 2 (mirando hacia -x)
+        '		06 0C 06 18 -> usado cuando la orientación del personaje es 3 (mirando hacia +y)
+
+        Dim AlturaGuillermoA As Byte
+        Dim AlturaPersonajeA As Byte
+        Dim AlturaPlantaGuillermoB As Byte
+        Dim AlturaPlantaPersonajeB As Byte
+        Dim OrientacionPersonajeA As Byte
+        Dim PosicionXGuillermoA As Byte
+        Dim PosicionXPersonajeA As Byte
+        Dim PosicionYGuillermoA As Byte
+        Dim PosicionYPersonajeA As Byte
+        Dim PunteroDistanciaPersonajesHL As Integer
+        Dim DistanciaA As Integer
+        'a = altura de guillermo
+        AlturaGuillermoA = TablaCaracteristicasPersonajes_3036(&H303A - &H3036)
+        'b = altura base de la planta en la que está guillermo
+        AlturaPlantaGuillermoB = LeerAlturaBasePlanta_2473(AlturaGuillermoA)
+        'a = altura del personaje
+        AlturaPersonajeA = TablaCaracteristicasPersonajes_3036(PersonajeIY + 4 - &H3036)
+        'b = altura base de la planta en la que está el personaje
+        AlturaPlantaPersonajeB = LeerAlturaBasePlanta_2473(AlturaPersonajeA)
+        'si los personajes no están en la misma planta, sale
+        If AlturaPlantaGuillermoB <> AlturaPlantaPersonajeB Then
+            CompararDistanciaGuillermo_3E61 = AlturaPlantaPersonajeB
+            Exit Function
+        End If
+        '3E71
+        'obtiene la orientación del personaje
+        OrientacionPersonajeA = TablaCaracteristicasPersonajes_3036(PersonajeIY + 1 - &H3036)
+        'indexa en la tabla valores de distancia permisibles según la orientación
+        PunteroDistanciaPersonajesHL = 4 * OrientacionPersonajeA + &H3D9F
+        '3E7C
+        'obtiene la posición x de guillermo
+        PosicionXGuillermoA = TablaCaracteristicasPersonajes_3036(&H3038 - &H3036)
+        'le suma una constante según la orientación
+        DistanciaA = PosicionXGuillermoA + TablaDistanciaPersonajes_3D9F(PunteroDistanciaPersonajesHL - &H3D9F)
+        PunteroDistanciaPersonajesHL = PunteroDistanciaPersonajesHL + 1
+        PosicionXPersonajeA = TablaCaracteristicasPersonajes_3036(PersonajeIY + 2 - &H3036)
+        'le resta la posición x del personaje
+        DistanciaA = DistanciaA - CInt(PosicionXPersonajeA)
+        '3E84
+        'si la distancia en x entre la posición del personaje y de guillermo supera el umbral, sale
+        If DistanciaA < 0 Or DistanciaA >= TablaDistanciaPersonajes_3D9F(PunteroDistanciaPersonajesHL - &H3D9F) Then
+            CompararDistanciaGuillermo_3E61 = &HFF
+            Exit Function
+        End If
+        '3E87
+        PunteroDistanciaPersonajesHL = PunteroDistanciaPersonajesHL + 1
+        'obtiene la posición y de guillermo
+        PosicionYGuillermoA = TablaCaracteristicasPersonajes_3036(&H3039 - &H3036)
+        'le suma una constante según la orientación
+        DistanciaA = PosicionYGuillermoA + TablaDistanciaPersonajes_3D9F(PunteroDistanciaPersonajesHL - &H3D9F)
+        PunteroDistanciaPersonajesHL = PunteroDistanciaPersonajesHL + 1
+        PosicionYPersonajeA = TablaCaracteristicasPersonajes_3036(PersonajeIY + 3 - &H3036)
+        'le resta la posición y del personaje
+        DistanciaA = DistanciaA - CInt(PosicionYPersonajeA)
+        '3e90
+        'si la distancia en y entre la posición del personaje y de guillermo supera el umbral, sale
+        If DistanciaA < 0 Or DistanciaA >= TablaDistanciaPersonajes_3D9F(PunteroDistanciaPersonajesHL - &H3D9F) Then
+            CompararDistanciaGuillermo_3E61 = &HFF
+        Else 'si no, devuelve 0
+            CompararDistanciaGuillermo_3E61 = 0
+        End If
+    End Function
+
+    Public Sub Tick() Handles TmTick.Tick
+        TmTick.Enabled = False
+        ActualizarFrase_3B54()
+        SiguienteTickTiempoms = SiguienteTickTiempoms - Reloj.ElapsedMilliseconds
+        Reloj.Restart()
+
+        If SiguienteTickTiempoms > 0 Then
+            TmTick.Enabled = True
+            Exit Sub
+        End If
+        'Application.DoEvents()
+
+        Select Case SiguienteTickNombreFuncion
+            Case = "DibujarPresentacion"
+                DibujarPresentacion()
+            Case = "DibujarTextosPergamino_6725"
+                DibujarTextosPergamino_6725()
+            Case = "InicializarJuego_249A_c"
+                InicializarJuego_249A_c()
+            Case = "DibujarCaracterPergamino_6781"
+                DibujarCaracterPergamino_6781()
+            Case = "ImprimirRetornoCarroPergamino_67DE"
+                ImprimirRetornoCarroPergamino_67DE()
+            Case = "BuclePrincipal_25B7"
+                BuclePrincipal_25B7()
+                CalcularFPS()
+            Case = "PasarPaginaPergamino_67F0"
+                PasarPaginaPergamino_67F0()
+            Case = "PasarPaginaPergamino_6697"
+                PasarPaginaPergamino_6697()
+        End Select
+        ModPantalla.Refrescar()
+        TmTick.Enabled = True
+    End Sub
+
+    Public Sub CalcularFPS()
+        'cada vez que se pasa por el buble principal se incrementa el contador de fotogramas
+        'cuando haya pasado un segundo desde el anterior ciclo, el valor del contador son los FPS
+        Static Contador As Integer = 0
+        Contador = Contador + 1
+        If RelojFPS.ElapsedMilliseconds >= 1000 Then
+            RelojFPS.Restart()
+            FPS = Contador
+            Contador = 0
+        End If
+    End Sub
+
+    Public Function BuscarEntradaTablaPalabras_3C3A(ByVal PunteroPalabrasHL As Integer, ByVal NumeroPalabraB As Byte) As Integer
+        'busca la entrada número b de la tabla de palabras
+        Dim ContadorB As Byte
+        For ContadorB = 0 To NumeroPalabraB - 1
+            'busca el fin de la palabra actual
+            While Not LeerBitArray(TablaCaracteresPalabrasFrases_B400, PunteroPalabrasHL - &HB400, 7)
+                PunteroPalabrasHL = PunteroPalabrasHL + 1
+            End While 'repite hasta que se acabe la entrada actual
+            PunteroPalabrasHL = PunteroPalabrasHL + 1
+        Next 'repite hasta encontrar la entrada
+        BuscarEntradaTablaPalabras_3C3A = PunteroPalabrasHL
+    End Function
+
+    Public Sub IniciarCanal3_1020()
+        '###pendiente
+    End Sub
+
+    Public Sub RealizarScrollFrase_3B9D(ByVal CaracterA As Byte)
+        'realiza el scroll de la parte del marcador relativa a las frases y pinta el caracter que esté en a
+        Dim PunteroPantallaHL As Integer
+        Dim ContadorB As Byte
+        Dim ContadorC As Byte
+        Dim Pixels As Byte
+        Dim ValorAnteriorPunteroCaracteresPantalla_2D97 As Byte
+        'hl apunta a la parte de pantalla de las frases (104, 164)
+        PunteroPantallaHL = &HE65A
+        For ContadorB = 0 To 7 'b = 8 lineas
+            For ContadorC = 0 To &H1E - 1 'c = 30 bytes
+                '3BA4
+                Pixels = PantallaCGA(PunteroPantallaHL + ContadorC - &HC000)
+                PantallaCGA(PunteroPantallaHL - 2 + ContadorC - &HC000) = Pixels
+                PantallaCGA2PC(PunteroPantallaHL - 2 + ContadorC - &HC000, Pixels)
+            Next
+            '3BAE
+            PunteroPantallaHL = &HC000 + DireccionSiguienteLinea_3A4D_68F2(PunteroPantallaHL - &HC000)
+        Next
+        '3BB5
+        'posición (h = y en pixels, l = x en bytes) (184, 164)
+        PunteroPantallaHL = &HA42E
+        'fija la posición en la que debe dibujar el caracter (usado por la rutina 0x3b13)
+        ValorAnteriorPunteroCaracteresPantalla_2D97 = PunteroCaracteresPantalla_2D97
+        PunteroCaracteresPantalla_2D97 = PunteroPantallaHL
+        '¿es un espacio en blanco?
+        'modifica la tabla de envolventes y cambios de volumen para la voz
+        If CaracterA = &H20 Then
+            'si es un espacio en blanco, pone 0
+            TablaTonosNotasVoces_1388(&H13C2 - &H1388) = 0
+        Else
+            TablaTonosNotasVoces_1388(&H13C2 - &H1388) = 6
+        End If
+        '3BC7
+        ImprimirCaracter_3B19(CaracterA, &HFF)
+        'restaura el valor de esta variable, ya que ha sido modificado
+        PunteroCaracteresPantalla_2D97 = ValorAnteriorPunteroCaracteresPantalla_2D97
+    End Sub
+
+    Public Sub ActualizarFrase_3B54()
+        'escribe las frases en el marcador
+        Static Contador_2D9A As Byte = 0
+        Dim CaracterA As Byte
+        Dim TonoA As Byte
+        Dim PunteroFraseHL As Integer
+        Dim PunteroPalabraHL As Integer
+        Dim ValorC As Byte
+        'tabla de símbolos de puntuación
+        '38E2: 	C0 -> 0x00 (0xfa) -> ¿
+        '		BF -> 0x01 (0xfb) -> ?
+        '		BB -> 0x02 (0xfc) -> ;
+        '		BD -> 0x03 (0xfd) -> .
+        '		BC -> 0x04 (0xfe) -> ,   
+        Contador_2D9A = Contador_2D9A + 1
+        'si no es 45 sale
+        'If Contador_2D9A < &H45 Then Exit Sub
+        '3B5F
+        Contador_2D9A = 0 'mantiene entre 0 y 44
+        'si no está mostrando una frase, sale
+        If Not ReproduciendoFrase_2DA2 Then Exit Sub
+        '3B68
+        IniciarCanal3_1020()
+        '3B76
+        Do
+            If Not PalabraTerminada_2DA0 Then
+                '3B7C
+                'obtiene el texto que se está poniendo en el marcador
+                If PunteroPalabraMarcador_2D9C >= &HB400 Then
+                    'lee el carácter de la tabla de caracteres
+                    CaracterA = TablaCaracteresPalabrasFrases_B400(PunteroPalabraMarcador_2D9C - &HB400)
+                Else
+                    'lee el carácter de la tabla de símbolos
+                    CaracterA = TablaSimbolos_38E2(PunteroPalabraMarcador_2D9C - &H38E2)
+                End If
+                'si tiene puesto el bit 7
+                If LeerBitByte(CaracterA, 7) Then
+                    PalabraTerminada_2DA0 = True 'indica que ha terminado la palabra
+                End If
+                '3B88
+                'se queda con los 3 bits menos significativos de la letra actual
+                TonoA = CaracterA And &H07
+                'modifica los tonos de la voz
+                TablaTonosNotasVoces_1388(&H1389 - &H1388) = TonoA
+                TablaTonosNotasVoces_1388(&H138F - &H1388) = TonoA
+                TablaTonosNotasVoces_1388(&H138C - &H1388) = Z80Neg(TonoA)
+                '3b96
+                'obtiene los 7 bits menos significativos de la letra actual
+                CaracterA = CaracterA And &H7F
+                'actualiza el puntero a los datos del texto
+                PunteroPalabraMarcador_2D9C = PunteroPalabraMarcador_2D9C + 1
+                'realiza el scroll de la parte del marcador relativa a las frases y pinta el caracter que esté en a
+                RealizarScrollFrase_3B9D(CaracterA)
+                Exit Sub
+            Else
+                '3BD7
+                Do
+                    'aqui llega si se ha terminado una palabra (0x2da0 = 1)
+                    If CaracteresPendientesFrase_2D9B <> 0 Then
+                        '3BDD
+                        'decrementa los caracteres que quedan por decir
+                        CaracteresPendientesFrase_2D9B = CaracteresPendientesFrase_2D9B - 1
+                        If CaracteresPendientesFrase_2D9B > 0 Then
+                            '3BE1
+                            'realiza el scroll de la parte del marcador relativa a las frases y pinta un espacio en blanco
+                            RealizarScrollFrase_3B9D(&H20)
+                        Else
+                            '3BE5
+                            'si la frase ha terminado (caracteres por decir = 0), lo indica y sale
+                            ReproduciendoFrase_2DA2 = False
+                        End If
+                        Exit Sub
+                    Else
+                        '3BEC
+                        'aquí llega si aún quedan caracteres por decir
+                        PalabraTerminada_2DA0 = CaracteresPendientesFrase_2D9B
+                        'obtiene el puntero a los datos de la voz actual
+                        PunteroFraseHL = PunteroFraseActual_2D9E
+                        'lee un byte
+                        CaracterA = TablaCaracteresPalabrasFrases_B400(PunteroFraseHL - &HB400)
+                        'si han terminado los datos de la voz
+                        If CaracterA = &HFF Then
+                            '3BF7
+                            'indica que quedan 11 caracteres por mostrar
+                            CaracteresPendientesFrase_2D9B = &H11
+                            'indica que se ha terminado la palabra
+                            PalabraTerminada_2DA0 = True
+                        Else
+                            '3C03
+                            If CaracterA < &HFA Then
+                                '3C07
+                                PunteroFraseHL = PunteroFraseHL + 1
+                                If CaracterA >= &HF9 Then
+                                    '3C0E
+                                    'c = 00, ningún espacio en blanco
+                                    ValorC = 0
+                                    'si el valor leido es 0xf9, hay que decir la siguiente palabra siguiendo a la actual
+                                    CaracterA = TablaCaracteresPalabrasFrases_B400(PunteroFraseHL - &HB400)
+                                    PunteroFraseHL = PunteroFraseHL + 1
+                                Else
+                                    'c = espacio en blanco
+                                    ValorC = &H20
+                                End If
+                                '3C12
+                                PunteroFraseActual_2D9E = PunteroFraseHL
+                                PunteroPalabraHL = &HB580 'apunta a la tabla de palabras
+                                'si el byte leido no era 0, busca la entrada correspondiente en la tabla de palabras
+                                If CaracterA <> 0 Then
+                                    PunteroPalabraHL = BuscarEntradaTablaPalabras_3C3A(PunteroPalabraHL, CaracterA)
+                                End If
+                                'guarda la dirección de la palabra
+                                PunteroPalabraMarcador_2D9C = PunteroPalabraHL
+                                If ValorC = 0 Then
+                                    '3C22
+                                    'vuelve al principio a procesar el caracter siguiente
+                                    Exit Do
+                                Else
+                                    '3C25
+                                    'realiza el scroll de la parte del marcador relativa a las frases y pinta el caracter que esté en a
+                                    RealizarScrollFrase_3B9D(ValorC)
+                                    Exit Sub
+                                End If
+                            Else
+                                '3C28
+                                'aquí llega si el valor leido es mayor o igual que 0xfa
+                                CaracterA = CaracterA - &HFA
+                                PunteroFraseHL = PunteroFraseHL + 1
+                                'actualiza la dirección de los datos de la frase
+                                PunteroFraseActual_2D9E = PunteroFraseHL
+                                'hl apunta a la tabla de símbolos de puntuación
+                                'cambia la dirección del texto que se está poniendo en el marcador
+                                PunteroPalabraMarcador_2D9C = &H38E2 + CaracterA
+                                Exit Do
+                            End If
+                        End If
+                    End If
+                Loop
+            End If
+        Loop
+    End Sub
+
+    Public Sub SiguienteTick(Tiempoms As Integer, NombreFuncion As String)
+        'define el tiempo que debe dormir la tarea principal, y a qué función
+        'hay que llamar cuando termine ese tiempo
+        SiguienteTickTiempoms = Tiempoms
+        SiguienteTickNombreFuncion = NombreFuncion
+    End Sub
+
+    Public Sub Start(ObjetoPantalla As PictureBox)
+        'arranca el juego y dibuja en ObjetoPantalla
+        InicializarPantalla(2, ObjetoPantalla)
+        InicializarJuego_249A()
+    End Sub
+
+
+
 
 End Module

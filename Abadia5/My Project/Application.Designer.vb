@@ -32,7 +32,7 @@ Namespace My
         
         <Global.System.Diagnostics.DebuggerStepThroughAttribute()>  _
         Protected Overrides Sub OnCreateMainForm()
-            Me.MainForm = Global.Abadia4.FrmPrincipal
+            Me.MainForm = Global.Abadia5.FrmPrincipal
         End Sub
     End Class
 End Namespace

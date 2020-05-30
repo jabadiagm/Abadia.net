@@ -46,7 +46,7 @@ Module ModTeclado
     Public Function TeclaPulsadaNivel(Tecla As EnumTecla) As Boolean
         'devuelve true si una tecla se mantiene pulsada
         TeclaPulsadaNivel = TeclasNivel(Tecla)
-        TeclasNivel(Tecla) = False '### depuración
+        'TeclasNivel(Tecla) = False '### depuración
     End Function
 
     Public Function TeclaPulsadaFlanco(Tecla As EnumTecla) As Boolean

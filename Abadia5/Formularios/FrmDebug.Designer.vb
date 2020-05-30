@@ -197,7 +197,7 @@ Partial Class FrmDebug
         'OpLuzNormal
         '
         Me.OpLuzNormal.AutoSize = True
-        Me.OpLuzNormal.Checked = True
+        'Me.OpLuzNormal.Checked = True
         Me.OpLuzNormal.Location = New System.Drawing.Point(16, 16)
         Me.OpLuzNormal.Name = "OpLuzNormal"
         Me.OpLuzNormal.Size = New System.Drawing.Size(58, 17)

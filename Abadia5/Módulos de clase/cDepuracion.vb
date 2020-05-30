@@ -20,6 +20,7 @@ Public Class cDepuracion
     Public QuitarRetardos As Boolean
     Public SaltarPergamino As Boolean
     Public SaltarPresentacion As Boolean
+    Public PararAdsoCTRL As Boolean 'permitir parar a Adso al pulsar Control
 
 
     Public Sub Init()
@@ -35,5 +36,6 @@ Public Class cDepuracion
         QuitarRetardos = False
         SaltarPergamino = False
         SaltarPresentacion = False
+        PararAdsoCTRL = True
     End Sub
 End Class
