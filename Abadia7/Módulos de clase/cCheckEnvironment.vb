@@ -126,6 +126,7 @@ Public Class cCheckEnvironment
             Posicion = ListaPosiciones.ElementAt(Contador)
             Log = Log + "Generando tablas para la pantalla &H" + Posicion.NumeroPantallaHex + " ->"
             Result = GenerarTablasCheckPantalla(Posicion, RutaCheck)
+            ModPantalla.Refrescar()
             If Result = 0 Then
                 Log = Log + "Tablas Generadas" + vbCrLf
             Else

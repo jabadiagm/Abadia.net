@@ -63,8 +63,8 @@ Public Class cDepuracion
         PersonajesSeverino = True
         DeshabilitarCalculoDimensionesAmpliadas = False
         QuitarRetardos = False
-        SaltarPergamino = True
-        SaltarPresentacion = True
+        SaltarPergamino = False
+        SaltarPresentacion = False
         PararAdsoCTRL = True
         SaltarMomentoDiaEnter = True
         BugDejarObjetoPresente = True

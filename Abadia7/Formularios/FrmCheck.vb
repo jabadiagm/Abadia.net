@@ -2,11 +2,11 @@
     Dim Check As New cCheckEnvironment
     Private Sub BtGenerar_Click(sender As Object, e As EventArgs) Handles BtGenerar.Click
         Dim Log As String = ""
-        Dim cShell As Object
-        cShell = CreateObject("WScript.Shell")
-        cShell.run("powercfg -setactive 381b4222-f694-41f0-9685-ff5bb260df2e") 'plan de energía equilibrado 
+        'Dim cShell As Object
+        'cShell = CreateObject("WScript.Shell")
+        'cShell.run("powercfg -setactive 381b4222-f694-41f0-9685-ff5bb260df2e") 'plan de energía equilibrado 
         Check.GenerarTablasCheck(TxRutaArchivoPosiciones.Text, TxRutaCheck.Text, Log)
-        cShell.run("powercfg -setactive a1841308-3541-4fab-bc81-f71556f20b4a") 'plan de energía economizador
+        'cShell.run("powercfg -setactive a1841308-3541-4fab-bc81-f71556f20b4a") 'plan de energía economizador
         TxInforme.Text = Log
 
     End Sub

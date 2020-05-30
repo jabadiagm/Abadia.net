@@ -52,6 +52,7 @@
 
     Private Sub BtParar_Click(sender As Object, e As EventArgs) Handles BtParar.Click
         ModAbadia.Parar()
+
     End Sub
 
     Private Sub BtDebug_Click(sender As Object, e As EventArgs) Handles BtDebug.Click
@@ -73,7 +74,9 @@
 
 
     Private Sub FrmPrincipal_Paint(sender As Object, e As PaintEventArgs) Handles Me.Paint
-        ModPantalla.Refrescar()
+        If ModAbadia.Activa Then
+            ModPantalla.Refrescar()
+        End If
     End Sub
 
 
@@ -95,10 +98,7 @@
     End Sub
 
     Private Sub Button1_Click_1(sender As Object, e As EventArgs) Handles Button1.Click
-        TablaVariablesLogica_3C85(PersonajeSeguidoPorCamaraReposo_3C92 - &H3C85) = 3
-        Dim a As Byte
-        a = 9
-        a = a Mod 10
+        ReproducirSonidoAbrirEspejoCanal1_0FFD()
     End Sub
 
     Private Sub FrmPrincipal_KeyUp(sender As Object, e As KeyEventArgs) Handles Me.KeyUp
@@ -148,6 +148,7 @@
         HabitacionOscura_156C = False
         ModAbadia.Check = True
         DibujarPantalla_19D8()
+        ModPantalla.Refrescar()
         'NumeroHabitacion = NumeroHabitacion + 2
         'TxNumeroHabitacion.Text = "&H" + Hex$(NumeroHabitacion)
 
@@ -334,4 +335,6 @@
         TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H29
         TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H1A
     End Sub
+
+
 End Class

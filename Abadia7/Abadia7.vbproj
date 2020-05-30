@@ -6,9 +6,9 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{BA29FB3E-C0E1-4F90-A501-D91B1C5B0E2E}</ProjectGuid>
     <OutputType>WinExe</OutputType>
-    <StartupObject>Abadia6.My.MyApplication</StartupObject>
-    <RootNamespace>Abadia6</RootNamespace>
-    <AssemblyName>Abadia6</AssemblyName>
+    <StartupObject>Abadia7.My.MyApplication</StartupObject>
+    <RootNamespace>Abadia7</RootNamespace>
+    <AssemblyName>Abadia7</AssemblyName>
     <FileAlignment>512</FileAlignment>
     <MyType>WindowsForms</MyType>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
@@ -22,7 +22,7 @@
     <DefineDebug>true</DefineDebug>
     <DefineTrace>true</DefineTrace>
     <OutputPath>bin\Debug\</OutputPath>
-    <DocumentationFile>Abadia6.xml</DocumentationFile>
+    <DocumentationFile>Abadia7.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
@@ -33,7 +33,7 @@
     <DefineTrace>true</DefineTrace>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
-    <DocumentationFile>Abadia6.xml</DocumentationFile>
+    <DocumentationFile>Abadia7.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
@@ -94,6 +94,7 @@
       <DependentUpon>FrmPrincipal.vb</DependentUpon>
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="Módulos de clase\cAY8912.vb" />
     <Compile Include="Módulos de clase\cCheckEnvironment.vb" />
     <Compile Include="Módulos de clase\cDepuracion.vb" />
     <Compile Include="Módulos de clase\cListaPosiciones.vb" />
@@ -101,7 +102,9 @@
     <Compile Include="Módulos de clase\cPosicion.vb" />
     <Compile Include="Módulos de clase\cStringList.vb" />
     <Compile Include="Módulos de clase\cTipoTabla.vb" />
+    <Compile Include="Módulos de clase\cWaveOut.vb" />
     <Compile Include="Módulos\ModAbadia.vb" />
+    <Compile Include="Módulos\modAY8912.vb" />
     <Compile Include="Módulos\ModFunciones.vb" />
     <Compile Include="Módulos\ModPantalla.vb" />
     <Compile Include="Módulos\ModTeclado.vb" />
@@ -120,6 +123,7 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
+    <Compile Include="Módulos\modWaveOut.vb" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Formularios\FrmCheck.resx">

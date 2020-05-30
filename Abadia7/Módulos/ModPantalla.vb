@@ -198,7 +198,6 @@
 
 
     Public Sub Refrescar()
-        On Error Resume Next
         cGraphics.DrawImage(cBitmap, 0, 0, 640, 400) '1x
     End Sub
 

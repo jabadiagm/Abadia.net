@@ -1,5 +1,5 @@
 ﻿Module ModFunciones
-    Public Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+    Public Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Integer)
 
     Public Function shr(ByVal Value As Long, ByVal Shift As Byte) As Long
         Dim i As Byte
@@ -391,7 +391,7 @@ CatchError:
     End Sub
 
     Public Function Nibbles2Integer(ByVal HighNibble As Byte, ByVal LowNibble As Byte) As Integer
-        Nibbles2Integer = HighNibble << 8 Or LowNibble
+        Nibbles2Integer = CInt(HighNibble) << 8 Or LowNibble
     End Function
 
     Public Function Z80Sub(Operando1 As Byte, Operando2 As Byte) As Byte

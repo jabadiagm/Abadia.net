@@ -57,7 +57,7 @@ Partial Class FrmCheck
         Me.TxRutaArchivoPosiciones.Name = "TxRutaArchivoPosiciones"
         Me.TxRutaArchivoPosiciones.Size = New System.Drawing.Size(339, 20)
         Me.TxRutaArchivoPosiciones.TabIndex = 1
-        Me.TxRutaArchivoPosiciones.Text = "D:\datos\proyectos\16_Abadía\Vbasic\Abadia6\Posiciones.txt"
+        Me.TxRutaArchivoPosiciones.Text = "D:\datos\proyectos\16_Abadía\Vbasic\Abadia7\Posiciones.txt"
         '
         'Label2
         '
@@ -133,7 +133,7 @@ Partial Class FrmCheck
         Me.TxRutaCheck.Name = "TxRutaCheck"
         Me.TxRutaCheck.Size = New System.Drawing.Size(339, 20)
         Me.TxRutaCheck.TabIndex = 10
-        Me.TxRutaCheck.Text = "D:\datos\proyectos\16_Abadía\Vbasic\Abadia6\Check"
+        Me.TxRutaCheck.Text = "D:\datos\proyectos\16_Abadía\Vbasic\Abadia7\Check"
         '
         'BtGenerarModelos
         '

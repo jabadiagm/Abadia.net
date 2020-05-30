@@ -1,23 +1,28 @@
 ﻿Imports System.IO
 Imports System.Reflection
+
 Module ModAbadia
-    'Dim bug As Boolean
-    Dim Cronometro As New Stopwatch 'usado para las pruebas de tiempos
-    Dim PilaDebug(210) As Integer
-    Public WithEvents TmTick As New Timer
-    Public Reloj As New Stopwatch 'reloj para retardos
-    Public RelojFPS As New Stopwatch 'reloj para al cálculo de frames por segundo
-    Public SiguienteTickTiempoms As Integer = 100
-    Public SiguienteTickNombreFuncion As String = "BuclePrincipal_25B7"
+    'variables públicas del módulo
+    Public Activa As Boolean
     Public FPS As Integer 'fotogramas por segundo
-
-    Private WithEvents TmRetardo As New Timer()
-
-    Dim Entradas(6) As Boolean
-
     Public Depuracion As New cDepuracion
-    Public Parado As Boolean
     Public Check As Boolean 'true para hacer una pasada por el bucle principal, ajustando la posición y orientación de guillermo, y guardando las tablas en disco
+    Public Pintar As Boolean
+
+    'variables y objetos privados del módulo
+    Private Cronometro As New Stopwatch 'usado para las pruebas de tiempos
+    Private PilaDebug(210) As Integer
+    Private WithEvents TmTick As New Timer
+    Private Reloj As New Stopwatch 'reloj para retardos
+    Private RelojFPS As New Stopwatch 'reloj para al cálculo de frames por segundo
+    Private SiguienteTickTiempoms As Integer = 100
+    Private SiguienteTickNombreFuncion As String = "BuclePrincipal_25B7"
+    Private AY38910 As New cAY8912(cWaveOut.WAVE_FREQ) 'sintetizador de audio
+    Private WaveOut As New cWaveOut(AY38910) 'reproductor de sonido
+    Private CancelarTareaSonido As Boolean
+    Private TareaSonidoActiva As Boolean
+    Private CambiarPaletaColores As Byte = &HFF
+    Private Parado As Boolean
     Private CheckPantalla As String
     Private CheckOrientacion As Byte
     Private CheckX As Byte
@@ -26,12 +31,17 @@ Module ModAbadia
     Private CheckEscaleras As Byte
     Private CheckRuta As String
 
+    Private Thread1 As System.Threading.Thread
+    Private WithEvents TmRetardo As New Timer()
+
+
     'tablas del juego
     Public TablaBugDejarObjetos_0000(&HFF) As Byte 'primeros 256 bytes del juego, usados por error en la rutina de dejar objetos
     Public TablaBufferAlturas_01C0(&H23F) As Byte '576 bytes (24x24) = (4 + 16 + 4)x2  RAM
     Public TablaPosicionesAlternativas_0593() As Byte = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, &HFF} 'buffer de posiciones alternativas. Cada posición ocupa 3 bytes: x, y, z+orientación. sin byte final  RAM
     Public TablaConexionesHabitaciones_05CD(&H12F) As Byte 'tablas con las conexiones de las habitaciones de las plantas
     Public TablaDestinos_0C8A(&H0F) As Byte 'tabla para marcar las posiciones a las que debe ir el personaje para cambiar de habitación ROM
+    Public TablaDatosSonidos_0F96(&H67) As Byte 'variables y tablas relacionadas con los sonidos
     Public TablaTonosNotasVoces_1388(&H01E1) As Byte  '1388-1569. tono base de las notas para las voces, envolventes y cambios de volumen para las voces, datos de iniciación de la voz para el canal 3. RAM
     Dim TablaBloquesPantallas_156D(&HBF) As Byte 'ROM
     'Dim DatosTilesBloques_1693(&H92) As Byte
@@ -43,6 +53,7 @@ Module ModAbadia
     Dim TablaAvancePersonaje1Tile_286D(31) As Byte
     Dim TablaPunterosPersonajes_2BAE(&H3D) As Byte 'tabla con datos para mover los personajes
     Public BufferAuxiliar_2D68() As Byte = {&H01, &H23, &H3E, &H20, &H12, &H13, &H78, &H04, &HB9, &H38} 'buffer auxiliar con copia de los datos del personaje
+    Public TablaVariablesEspejo_2D8D(9) As Byte 'variables auxiliares para hacer el efecto espejo
     Dim TablaVariablesAuxiliares_2D8D(&H37) As Byte '2d8d-2dd8. variables auxiliares de algunas rutinas
     Public BufferAuxiliar_2DC5(&HF) As Integer 'buffer auxiliar para el cálculo de las alturas a los movimientos usado en 27cb
     Dim TablaPermisosPuertas_2DD9(18) As Byte 'copiado en 0x122-0x131. puertas a las que pueden entrar los personajes
@@ -73,12 +84,14 @@ Module ModAbadia
     Dim TablaEtapasDia_4F7A(&H72) As Byte '4F7A-4FEC. tabla de duración de las etapas del día para cada día y periodo del día 4FA7:tabla usada para rellenar el número del día en el marcador 4FBC:tabla de los nombres de los momentos del día
     Public TablaNotasOctavasFrases_5659(&H37) As Byte 'tabla de octavas y notas para las frases del juego. ROM
     Dim DatosMarcador_6328(&H7FF) As Byte 'datos del marcador (de 0x6328 a 0x6b27)
-    Dim DatosCaracteresPergamino_6947(&H9B8) As Byte
     Dim PunterosCaracteresPergamino_680C(&HB9) As Byte
+    Dim DatosCaracteresPergamino_6947(&H9B8) As Byte
     Dim TilesAbadia_6D00(&H1FFF) As Byte
-    Dim TablaRellenoBugTiles_8D00(&H7F) As Byte
     Dim TextoPergaminoPresentacion_7300(&H589) As Byte
     Dim DatosGraficosPergamino_788A(&H5FF) As Byte
+    Dim TablaMusicaPergamino_8000(&H2FF) As Byte
+    Public TablaDatosPergaminoFinal_8000(&H14D7) As Byte 'música y texto del pergamino final
+    Dim TablaRellenoBugTiles_8D00(&H7F) As Byte
     Dim BufferTiles_8D80(&H77F) As Byte
     Dim BufferSprites_9500(&H7FF) As Byte
     Public TablaBufferAlturas_96F4(&H23F) As Byte '576 bytes (24x24) = (4 + 16 + 4)x2  RAM
@@ -92,7 +105,7 @@ Module ModAbadia
     Dim TablaPresentacion_C000(&H3FCF) As Byte 'pantalla de presentación del juego con el monje
     Dim PantallaCGA(&H3FFF) As Byte
 
-
+    'variables del juego
     Public PunteroAlternativaActual_05A3 As Integer 'puntero a la alternativa que está probando buscando caminos
     Dim ContadorAnimacionGuillermo_0990 As Byte 'contador de la animación de guillermo ###pendiente: quitar? sólo se usa en 098a
     Dim PintarPantalla_0DFD As Boolean 'usada en las rutinas de las puertas indicando que pinta la pantalla
@@ -224,6 +237,7 @@ Module ModAbadia
     Public AlturaPersonajeCoger_5167 As Byte 'altura del personaje que coge un objeto
     Public PosicionXPersonajeCoger_516E As Byte 'posición x del personaje que coge un objeto + 2*desplazamiento en x según orientación
     Public PosicionYPersonajeCoger_5173 As Byte 'posición y del personaje que coge un objeto + 2*desplazamiento en y según orientación
+    Public PunteroEspejo_5483 As Integer 'puntero a la tabla de variables del espejo
     Dim PosicionPergaminoY_680A As Integer
     Dim PosicionPergaminoX_680B As Integer
     Dim PunteroPantallaGlobal As Integer 'posición actual dentro de la pantalla mientras se procesa
@@ -231,7 +245,7 @@ Module ModAbadia
     Dim InvertirDireccionesGeneracionBloques As Boolean
     Dim Pila(100) As Integer
     Dim PunteroPila As Integer
-    Public Pintar As Boolean
+
 
     Enum EnumIncremento
         IncSumarX
@@ -243,6 +257,7 @@ Module ModAbadia
         TmTick.Enabled = False
         Reloj.Stop()
         RelojFPS.Stop()
+        PararTareaSonido()
         Parado = True
     End Sub
 
@@ -268,8 +283,6 @@ Module ModAbadia
         CheckRuta = ModFunciones.FixPath(RutaCheck)
     End Sub
 
-
-
     Public Sub CargarDatos()
         Dim Conjunto As [Assembly]
         Dim StrArchivo As Stream
@@ -284,31 +297,31 @@ Module ModAbadia
         Dim BugDejarObjeto(255) As Byte
         Try
             Conjunto = [Assembly].GetExecutingAssembly()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.ABADIA0.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.ABADIA0.BIN")
             StrArchivo.Read(Abadia0, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.ABADIA1.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.ABADIA1.BIN")
             StrArchivo.Read(Abadia1, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.ABADIA2.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.ABADIA2.BIN")
             StrArchivo.Read(Abadia2, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.ABADIA3.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.ABADIA3.BIN")
             StrArchivo.Read(Abadia3, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.ABADIA5.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.ABADIA5.BIN")
             StrArchivo.Read(Abadia5, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.ABADIA6.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.ABADIA6.BIN")
             StrArchivo.Read(Abadia6, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.ABADIA7.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.ABADIA7.BIN")
             StrArchivo.Read(Abadia7, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.ABADIA8.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.ABADIA8.BIN")
             StrArchivo.Read(Abadia8, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.BugDejarObjeto.bin")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia7.BugDejarObjeto.bin")
             StrArchivo.Read(BugDejarObjeto, 0, 256)
             StrArchivo.Dispose()
         Catch ex As Exception
@@ -325,6 +338,7 @@ Module ModAbadia
         CargarTablaArchivo(BugDejarObjeto, TablaBugDejarObjetos_0000, &H0000)
         CargarTablaArchivo(Abadia1, TablaConexionesHabitaciones_05CD, &H05CD)
         CargarTablaArchivo(Abadia1, TablaDestinos_0C8A, &H0C8A)
+        CargarTablaArchivo(Abadia1, TablaDatosSonidos_0F96, &H0F96)
         CargarTablaArchivo(Abadia1, TablaTonosNotasVoces_1388, &H1388)
         CargarTablaArchivo(Abadia1, TablaBloquesPantallas_156D, &H156D)
         CargarTablaArchivo(Abadia1, TablaRutinasConstruccionBloques_1FE0, &H1FE0)
@@ -372,6 +386,7 @@ Module ModAbadia
         'abadia3.bin
         'CargarArchivo("D:\datos\vbasic\Abadia\Abadia2\abadia3.bin", Archivo)
         CargarTablaArchivo(Abadia3, TilesAbadia_6D00, &H300)
+        CargarTablaArchivo(Abadia3, TablaMusicaPergamino_8000, 0)
         CargarTablaArchivo(Abadia3, TablaRellenoBugTiles_8D00, &HD00&)
         CargarTablaArchivo(Abadia3, BufferSprites_9500, &H1500)
         CargarTablaArchivo(Abadia3, TablaGraficosObjetos_A300, &H2300)
@@ -387,6 +402,7 @@ Module ModAbadia
         'CargarArchivo("D:\datos\vbasic\Abadia\Abadia2\abadia8.bin", Archivo)
         CargarTablaArchivo(Abadia8, DatosHabitaciones_4000, 0) '0x0000-0x2237 datos sobre los bloques que forman las pantallas
         CargarTablaArchivo(Abadia8, DatosMarcador_6328, &H2328) 'datos del marcador (de 0x6328 a 0x6b27)
+        CargarTablaArchivo(Abadia8, TablaDatosPergaminoFinal_8000, &H2B28) 'música y texto del pergamino final
 
 
 
@@ -466,8 +482,6 @@ Module ModAbadia
         'pasa a la siguiente línea y ajusta para que esté en el rango 0xc000-0xffff
         DireccionSiguienteLinea_3A4D_68F2 = Puntero
     End Function
-
-
 
     Public Sub GenerarEscenario_1A0A()
         'genera el escenerio con los datos de abadia8 y lo proyecta a la rejilla
@@ -578,7 +592,6 @@ Module ModAbadia
             DibujarTiles_4F18(NTiles, DistanciaRejilla, DistanciaPantalla, PunteroRejilla, PunteroPantalla) ' dibuja posiciones horizontales de la rejilla en la memoria de video
             'ModPantalla.Refrescar()
         Loop 'repite hasta que se termine
-
     End Sub
 
     Public Sub DibujarPantalla_4EB2()
@@ -702,7 +715,6 @@ Module ModAbadia
         Loop
     End Function
 
-
     Public Sub ConstruirBloque_1BBC(ByVal X As Byte, ByVal nX As Byte, ByVal Y As Byte, ByVal nY As Byte, ByVal Altura As Byte, ByVal PunteroTilesBloque As Integer, ByVal PunteroRutinasBloque As Integer, ActualizarVariablesTiles As Boolean)
         'inicia el buffer para la construcción del bloque actual y evalua los parámetros de construcción del bloque
         Dim Contador As Integer
@@ -714,7 +726,6 @@ Module ModAbadia
         TransformarPosicionBloqueCoordenadasRejilla_1FB8(X, Y, Altura)
         GenerarBloque_2018(X, nX, Y, nY, PunteroRutinasBloque)
     End Sub
-
 
     Public Sub TransformarPosicionBloqueCoordenadasRejilla_1FB8(ByVal X As Byte, ByVal Y As Byte, ByVal Altura As Byte)
         Dim Xr As Integer
@@ -740,8 +751,6 @@ Module ModAbadia
         VariablesBloques_1FCD(&H1FDE - &H1FCD) = Xr
         VariablesBloques_1FCD(&H1FDF - &H1FCD) = Yr
         'comprobar
-
-
     End Sub
 
     Public Sub GenerarBloque_2018(ByVal X As Byte, ByVal nX As Byte, ByVal Y As Byte, ByVal nY As Byte, ByVal PunteroRutinasBloque As Integer)
@@ -836,8 +845,6 @@ Module ModAbadia
             End If
         Loop
     End Sub
-
-
 
     Sub Rutina_FF_2032()
         'si se cambiaron las coordenadas x (x = -x), marca para deshacer el cambio la siguiente vez que pase por aquí
@@ -979,13 +986,10 @@ Module ModAbadia
         Dim PunteroRutinasBloqueAnterior As Integer
         Dim Valor As Integer
         Dim Altura As Byte
-
         PunteroRutinasBloqueAnterior = PunteroRutinasBloque + 2 'dirección para continuar con el proceso
         PunteroCaracteristicasBloque = Leer16(TablaCaracteristicasMaterial_1693, PunteroRutinasBloque - &H1693)
-
         PunteroTilesBloque = Leer16(TablaCaracteristicasMaterial_1693, PunteroCaracteristicasBloque - &H1693)
         PunteroRutinasBloque = PunteroCaracteristicasBloque + 2
-
         InvertirDireccionesGeneracionBloquesAntiguo = InvertirDireccionesGeneracionBloques 'obtiene las instrucciones que se usan para tratar las x
         Push(CInt(X))
         Push(CInt(Y))
@@ -1461,21 +1465,27 @@ Module ModAbadia
             ModPantalla.DefinirModo(1) 'fija el modo 0 (320x200 4 colores)
             ModPantalla.SeleccionarPaleta(0) 'pone una paleta de colores negra
             'InicializarInterrupcion 'coloca el código a ejecutar al producirse una interrupción ###pendiente
-            'InicializarTablaSonido_103F() ' inicializa la tabla del sonido y habilita las interrupciones ###pendiente
+            '24DD
+            'cambia un valor relacionado con el tempo de la música
+            TempoMusica_1086 = &H0B '###pendiente de ajustar bien
+            TempoMusica_1086 = &H0D
+            If Not Check Then
+                ArrancarTareaSonido()
+                ReproducirSonidoPergamino()
+            End If
             DeshabilitarInterrupcion()
             If Not Depuracion.SaltarPergamino Then
-                DibujarPergaminoIntroduccion_659D() 'dibuja el Pergamino y cuenta la introducción. De aquí vuelve al pulsar espacio
+                DibujarPergaminoIntroduccion_659D(&H7300) 'dibuja el Pergamino y cuenta la introducción. De aquí vuelve al pulsar espacio
             Else
                 InicializarJuego_249A_c()
             End If
-
         End If
     End Sub
 
     Public Sub InicializarJuego_249A_c()
         'tercera parte de la inicialización. separado para poder usar los retardos
         DeshabilitarInterrupcion()
-        'ApagarSonido_1376 'apaga el sonido '###pendiente
+        ApagarSonido_1376() 'apaga el sonido
         ModPantalla.SeleccionarPaleta(0)  'pone los colores de la paleta a negro
         Limpiar40LineasInferioresPantalla_2712()
         CopiarVariables_37B6() 'copia cosas de muchos sitios en 0x0103-0x01a9 (pq??z)
@@ -1500,12 +1510,12 @@ Module ModAbadia
 
 
     End Sub
-    Sub DibujarPergaminoIntroduccion_659D()
+    Sub DibujarPergaminoIntroduccion_659D(ByVal PunteroTextoPergaminoIX As Integer)
         'dibuja el pergamino
         ModPantalla.SeleccionarPaleta(1) 'coloca la paleta negra
         DibujarPergamino_65AF() 'dibuja el pergamino
         ModPantalla.SeleccionarPaleta(1) 'coloca la paleta del pergamino
-        DibujarTextosPergamino_6725() 'dibuja los textos en el Pergamino mientras no se pulse el espacio
+        DibujarTextosPergamino_6725(PunteroTextoPergaminoIX) 'dibuja los textos en el Pergamino mientras no se pulse el espacio
     End Sub
 
 
@@ -1599,17 +1609,30 @@ Module ModAbadia
     End Sub
 
 
+    Public Function LeerCaracterPergamino(ByVal PunteroTextoPergaminoIX As Integer) As Byte
+        If PunteroTextoPergaminoIX < &H8330 Then
+            'pergamino de presentación
+            LeerCaracterPergamino = TextoPergaminoPresentacion_7300(PunteroTextoPergaminoIX - &H7300)
+        Else
+            'pergamino final
+            LeerCaracterPergamino = TablaDatosPergaminoFinal_8000(PunteroTextoPergaminoIX - &H8000)
+        End If
+    End Function
 
 
-    Sub DibujarTextosPergamino_6725()
+    Sub DibujarTextosPergamino_6725(ByVal PunteroTextoPergaminoIX As Integer)
         'dibuja los textos en el Pergamino mientras no se pulse el espacio
         Static PunteroDatosPergamino As Integer
+        Static PergaminoFinal As Boolean
         Dim Caracter As Byte 'caracter a imprimir
-
         Dim ColorLetra_67C0 As Byte
         Dim PunteroCaracter As Integer
         Static Estado As Byte = 0
         If Estado = 0 Then
+            If PunteroTextoPergaminoIX = &H8330 Then
+                PergaminoFinal = True 'el pergamino final no tiene salida
+            End If
+            PunteroDatosPergamino = PunteroTextoPergaminoIX
             PosicionPergaminoY_680A = 16
             PosicionPergaminoX_680B = 44
             Estado = 1
@@ -1619,14 +1642,20 @@ Module ModAbadia
             'LeerEstadoTeclas_32BC ###pendiente 'lee el estado de las teclas
             If TeclaPulsadaNivel_3482(&H2F) Then
                 'reinicia las variables estáticas
-                PunteroDatosPergamino = 0
+
                 PosicionPergaminoY_680A = 16
                 PosicionPergaminoX_680B = 44
                 Estado = 0
-                SiguienteTick(100, "InicializarJuego_249A_c") '###pendiente 'comprueba si se pulsó el espacio
+                If Not PergaminoFinal Then
+                    SiguienteTick(100, "InicializarJuego_249A_c") '###pendiente 'comprueba si se pulsó el espacio
+                Else
+                    SiguienteTick(100, "DibujarPergaminoFinal_3868") 'el pergamino final no tiene salida
+                End If
                 Exit Sub
             End If
-            Caracter = TextoPergaminoPresentacion_7300(PunteroDatosPergamino) 'lee el caracter a imprimir
+            '673A
+            Caracter = LeerCaracterPergamino(PunteroDatosPergamino) 'lee el caracter a imprimir
+            'Caracter = TablaTextoPergaminoFinal_8330(PunteroDatosPergamino)
             'si ha encontrado el carácter de fin de pergamino (&H1A), espera a que se pulse espacio para terminar
             If Caracter <> &H1A Then
                 PunteroDatosPergamino = PunteroDatosPergamino + 1 'apunta al siguiente carácter
@@ -2027,13 +2056,14 @@ Module ModAbadia
         'aquí ya se ha completado la inicialización de datos para el juego
         'ahora realiza la inicialización para poder empezar a jugar una partida
         DeshabilitarInterrupcion()
-        'ApagarSonido_1376 'apaga el sonido '###pendiente
+        ApagarSonido_1376() 'apaga el sonido
         'LeerEstadoTeclas_32BC ###pendiente 'lee el estado de las teclas y lo guarda en los buffers de teclado
         If TeclaPulsadaNivel_3482(&H2F) Then  'mientras no se suelte el espacio, espera
             SiguienteTick(100, "InicializarPartida_2509")
         Else
             SiguienteTick(100, "InicializarPartida_2509_b")
         End If
+        If Check Then InicializarPartida_2509_b()
     End Sub
 
     Sub InicializarPartida_2509_b()
@@ -2042,7 +2072,8 @@ Module ModAbadia
         DibujarAreaJuego_275C() 'dibuja un rectángulo de 256 de ancho en las 160 líneas superiores de pantalla
         DibujarMarcador_272C()
         '2520
-        TempoMusica_1086 = 6 'coloca el nuevo tempo de la música
+        TempoMusica_1086 = 6 'coloca el nuevo tempo de la música ###pendiente ajustar
+        TempoMusica_1086 = 7
         ColocarVectorInterrupcion()
         VelocidadPasosGuillermo_2618 = 36
         '254e
@@ -2279,7 +2310,7 @@ Module ModAbadia
         EstadoGuillermo_288F = 0 'inicia el estado de guillermo
         AjustePosicionYSpriteGuillermo_28B1 = 2
         'DibujarAreaJuego_275C 'dibuja un rectángulo de 256 de ancho en las 160 líneas superiores de pantalla
-        'ApagarSonido_1376 'apaga el sonido '###pendiente
+        ApagarSonido_1376() 'apaga el sonido
         InicializarEspejo_34B9() 'inicia la habitación del espejo
         DibujarObjetosMarcador_51D4() 'dibuja los objetos que tenemos en el marcador
         FijarPaletaMomentoDia_54DF() 'fija la paleta según el momento del día, muestra el número de día y avanza el momento del día
@@ -2319,6 +2350,8 @@ Module ModAbadia
 
 
     End Sub
+
+
 
     Sub CopiarVariables_37B6()
         CopiarTabla(TablaPermisosPuertas_2DD9, CopiaTablaPermisosPuertas_2DD9) 'puertas a las que pueden entrar los personajes
@@ -2443,18 +2476,17 @@ Module ModAbadia
 
     Sub ActualizarDiaMarcador_5559(ByVal Dia As Byte)
         'actualiza el día, reflejándolo en el marcador
-        NumeroDia_2D80 = Dia 'actualiza el día
         Dim PunteroDia As Integer
         Dim PunteroPantalla As Integer
+        NumeroDia_2D80 = Dia 'actualiza el día
         PunteroDia = &H4FA7 + (Dia - 1) * 3 'indexa en la tabla de los días. ajusta el índice a 0. cada entrada en la tabla ocupa 3 bytes
         PunteroPantalla = &HEE51 - &HC000 'apunta a pantalla (68, 165)
         DibujarNumeroDia_5583(PunteroDia, PunteroPantalla) 'coloca el primer número de día en el marcador
-        ModPantalla.Refrescar()
+        'ModPantalla.Refrescar()
         DibujarNumeroDia_5583(PunteroDia, PunteroPantalla) 'coloca el segundo número de día en el marcador
-        ModPantalla.Refrescar()
+        'ModPantalla.Refrescar()
         DibujarNumeroDia_5583(PunteroDia, PunteroPantalla) 'coloca el tercer número de día en el marcador
-        ModPantalla.Refrescar()
-
+        'ModPantalla.Refrescar()
         InicializarScrollMomentoDia_5575(0) 'pone la primera hora del día
     End Sub
 
@@ -2638,10 +2670,11 @@ Module ModAbadia
         If Not Inicializado Then
             'el abad una posición a la derecha para dejar paso
             'TablaCaracteristicasPersonajes_3036(&H3063 + 2 - &H3036) = &H89
-            'guillermo
-            'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H9D
-            'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H27
-            'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H2
+            'guillermo en el espejo
+            'TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H02
+            'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H26
+            'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H69
+            'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H18
             'adso
             'TablaCaracteristicasPersonajes_3036(&H3045 + 2 - &H3036) = &H8D
             'TablaCaracteristicasPersonajes_3036(&H3045 + 3 - &H3036) = &H85
@@ -2659,7 +2692,8 @@ Module ModAbadia
         'comprueba si hay que modificar las variables relacionadas con el tiempo (momento del día, combustible de la lámpara, etc)
         ActualizarVariablesTiempo_55B6()
         '25d5
-        MostrarResultadoJuego_42E7()
+        'si se ha completado el juego, deja que arranque la secuencia del pergamino final
+        If MostrarResultadoJuego_42E7() = True Then Exit Sub
         '25D8
         ComprobarSaludGuillermo_42AC()
         '25DB
@@ -2668,6 +2702,12 @@ Module ModAbadia
         '25DE
         'obtiene el estado de las voces, y ejecuta unas acciones dependiendo del momento del día
         EjecutarAccionesMomentoDia_3EEA()
+
+        If SiguienteTickNombreFuncion <> "BuclePrincipal_25B7" Then
+            Exit Sub
+        End If
+
+
         '25E1
         'comprueba si hay que cambiar el personaje al que sigue la cámara y calcula los bonus que hemos conseguido (interpretado)
         AjustarCamara_Bonus_41D6()
@@ -2702,7 +2742,87 @@ Module ModAbadia
         ModificarCaracteristicasSpriteLuz_26A3() 'modifica las características del sprite de la luz si puede ser usada por adso
         '260e
         FlipearGraficosPuertas_0E66() 'comprueba si tiene que flipear los gráficos de las puertas y si es así, lo hace
+        '2611
+        'comprueba si tiene que reflejar los gráficos en el espejo
+        ComprobarEfectoEspejo_5374()
+        '2614
+        If ContadorInterrupcion_2D4B > VelocidadPasosGuillermo_2618 Then
+            'si guillermo se está moviendo, pone un sonido
+            If (TablaCaracteristicasPersonajes_3036(0) And &H01) <> 0 Then
+                ReproducirPasos_1002()
+            End If
+            'resetea el contador de la interrupción
+            ContadorInterrupcion_2D4B = 0
+        End If
 
+        '2627
+        DibujarSprites_2674() 'dibuja los sprites
+
+        ActualizarVariablesFormulario()
+
+        If SiguienteTickNombreFuncion = "BuclePrincipal_25B7" Then
+            If Depuracion.QuitarRetardos Then
+                SiguienteTick(5, "BuclePrincipal_25B7")
+            Else
+                SiguienteTick(100, "BuclePrincipal_25B7")
+            End If
+        End If
+        '2632
+        'Loop
+        'Parado = True
+        'Exit Sub
+
+    End Sub
+
+    Sub BuclePrincipal_25B7_EspiralDibujada()
+        'llamada después de dibujar la espiral
+        Dim PunteroPersonajeHL As Integer
+        '25E1
+        'comprueba si hay que cambiar el personaje al que sigue la cámara y calcula los bonus que hemos conseguido (interpretado)
+        AjustarCamara_Bonus_41D6()
+        '25e4
+        ComprobarCambioPantalla_2355() 'comprueba si el personaje que se muestra ha cambiado de pantalla y si es así hace muchas cosas
+        '25E7
+        If CambioPantalla_2DB8 Then
+            DibujarPantalla_19D8() 'si hay que redibujar la pantalla
+            Exit Sub 'DibujarPantalla_19D8 tiene retardos, hay que salir del bucle
+            PintarPantalla_0DFD = True 'modifica una instrucción de las rutinas de las puertas indicando que pinta la pantalla
+        Else
+            PintarPantalla_0DFD = False
+        End If
+        '25f5
+        'comprueba si guillermo y adso cogen o dejan algún objeto
+        CogerDejarObjetos_5096()
+        '25f8
+        'comprueba si hay que abrir o cerrar alguna puerta y actualiza los sprites de las puertas en consecuencia
+        AbrirCerrarPuertas_0D67()
+
+        '25fb
+        PunteroPersonajeHL = &H2BAE 'hl apunta a la tabla de guillermo
+        '25fe
+        ActualizarDatosPersonaje_291D(PunteroPersonajeHL) 'comprueba si guillermo puede moverse a donde quiere y actualiza su sprite y el buffer de alturas
+        '2601
+        EjecutarComportamientoPersonajes_2664() 'mueve a adso y los monjes
+
+        '2604
+        CambioPantalla_2DB8 = False 'indica que no hay que redibujar la pantalla
+        CaminoEncontrado_2DA9 = False 'indica que no se ha encontrado ningún camino
+        '260b
+        ModificarCaracteristicasSpriteLuz_26A3() 'modifica las características del sprite de la luz si puede ser usada por adso
+        '260e
+        FlipearGraficosPuertas_0E66() 'comprueba si tiene que flipear los gráficos de las puertas y si es así, lo hace
+        '2611
+        'comprueba si tiene que reflejar los gráficos en el espejo
+        ComprobarEfectoEspejo_5374()
+        '2614
+        If ContadorInterrupcion_2D4B > VelocidadPasosGuillermo_2618 Then
+            'si guillermo se está moviendo, pone un sonido
+            If (TablaCaracteristicasPersonajes_3036(0) And &H01) <> 0 Then
+                ReproducirPasos_1002()
+            End If
+            'resetea el contador de la interrupción
+            ContadorInterrupcion_2D4B = 0
+        End If
 
         '2627
         DibujarSprites_2674() 'dibuja los sprites
@@ -2808,7 +2928,7 @@ Module ModAbadia
         FlipearGraficosPuertas_0E66() 'comprueba si tiene que flipear los gráficos de las puertas y si es así, lo hace
         '2627
         DibujarSprites_2674() 'dibuja los sprites
-        ModPantalla.Refrescar()
+        'ModPantalla.Refrescar()
         SiguienteTick(100, "BuclePrincipal_25B7")
     End Sub
 
@@ -3436,9 +3556,11 @@ Module ModAbadia
     End Sub
 
     Function LeerDatoGrafico(ByVal PunteroDatosGrafico As Integer) As Byte
-        'devuelve un valor de la tabla TilesAbadia_6D00, TablaGraficosObjetos_A300 ó DatosMonjes_AB59
-        If PunteroDatosGrafico < &HA300& Then 'TilesAbadia_6D00
+        'devuelve un valor de la tabla TilesAbadia_6D00, BufferSprites_9500, TablaGraficosObjetos_A300 ó DatosMonjes_AB59
+        If PunteroDatosGrafico < &H9500& Then 'TilesAbadia_6D00
             LeerDatoGrafico = TilesAbadia_6D00(PunteroDatosGrafico - &H6D00)
+        ElseIf PunteroDatosGrafico < &HA300& Then 'BufferSprites_9500
+            LeerDatoGrafico = BufferSprites_9500(PunteroDatosGrafico - &H9500)
         ElseIf PunteroDatosGrafico < &HAB59& Then 'TablaGraficosObjetos_A300
             LeerDatoGrafico = TablaGraficosObjetos_A300(PunteroDatosGrafico - &HA300&)
         Else 'DatosMonjes_AB59
@@ -4136,6 +4258,8 @@ Module ModAbadia
                     FlipearSpritesBerengario_351B()
                 Case Is = &H352B
                     FlipearSpritesSeverino_352B()
+                Case = &H5473
+                    FlipearGraficosEspejo_5473(PunteroSpriteIX:=PunteroSpritePersonajeIX)
             End Select
         End If
         '2A5D
@@ -4335,7 +4459,7 @@ Module ModAbadia
         Dim ProfundidadMaxima As Integer 'profundidad máxima de la iteración actual
         Dim PunteroBufferTilesAnterior_3095 As Integer
         Dim NCiclos As Integer
-        ModPantalla.Refrescar()
+        'ModPantalla.Refrescar()
         If Not Depuracion.PersonajesAdso Then
             TablaSprites_2E17(&H2E2B + 0 - &H2E17) = &HFE 'desconecta a adso ###depuración
         End If
@@ -5495,7 +5619,7 @@ Module ModAbadia
                 Else
                     ValorBufferAlturas = TablaBufferAlturas_96F4(PunteroBufferAlturas - &H96F4&)
                 End If
-                If ValorBufferAlturas <&H10 Then 'comprueba si en esa posición hay algun personaje
+                If ValorBufferAlturas < &H10 Then 'comprueba si en esa posición hay algun personaje
                     ' 281E
                     BufferAuxiliar_2DC5(PunteroBufferAuxiliar - &H2DC5) = CInt(ValorBufferAlturas) - CInt(DiferenciaAlturaA)
                 Else
@@ -6174,51 +6298,51 @@ Module ModAbadia
         'si llega aquí, ya se ha encontrado el camino completo del destino al origen
         '46d3
         PunteroBufferSpritesIX = PunteroBufferSpritesHL 'obtiene el principio de la pila de movimientos en ix
+        Do
+            '46db
+            OrientacionB = TablaCaracteristicasPersonajes_3036(PersonajeIY + 1 - &H3036) 'obtiene la orientación del personaje
+            OrientacionA = BufferSprites_9500(PunteroBufferSpritesIX - &H9500) 'lee la orientación que debe tomar
+            'si el personaje ocupa 4 posiciones, salta esta parte
+            If LeerBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 5 - &H3036, 7) Then
+                'el personaje ocupa 1 posición
+                '46E7
+                'compara la orientación del personaje con la que debe tomar
+                If (OrientacionB Xor OrientacionA) And &H01 Then 'si el personaje está girado respecto de las escaleras
+                    'en otro caso, cambia el estado de girado en desnivel
+                    '46ED
+                    TablaCaracteristicasPersonajes_3036(PersonajeIY + 5 - &H3036) = TablaCaracteristicasPersonajes_3036(PersonajeIY + 5 - &H3036) Xor &H20
+                End If
+            End If
+            '46f5
+            'modifica la orientación del personaje con la de la ruta que debe seguir
+            TablaCaracteristicasPersonajes_3036(PersonajeIY + 1 - &H3036) = OrientacionA
+            If OrientacionA <> OrientacionB Then 'comprueba si ha variado su orientación
+                'si ha variado su orientación, escribe unos comandos para cambiar la orientación del personaje
+                '46fa
+                GenerarComandosOrientacionPersonaje_47C3(PersonajeIY, OrientacionB, OrientacionA)
+            End If
+            '46fd
+            ObtenerAlturaDestinoPersonaje_27B8(0, OrientacionA, PersonajeIY, Altura1A, Altura2C, PunteroTablaAvanceHL)
+            EscribirComando_4729(PersonajeIY, Int2Byte(Altura1A), Int2Byte(Altura2C), PunteroTablaAvanceHL)
             Do
-                '46db
-                OrientacionB = TablaCaracteristicasPersonajes_3036(PersonajeIY + 1 - &H3036) 'obtiene la orientación del personaje
-                OrientacionA = BufferSprites_9500(PunteroBufferSpritesIX - &H9500) 'lee la orientación que debe tomar
-                'si el personaje ocupa 4 posiciones, salta esta parte
-                If LeerBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + 5 - &H3036, 7) Then
-                    'el personaje ocupa 1 posición
-                    '46E7
-                    'compara la orientación del personaje con la que debe tomar
-                    If (OrientacionB Xor OrientacionA) And &H01 Then 'si el personaje está girado respecto de las escaleras
-                        'en otro caso, cambia el estado de girado en desnivel
-                        '46ED
-                        TablaCaracteristicasPersonajes_3036(PersonajeIY + 5 - &H3036) = TablaCaracteristicasPersonajes_3036(PersonajeIY + 5 - &H3036) Xor &H20
-                    End If
-                End If
-                '46f5
-                'modifica la orientación del personaje con la de la ruta que debe seguir
-                TablaCaracteristicasPersonajes_3036(PersonajeIY + 1 - &H3036) = OrientacionA
-                If OrientacionA <> OrientacionB Then 'comprueba si ha variado su orientación
-                    'si ha variado su orientación, escribe unos comandos para cambiar la orientación del personaje
-                    '46fa
-                    GenerarComandosOrientacionPersonaje_47C3(PersonajeIY, OrientacionB, OrientacionA)
-                End If
-                '46fd
-                ObtenerAlturaDestinoPersonaje_27B8(0, OrientacionA, PersonajeIY, Altura1A, Altura2C, PunteroTablaAvanceHL)
-                EscribirComando_4729(PersonajeIY, Int2Byte(Altura1A), Int2Byte(Altura2C), PunteroTablaAvanceHL)
-                Do
-                    '4707
-                    PunteroBufferSpritesIX = PunteroBufferSpritesIX - 3 'avanza a la siguiente posición del camino
-                    Valor1 = BufferSprites_9500(PunteroBufferSpritesIX - &H9500&)
-                    If Valor1 = &HFF Then Exit Sub 'si se ha alcanzado la última posición del camino, sale
-                    'obtiene la posición del personaje
-                    PosicionXC = TablaCaracteristicasPersonajes_3036(PersonajeIY + 2 - &H3036)
-                    PosicionYB = TablaCaracteristicasPersonajes_3036(PersonajeIY + 3 - &H3036)
-                    'ajusta la posición pasada en hl a las 20x20 posiciones centrales que se muestran. Si la posición está fuera, CF=1
-                    DeterminarPosicionCentral_279B(PosicionXC, PosicionYB)
-                    DestinoXE = BufferSprites_9500(PunteroBufferSpritesIX + 1 - &H9500)
-                    DestinoYD = BufferSprites_9500(PunteroBufferSpritesIX + 2 - &H9500)
-                    '4723
-                    'compara la posición del personaje con la de la pila
-                    'si coincide, es porque comprueba ha llegado a la posición de destino y debe sacar más valores de la pila
-                    If DestinoXE = PosicionXC And DestinoYD = PosicionYB Then Exit Do
-                    'en otro caso, sigue procesando entradas
-                Loop
+                '4707
+                PunteroBufferSpritesIX = PunteroBufferSpritesIX - 3 'avanza a la siguiente posición del camino
+                Valor1 = BufferSprites_9500(PunteroBufferSpritesIX - &H9500&)
+                If Valor1 = &HFF Then Exit Sub 'si se ha alcanzado la última posición del camino, sale
+                'obtiene la posición del personaje
+                PosicionXC = TablaCaracteristicasPersonajes_3036(PersonajeIY + 2 - &H3036)
+                PosicionYB = TablaCaracteristicasPersonajes_3036(PersonajeIY + 3 - &H3036)
+                'ajusta la posición pasada en hl a las 20x20 posiciones centrales que se muestran. Si la posición está fuera, CF=1
+                DeterminarPosicionCentral_279B(PosicionXC, PosicionYB)
+                DestinoXE = BufferSprites_9500(PunteroBufferSpritesIX + 1 - &H9500)
+                DestinoYD = BufferSprites_9500(PunteroBufferSpritesIX + 2 - &H9500)
+                '4723
+                'compara la posición del personaje con la de la pila
+                'si coincide, es porque comprueba ha llegado a la posición de destino y debe sacar más valores de la pila
+                If DestinoXE = PosicionXC And DestinoYD = PosicionYB Then Exit Do
+                'en otro caso, sigue procesando entradas
             Loop
+        Loop
 
     End Sub
 
@@ -8300,7 +8424,7 @@ Module ModAbadia
             ActualizarDatosPersonaje_291D(&H2BB8)
             '0895
             'lee a donde debe ir adso
-            If TablaVariablesLogica_3C85(DondeVaAdso_3d13 - &H3C85) = &HFF Then
+            If TablaVariablesLogica_3C85(DondeVaAdso_3D13 - &H3C85) = &HFF Then
                 '08a1
                 'adso tiene que seguir a guillermo
                 'lee el personaje al que sigue la cámara
@@ -8657,7 +8781,7 @@ Module ModAbadia
         Next
         '5052
         'guarda el puntero a la frase
-        punteroFraseActual_2D9E = PunteroFrasesHL
+        PunteroFraseActual_2D9E = PunteroFrasesHL
         'pone a 0 los caracteres en blanco que quedan por salir para que la frase haya salido totalmente por pantalla
         CaracteresPendientesFrase_2D9B = 0
         EscribirFraseMarcador_5026 = False = True
@@ -8776,6 +8900,8 @@ Module ModAbadia
 
     Public Sub Tick() Handles TmTick.Tick
         TmTick.Enabled = False
+
+        'ActualizarSonidos_1060()
         ActualizarFrase_3B54()
         SiguienteTickTiempoms = SiguienteTickTiempoms - Reloj.ElapsedMilliseconds
         Reloj.Restart()
@@ -8790,7 +8916,7 @@ Module ModAbadia
             Case = "DibujarPresentacion"
                 DibujarPresentacion()
             Case = "DibujarTextosPergamino_6725"
-                DibujarTextosPergamino_6725()
+                DibujarTextosPergamino_6725(0)
             Case = "InicializarJuego_249A_c"
                 InicializarJuego_249A_c()
             Case = "DibujarCaracterPergamino_6781"
@@ -8804,7 +8930,7 @@ Module ModAbadia
             Case = "InicializarPartida_2509"
                 InicializarPartida_2509()
             Case = "InicializarPartida_2509_b"
-                InicializarPartida_2509_b
+                InicializarPartida_2509_b()
             Case = "DibujarPantalla_4EB2"
                 DibujarPantalla_4EB2()
             Case = "MostrarResultadoJuego_42E7_b"
@@ -8814,6 +8940,17 @@ Module ModAbadia
                 CalcularFPS()
             Case = "BuclePrincipal_25B7_PantallaDibujada"
                 BuclePrincipal_25B7_PantallaDibujada()
+            Case = "DibujarPergaminoFinal_3868"
+                DibujarPergaminoFinal_3868()
+            Case = "ActualizarDiaMarcador_5559"
+                ActualizarDiaMarcador_5559(0)
+            Case = "DibujarEspiral_3F7F"
+                DibujarEspiral_3F7F(0)
+            Case = "DibujarEspiral_3F6B"
+                DibujarEspiral_3F6B()
+            Case = "BuclePrincipal_25B7_EspiralDibujada"
+                BuclePrincipal_25B7_EspiralDibujada()
+
         End Select
         ModPantalla.Refrescar()
         TmTick.Enabled = True
@@ -8844,9 +8981,7 @@ Module ModAbadia
         BuscarEntradaTablaPalabras_3C3A = PunteroPalabrasHL
     End Function
 
-    Public Sub IniciarCanal3_1020()
-        '###pendiente
-    End Sub
+
 
     Public Sub RealizarScrollFrase_3B9D(ByVal CaracterA As Byte)
         'realiza el scroll de la parte del marcador relativa a las frases y pinta el caracter que esté en a
@@ -8909,7 +9044,7 @@ Module ModAbadia
         'si no está mostrando una frase, sale
         If Not ReproduciendoFrase_2DA2 Then Exit Sub
         '3B68
-        IniciarCanal3_1020()
+        ReproducirSonidoVoz_1020()
         '3B76
         Do
             If Not PalabraTerminada_2DA0 Then
@@ -9037,6 +9172,22 @@ Module ModAbadia
 
     Public Sub Start(ObjetoPantalla As PictureBox)
         'arranca el juego y dibuja en ObjetoPantalla
+
+        'prueba sonido
+        'AY38910.EscribirRegistro(0, 168)
+        'AY38910.EscribirRegistro(1, 0)
+        'AY38910.EscribirRegistro(2, &H10)
+        'AY38910.EscribirRegistro(4, &H4)
+        'AY38910.EscribirRegistro(6, 16)
+        'AY38910.EscribirRegistro(7, 248)
+        'AY38910.EscribirRegistro(8, 6)
+        'AY38910.EscribirRegistro(14, 255)
+
+        WaveOut.Abrir()
+        WaveOut.Reproducir()
+
+
+
         InicializarPantalla(2, ObjetoPantalla)
         InicializarJuego_249A()
     End Sub
@@ -9496,6 +9647,7 @@ Module ModAbadia
         Dim Orientacion As Byte
         Dim IncrementoX As Integer
         Dim IncrementoY As Integer
+        Dim PosicionXPersonajeCoger As Integer
         'On Error Resume Next
         'lee la dirección de los datos de posición del personaje
         PunteroPersonajeDE = Leer16(TablaObjetosPersonajes_2DEC, PunteroPersonajeObjetoIX + 1 - &H2DEC) - 2
@@ -9507,7 +9659,9 @@ Module ModAbadia
         'lee la posición x del personaje
         PosicionX = TablaCaracteristicasPersonajes_3036(PunteroPersonajeDE + 2 - &H3036)
         'le suma 2 veces el valor leido de la tabla y modifica una comparación
-        PosicionXPersonajeCoger_516E = CByte(CInt(PosicionX) + 2 * IncrementoX)
+        PosicionXPersonajeCoger = CInt(PosicionX) + 2 * IncrementoX
+        If PosicionXPersonajeCoger < 0 Then PosicionXPersonajeCoger = 0
+        PosicionXPersonajeCoger_516E = CByte(PosicionXPersonajeCoger)
         '5364
         'lee la posición y del personaje
         PosicionY = TablaCaracteristicasPersonajes_3036(PunteroPersonajeDE + 3 - &H3036)
@@ -9594,7 +9748,7 @@ Module ModAbadia
             'si la altura de la posición donde se deja - altura del personaje que deja el objeto >= 0x05, sale
             If (AlturaA - AlturaRelativa_52C1) >= 5 Then Exit Sub
             '52C6
-            AlturaA = AlturaA and &H0F
+            AlturaA = AlturaA And &H0F
             'la compara con la de sus vecinos y si no es igual, sale
             If AlturaA <> LeerByteBufferAlturas(PunteroBufferAlturasIX - 1) Then Exit Sub
             If AlturaA <> LeerByteBufferAlturas(PunteroBufferAlturasIX - &H18) Then Exit Sub
@@ -10122,56 +10276,7 @@ Module ModAbadia
         End If
     End Sub
 
-    Public Sub ReproducirSonido_1007()
-        '###pendiente
 
-    End Sub
-
-
-    Public Sub ReproducirSonido_102A()
-        '###pendiente
-
-    End Sub
-
-    Public Sub ReproducirSonidoAbrir_101B()
-        '###pendiente
-
-    End Sub
-
-    Public Sub ReproducirSonidoCerrar_1016()
-        '###pendiente
-
-    End Sub
-
-    Public Sub ReproducirSonidoCampanas_100C()
-        '###pendiente
-
-    End Sub
-
-    Public Sub ReproducirSonidoCampanillas_1011()
-        '###pendiente
-
-    End Sub
-
-    Public Sub ReproducirSonidoCogerDejar_1025()
-        '###pendiente
-
-    End Sub
-
-    Public Sub ReproducirSonidoCogerDejar_102F()
-        '###pendiente
-
-    End Sub
-
-    Public Sub ReproducirSonido_5088()
-        '###pendiente
-
-    End Sub
-
-    Public Sub ReproducirSonidoCanal1_0FFD()
-        '###pendiente
-
-    End Sub
 
 
     Public Sub EjecutarComportamientoAbad_071E()
@@ -10827,7 +10932,7 @@ Module ModAbadia
                                                                                 If TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = 0 Then
                                                                                     '635A
                                                                                     'pone un sonido
-                                                                                    ReproducirSonido_102A()
+                                                                                    ReproducirSonidoPuertaSeverino_102A()
                                                                                 End If
                                                                                 '635D
                                                                                 'incrementa el contador
@@ -11238,7 +11343,7 @@ Module ModAbadia
         PantallaCGA2PC(PunteroPantallaHL - &HC000, PixelsA)
     End Sub
 
-    Public Sub DibujarEspiral_3F7F(ByVal MascaraE As Byte)
+    Public Sub DibujarEspiral_3F7F_Anterior(ByVal MascaraE As Byte)
         'dibuja la espiral del color indicado por e
 
         Dim PosicionYH As Byte
@@ -11324,12 +11429,136 @@ Module ModAbadia
         Loop
     End Sub
 
-    Public Sub DibujarEspiral_3F6B()
+    Public Sub DibujarEspiral_3F7F(ByVal Mascara As Byte)
+        'dibuja la espiral del color indicado por e
+
+        Static PosicionYH As Byte
+        Static PosicionXL As Byte
+        Static Ancho_3F67 As Byte
+        Static Alto_3F68 As Byte
+        Static Ancho_3F69 As Byte
+        Static Alto_3F6A As Byte
+        Static ContadorGlobalB As Byte
+        Static ContadorTiraB As Byte
+        Static PixelsA As Byte
+        Static Estado As Byte
+        Static MascaraE As Byte
+        Dim Contador As Integer
+        Select Case Estado
+            Case = 0
+                'posición inicial (00, 00)
+                MascaraE = Mascara
+                PosicionYH = 0
+                PosicionXL = 0
+                Ancho_3F67 = &H3F 'ancho de izquierda a derecha
+                Alto_3F68 = &H4F 'alto de arriba a abajo
+                Ancho_3F69 = &H3F 'ancho de derecha a izquierda
+                Alto_3F6A = &H4E 'alto de abajo a arriba
+                '3F96
+                ContadorGlobalB = &H20 '32 veces
+                PixelsA = 0
+                ContadorTiraB = Ancho_3F67
+                Estado = 1
+                SiguienteTick(1, "DibujarEspiral_3F7F")
+            Case = 1
+                For Contador = 1 To 2
+                    '3FA6
+                    'dibuja una tira (de color a) de b*8 pixels de ancho y 2 de alto (de izquierda a derecha)
+                    Ancho_3F67 = Ancho_3F67 - 1
+                    '3FA9
+                    Do
+                        'pasa hl a coordenadas de pantalla y graba a en esa línea y en la siguiente
+                        Dibujar2Lineas_3FE6(PixelsA, PosicionYH, PosicionXL)
+                        PosicionXL = PosicionXL + 1 'pasa al siguiente byte en X
+                        ContadorTiraB = ContadorTiraB - 1
+                    Loop While ContadorTiraB <> 0 'repite hasta que b = 0
+                    '3FAF
+                    'dibuja una tira (de color a) de 8 pixels de ancho y [ix+0x01]*2 de alto (de arriba a abajo)
+                    ContadorTiraB = Alto_3F68
+                    Alto_3F68 = Alto_3F68 - 2
+                    '3FB8
+                    Do
+                        'pasa hl a coordenadas de pantalla y graba a en esa línea y en la siguiente
+                        Dibujar2Lineas_3FE6(PixelsA, PosicionYH, PosicionXL)
+                        PosicionYH = PosicionYH + 2 'pasa a las 2 líneas siguientes en Y
+                        ContadorTiraB = ContadorTiraB - 1
+                    Loop While ContadorTiraB <> 0 'repite hasta que b = 0
+                    '3FBF
+                    'dibuja una tira (de color a) de [ix+0x02]*8 pixels de ancho y 2 de alto (de derecha a izquierda)
+                    ContadorTiraB = Ancho_3F69
+                    Ancho_3F69 = Z80Sub(Ancho_3F69, 2)
+                    '3FC8
+                    Do
+                        'pasa hl a coordenadas de pantalla y graba a en esa línea y en la siguiente
+                        Dibujar2Lineas_3FE6(PixelsA, PosicionYH, PosicionXL)
+                        PosicionXL = PosicionXL - 1 'retrocede en X
+                        ContadorTiraB = ContadorTiraB - 1
+                    Loop While ContadorTiraB <> 0 'repite hasta que b = 0
+                    '3FCE
+                    'dibuja una tira (de color a) de 8 pixels de ancho y [ix+0x03]*2 de alto (de abajo a arriba)
+                    ContadorTiraB = Alto_3F6A
+                    Alto_3F6A = Alto_3F6A - 2
+                    '3FD7
+                    Do
+                        'pasa hl a coordenadas de pantalla y graba a en esa línea y en la siguiente
+                        Dibujar2Lineas_3FE6(PixelsA, PosicionYH, PosicionXL)
+                        PosicionYH = PosicionYH - 2
+                        ContadorTiraB = ContadorTiraB - 1
+                    Loop While ContadorTiraB <> 0 'repite hasta que b = 0
+                    '3FDE
+                    'cambia el color de las tiras
+                    PixelsA = PixelsA Xor MascaraE
+                    'ModPantalla.Refrescar()
+                    ContadorGlobalB = ContadorGlobalB - 1
+
+                    If ContadorGlobalB = 0 Then
+                        '3FE2
+                        'pasa hl a coordenadas de pantalla y graba a en esa línea y en la siguiente
+                        Dibujar2Lineas_3FE6(PixelsA, PosicionYH, PosicionXL)
+                        Estado = 0
+                        SiguienteTick(5, "DibujarEspiral_3F6B")
+                        Exit Sub
+                    Else
+                        '3F9F
+                        ContadorTiraB = Ancho_3F67
+                        Ancho_3F67 = Ancho_3F67 - 1
+                    End If
+                Next
+                SiguienteTick(5, "DibujarEspiral_3F7F")
+        End Select
+
+    End Sub
+
+    Public Sub DibujarEspiral_3F6B_Anterior()
         'rutina encargada de dibujar y de borrar la espiral
         DibujarEspiral_3F7F(&HFF) 'dibuja la espiral
         DibujarEspiral_3F7F(0) 'borra la espiral
         PosicionXPersonajeActual_2D75 = 0 'indica un cambio de pantalla
     End Sub
+
+    Public Sub DibujarEspiral_3F6B()
+        'rutina encargada de dibujar y de borrar la espiral
+        Static Estado As Byte
+        Select Case Estado
+            Case = 0
+                DibujarEspiral_3F7F(&HFF) 'dibuja la espiral
+                Estado = 1
+            Case = 1
+                DibujarEspiral_3F7F(0) 'borra la espiral
+                Estado = 2
+            Case = 2
+                'si se ha programado un cambio de paleta
+                If CambiarPaletaColores <> &HFF Then
+                    ModPantalla.SeleccionarPaleta(CambiarPaletaColores)
+                    'limpia el flag
+                    CambiarPaletaColores = &HFF
+                End If
+                PosicionXPersonajeActual_2D75 = 0 'indica un cambio de pantalla
+                Estado = 0
+                SiguienteTick(100, "BuclePrincipal_25B7_EspiralDibujada")
+        End Select
+    End Sub
+
 
     Public Sub ColocarLampara_4100()
         'si la lámpara estaba desaparecida, aparece en la cocina
@@ -11452,7 +11681,9 @@ Module ModAbadia
                 'modifica la máscara de las puertas que pueden abrirse
                 TablaVariablesLogica_3C85(PuertasAbribles_3CA6 - &H3C85) = &HEF
                 'selecciona paleta 2
-                ModPantalla.SeleccionarPaleta(2)
+                'ModPantalla.SeleccionarPaleta(2)
+                'programa el cambio de paleta para cuando termine de dibujar la espiral
+                CambiarPaletaColores = 2
                 'abre las puertas del ala izquierda de la abadía
                 AbrirPuertasAlaIzquierda_3585()
                 ReproducirSonidoCampanas_100C()
@@ -11538,7 +11769,9 @@ Module ModAbadia
                 'dibuja y borra la espiral
                 DibujarEspiral_3F6B()
                 'fija la paleta 3
-                ModPantalla.SeleccionarPaleta(3)
+                'ModPantalla.SeleccionarPaleta(3)
+                'programa el cambio de paleta de colores paracuando termina de dibujar la espiral
+                CambiarPaletaColores = 3
                 'bloquea las puertas del ala izquierda de la abadía
                 TablaVariablesLogica_3C85(PuertasAbribles_3CA6 - &H3C85) = &HDF
                 'pone en el canal 1 el sonido de las campanillas
@@ -13197,7 +13430,15 @@ Module ModAbadia
         ObjetosGuillermoDespuesA = TablaObjetosPersonajes_2DEC(&H2DEF - &H2DEC)
         If (ObjetosGuillermoAntesA <> ObjetosGuillermoDespuesA) Or (ObjetosAdso1AntesA <> ObjetosAdso1DespuesA) Or (ObjetosAdso2AntesA <> ObjetosAdso2DespuesA) Then
             'si han cambiado los objetos, reproduce un sonido
-            ReproducirSonido_5088()
+            If ObjetosGuillermoAntesA <> ObjetosGuillermoDespuesA Then
+                ReproducirSonidoCogerDejar_5088(ObjetosGuillermoAntesA, ObjetosGuillermoDespuesA)
+            End If
+            If ObjetosAdso1AntesA <> ObjetosAdso1DespuesA Then
+                ReproducirSonidoCogerDejar_5088(ObjetosAdso1AntesA, ObjetosAdso1DespuesA)
+            End If
+            If ObjetosAdso2AntesA <> ObjetosAdso2DespuesA Then
+                ReproducirSonidoCogerDejar_5088(ObjetosAdso2AntesA, ObjetosAdso2DespuesA)
+            End If
         End If
         '50D0
         'comprueba si hemos cogido las gafas y el pergamino
@@ -13295,7 +13536,7 @@ Module ModAbadia
         'indica que se ha abierto el espejo
         HabitacionEspejoCerrada_2D8C = False
         'reproduce un sonido
-        ReproducirSonidoCanal1_0FFD()
+        ReproducirSonidoAbrirEspejoCanal1_0FFD()
     End Sub
 
     Public Sub ProcesarLogicaBonusCamara_5691()
@@ -13462,7 +13703,7 @@ Module ModAbadia
             End If
             '41AB
             'inicia un sonido en el canal 1
-            ReproducirSonido_1007()
+            ReproducirSonidoMelodia_1007()
             'obtiene el personaje al que sigue la cámara
             PersonajeCamaraA = TablaVariablesLogica_3C85(PersonajeSeguidoPorCamaraReposo_3C92 - &H3C85)
             'lee el personaje al que se sigue si guillermo se está quieto
@@ -13543,10 +13784,7 @@ Module ModAbadia
         EscribirFraseMarcador_501B(&H22)
     End Sub
 
-    Public Sub DibujarPergaminoFinal_3868()
-        '###pendiente
 
-    End Sub
 
     Public Function CalcularPorcentajeJuegoResuelto_4269() As Byte()
         'calcula el porcentaje de misión completada y lo guarda en 0x431e
@@ -13579,8 +13817,9 @@ Module ModAbadia
         CalcularPorcentajeJuegoResuelto_4269 = Resultado
         'si 0x3ca7 es 0, muestra el final
         If TablaVariablesLogica_3C85(InvestigacionNoTerminada_3CA7 - &H3C85) = 0 Then
+            'señala que el juego ha sido completado y se pasa a la secuencia del pergamino final
+            CalcularPorcentajeJuegoResuelto_4269 = {&HFF, &HFF}
             DibujarPergaminoFinal_3868()
-            MsgBox("Juego Completado")
             Exit Function
         End If
         '4270
@@ -13610,21 +13849,27 @@ Module ModAbadia
         Resultado(0) = Decenas + &H30
     End Function
 
-    Public Sub MostrarResultadoJuego_42E7()
+    Public Function MostrarResultadoJuego_42E7() As Boolean
         'si guillermo está muerto, calcula el % de misión completado y lo muestra por pantalla
         Dim Puntuacion_431E As Byte()
+        MostrarResultadoJuego_42E7 = False
         'lee si guillermo está vivo y si es así, sale
-        If TablaVariablesLogica_3C85(GuillermoMuerto_3C97 - &H3C85) = 0 Then Exit Sub
+        If TablaVariablesLogica_3C85(GuillermoMuerto_3C97 - &H3C85) = 0 Then Exit Function
         '42EC
         'indica que la camara sigua a guillermo y que lo haga ya
         TablaVariablesLogica_3C85(PersonajeSeguidoPorCamara_3C8F - &H3C85) = 0
         'si está mostrando una frase/reproduciendo una voz, sale
-        If ReproduciendoFrase_2DA1 Then Exit Sub
+        If ReproduciendoFrase_2DA1 Then Exit Function
         '42F6
         'oculta el área de juego
         PintarAreaJuego_1A7D(&HFF)
         'calcula el porcentaje de misión completada y lo guarda en 0x431e
         Puntuacion_431E = CalcularPorcentajeJuegoResuelto_4269()
+        If Puntuacion_431E(0) = &HFF And Puntuacion_431E(1) = &HFF Then
+            'inidica juego completado y arranque del pergamino final
+            MostrarResultadoJuego_42E7 = True
+            Exit Function
+        End If
         '42FC
         '(h = y en pixels, l = x en bytes) (x = 64, y = 32)
         'modifica la variable usada como la dirección para poner caracteres en pantalla
@@ -13655,12 +13900,909 @@ Module ModAbadia
         ImprimirFrase_4FEE({&H50, &H55, &H4C, &H53, &H41, &H20, &H45, &H53, &H50, &H41, &H43, &H49, &H4F, &H20, &H50, &H41, &H52, &H41, &H20, &H45, &H4D, &H50, &H45, &H5A, &H41, &H52})
         SiguienteTick(100, "MostrarResultadoJuego_42E7_b")
         MostrarResultadoJuego_42E7_b()
-    End Sub
+    End Function
 
     Public Sub MostrarResultadoJuego_42E7_b()
         If TeclaPulsadaNivel_3482(&H2F) Then
             InicializarPartida_2509()
         End If
+    End Sub
+
+    Public Sub EscribirRegistroValorPSG_134E(ByVal RegistroA As Byte, ByVal ValorC As Byte)
+        '; escribe al registro número 'a' del PSG el valor 'c'
+        '; a = número de registro
+        '; c = valor a escribir
+        AY38910.EscribirRegistro(CInt(RegistroA), CInt(ValorC))
+    End Sub
+
+    Public Sub EscribirDatosSonido_10D0(ByVal PunteroDatosSonidosIX As Integer)
+        'escribe los datos del canal apuntado por ix en el PSG
+        'estructura de TablaDatosSonidos_0F96:
+        '0x0f96 máscara que indica en qué canales están activos los tonos y el generador de ruido
+        '0x0f97 copia de la máscara que indica en qué canales están activos los tonos y el generador de ruido
+
+        '0x0f98 contador que se va decrementando y al llegar a 0 actualiza las notas
+
+        '0x0f99 periodo de la envolvente (byte bajo) relacionado con lo leido en 0x0a-0x0b + 0x0c
+        '0x0f9a periodo de la envolvente (byte alto) relacionado con lo leido en 0x0a-0x0b + 0x0c
+        '0x0f9b tipo de envolvente relacionado con lo leido en 0x0a-0x0b + 0x0c (solo guarda 4 lsb)
+
+        '0x0f9c periodo del generador de ruido (solo se usan los últimos 5 bits)
+
+        '0x0f9d-0x0fe4 tabla con los datos de generación de cada canal de sonido (registros de PSG + entrada del canal). estructura de una entrada:
+        '	0x00-0x01: dirección de la nota musical actual
+        '        primer Byte
+        '            bits 0 - 3: nota(si es 0x0f es un caso especial)
+        '        bits 4 - 6: octava
+        '        bit 7: indica si se activa el generador de ruido
+        '        segundo Byte: duración de la nota
+        '    0x02: duración de la nota
+        '    0x03-0x04: tono de la nota
+        '    0x05-0x06: dirección con los datos del tono base de las notas
+        '        si encuentra 0x7f: contadores al maximo y no cambia el tono de las notas (entrada de 1 byte)
+        '		si encuentra 0x80: reinicia el índice en la tabla y sigue procesando (entrada de 1 byte)
+        '		si el bit más significativo está activo: actualiza el tipo de envolvente, su periodo y el nuevo contador (entrada de 4 bytes)
+        '		en otro caso: actualiza los contadores y el tono base (entrada de 3 bytes)
+        '	0x07: volumen de la nota actual
+        '    0x08: segundo contador que se va decrementando sólo cuando 0x11 es 0, y cuando llega a 0 se pueden producir cambios en frecuencia base de las notas generadas
+        '    0x09: indice en tabla 0x05-0x06
+        '    0x0a-0x0b: dirección con los datos que producen cambios en el volumen y el generador de envolventes
+        '        si encuentra 0x7f: contadores al maximo y no cambia el volumen de las notas (entrada de 1 byte)
+        '		si encuentra 0x80: reinicia el índice en la tabla y sigue procesando (entrada de 1 byte)
+        '		en otro caso: actualiza los contadores y el volumen base (entrada de 3 bytes)
+        '	0x0c: indice en tabla 0x0a-0x0b
+        '    0x0d: segundo contador que se va decrementando sólo cuando 0x12 es 0, y cuando llega a 0 se pueden producir cambios en el volumen y el generador de envolventes
+        '    0x0e: registro principal de control
+        '                bit 0 = si es 1 indica que el canal de música está activo y hay que procesarlo
+        '                bit 1 = si es 0 no se activa el generador de ruido
+        '                bit 2 = si es 1 no entra a la sección de actualización de envolventes y modificación del tono de las notas
+        '                bit 3 = si es 1, hay que actualizar el periodo del generador de ruido
+        '                bit 4 = si vale 0 se usa el volumen de 0x07, en otro caso se deja en manos del generador de envolventes
+        '                bit 5 = cuando vale 1 hay que fijar el volumen o las envolventes
+        '                bit 6 = si vale 1 indica si se actualiza la frecuencia de la nota en el PSG
+        '                bit 7 = si vale 1 indica q se leyo 0x0f y no una nota?
+        '    0x0f: valor al que poner el contador 0x11 cuando llega a 0
+        '    0x10: valor al que poner el contador 0x12 cuando llega a 0
+        '    0x11: contador que se va decrementando y al llegar a 0 se pueden producir cambios en la frecuencia base de las notas generadas
+        '    0x12: contador que se va decrementando y al llegar a 0 se pueden producir cambios en el volumen y el generador de envolventes
+        '    0x13: valor para el cambio del tono de las notas
+        '    0x14: incremento de volumen
+        '    0x15: registro
+        '0x16: no usado???
+        '	0x17: no usado???
+
+        Dim RegistroControlL As Byte
+        Dim FrecuenciaC As Byte
+        Dim AmplitudC As Byte
+        Dim EnvolventeC As Byte
+        Dim MezcladorC As Byte
+        Dim RegistroA As Byte
+
+        'lee el registro de control
+        RegistroControlL = TablaDatosSonidos_0F96(PunteroDatosSonidosIX + &H0E - &H0F96)
+        'si el canal no está activo, sale
+        If Not LeerBitByte(RegistroControlL, 0) Then Exit Sub
+        'si no hay que actualizar las notas ni las envolventes, sale
+        If LeerBitByte(RegistroControlL, 2) Then Exit Sub
+        If LeerBitByte(RegistroControlL, 7) Then Exit Sub
+        '10DC
+        If LeerBitByte(RegistroControlL, 6) Then
+            '10E0
+            'si el bit 6 = 1, escribir frecuencia de la nota en el PSG
+            'lee la frecuencia de la nota (parte inferior)
+            FrecuenciaC = TablaDatosSonidos_0F96(PunteroDatosSonidosIX + &H03 - &H0F96)
+            'lee el registro del PSG a escribir (frecuencia del canal (8 bits inferiores))
+            RegistroA = TablaDatosSonidos_0F96(PunteroDatosSonidosIX - &H03 - &H0F96)
+            'escribe al registro número 'a' del PSG el valor 'c'
+            EscribirRegistroValorPSG_134E(RegistroA, FrecuenciaC)
+            '10E9
+            'lee la frecuencia de la nota (parte superior)
+            FrecuenciaC = TablaDatosSonidos_0F96(PunteroDatosSonidosIX + &H04 - &H0F96)
+            'registro del PSG a escribir (frecuencia del canal (4 bits superiores))
+            RegistroA = RegistroA + 1
+            EscribirRegistroValorPSG_134E(RegistroA, FrecuenciaC)
+        End If
+        '10F3
+        If LeerBitByte(RegistroControlL, 5) Then
+            'si el bit 5 = 1, escribir volumen o envolvente deseada
+            '10F7
+            If LeerBitByte(RegistroControlL, 4) = 0 Then
+                'si el bit 4 vale 0 se usa el volumen de 0x07
+                '10FB
+                'lee el registro del PSG a escribir (amplitud))
+                RegistroA = TablaDatosSonidos_0F96(PunteroDatosSonidosIX - &H02 - &H0F96)
+                'lee el volumen
+                AmplitudC = TablaDatosSonidos_0F96(PunteroDatosSonidosIX + &H07 - &H0F96)
+                'escribe en el PSG el nuevo volumen
+                EscribirRegistroValorPSG_134E(RegistroA, AmplitudC)
+            Else
+                'si el bit 4 != 0, se generan envolventes para el volumen
+                '1106
+                'lee el byte bajo del periodo de la envolvente
+                FrecuenciaC = TablaDatosSonidos_0F96(&H0F99 - &H0F96)
+                'registro PSG del control de envolventes
+                RegistroA = &H0B
+                EscribirRegistroValorPSG_134E(RegistroA, FrecuenciaC)
+                '110F
+                'lee el byte alto del periodo de la envolvente
+                FrecuenciaC = TablaDatosSonidos_0F96(&H0F9A - &H0F96)
+                RegistroA = &H0C
+                'escribe el nuevo periodo de la envolvente (en unidades de 128 microsegundos)
+                EscribirRegistroValorPSG_134E(RegistroA, FrecuenciaC)
+                '1118
+                'lee el tipo de envolvente y lo escribe en el PSG
+                EnvolventeC = TablaDatosSonidos_0F96(&H0F9B - &H0F96)
+                RegistroA = &H0D
+                EscribirRegistroValorPSG_134E(RegistroA, FrecuenciaC)
+                '1121
+                'lee el registro del PSG a escribir (amplitud))
+                RegistroA = TablaDatosSonidos_0F96(PunteroDatosSonidosIX - &H02 - &H0F96)
+                'deja el volumen en manos del generador de envolventes
+                AmplitudC = &H10
+                EscribirRegistroValorPSG_134E(RegistroA, AmplitudC)
+            End If
+        End If
+        '1129
+        MezcladorC = 7
+        If LeerBitByte(RegistroControlL, 1) <> 0 Then
+            'si el bit 1 de 0x0e es 1, activa el generador de ruido
+            '112F
+            MezcladorC = &H3F
+            If LeerBitByte(RegistroControlL, 3) <> 0 Then
+                'si el bit 3 de 0x0e es 1 actualizar el periodo del generador de ruido
+                '1135
+                'fija el periodo del generador de ruido
+                FrecuenciaC = TablaDatosSonidos_0F96(&H0F9C - &H0F96)
+                RegistroA = 6
+                EscribirRegistroValorPSG_134E(RegistroA, FrecuenciaC)
+            End If
+        End If
+        '1140
+        'se hace un AND con los bits que representan al canal
+        MezcladorC = MezcladorC And TablaDatosSonidos_0F96(PunteroDatosSonidosIX - &H01 - &H0F96)
+        'actualiza la configuración del generador de ruido
+        TablaDatosSonidos_0F96(&H0F96 - &H0F96) = TablaDatosSonidos_0F96(&H0F96 - &H0F96) Xor MezcladorC
+    End Sub
+
+    Public Sub IniciarCanal_104F(ByVal PunteroCanalIX As Integer, ByVal PunteroDatosSonidoHL As Integer)
+        'rellena parte de la entrada seleccionada
+        'activa el sonido
+        TablaDatosSonidos_0F96(PunteroCanalIX + &H0E - &H0F96) = 5
+        'guarda la dirección de los datos de la música
+        Escribir16(TablaDatosSonidos_0F96, PunteroCanalIX + 0 - &H0F96, PunteroDatosSonidoHL)
+        'fija la duración de la nota
+        TablaDatosSonidos_0F96(PunteroCanalIX + &H02 - &H0F96) = 1
+    End Sub
+
+
+    Public Function LeerByteTablaSonidos(PunteroHL As Integer) As Byte
+        If PunteroHL < &H8000 Then 'tabla de sonidos
+            LeerByteTablaSonidos = TablaTonosNotasVoces_1388(PunteroHL - &H1388)
+        Else 'tabla de melodía del pergamino
+            LeerByteTablaSonidos = TablaMusicaPergamino_8000(PunteroHL - &H8000)
+        End If
+    End Function
+
+    Public Sub LeerEnvolventeVolumen_129B(ByVal PunteroCanalIX)
+        'lee valores de la tabla de envolventes y volumen base y actualiza los registros
+        Dim PunteroSonidoHL As Integer
+        Dim ValorA As Byte
+        Do
+            PunteroSonidoHL = Leer16(TablaDatosSonidos_0F96, PunteroCanalIX + &H0A - &H0F96) + TablaDatosSonidos_0F96(PunteroCanalIX + &H0C - &H0F96)
+            ValorA = LeerByteTablaSonidos(PunteroSonidoHL)
+            If ValorA = &H7F Then
+                '12AC
+                'contadores al máximo y sin modificar el volumen de las notas
+                TablaDatosSonidos_0F96(PunteroCanalIX + &H12 - &H0F96) = &HFF
+                TablaDatosSonidos_0F96(PunteroCanalIX + &H10 - &H0F96) = &HFF
+                TablaDatosSonidos_0F96(PunteroCanalIX + &H0D - &H0F96) = &HFF
+                TablaDatosSonidos_0F96(PunteroCanalIX + &H14 - &H0F96) = 0
+                Exit Sub
+            End If
+            '12BC
+            If ValorA <> &H80 Then Exit Do
+            '12C0
+            'reinicia el índice en la tabla y sigue procesando
+            TablaDatosSonidos_0F96(PunteroCanalIX + &H0C - &H0F96) = 0
+        Loop
+        '12C6
+        If LeerBitByte(ValorA, 7) <> 0 Then
+            'actualiza el periodo y tipo de envolvente
+            '12CA
+            ValorA = ValorA And &H0F
+            'actualiza el tipo de envolvente
+            TablaDatosSonidos_0F96(&H0F9B - &H0F96) = ValorA
+            PunteroSonidoHL = PunteroSonidoHL + 1
+            ValorA = LeerByteTablaSonidos(PunteroSonidoHL)
+            'actualiza el periodo de la envolvente
+            TablaDatosSonidos_0F96(&H0F99 - &H0F96) = ValorA
+            '12D4
+            PunteroSonidoHL = PunteroSonidoHL + 1
+            ValorA = LeerByteTablaSonidos(PunteroSonidoHL)
+            TablaDatosSonidos_0F96(&H0F9A - &H0F96) = ValorA
+            '12D9
+            PunteroSonidoHL = PunteroSonidoHL + 1
+            'lee el nuevo contador
+            ValorA = LeerByteTablaSonidos(PunteroSonidoHL)
+            TablaDatosSonidos_0F96(PunteroCanalIX + &H12 - &H0F96) = ValorA
+            TablaDatosSonidos_0F96(PunteroCanalIX + &H0D - &H0F96) = 1
+            'deja el volumen en manos del generador de envolventes
+            SetBitArray(TablaDatosSonidos_0F96, PunteroCanalIX + &H0E, 4)
+            'avanza el índice de la tabla en 4
+            ValorA = TablaDatosSonidos_0F96(PunteroCanalIX + &H0C - &H0F96) + 4
+        Else
+            '12ED
+            'actualiza el segundo contador
+            TablaDatosSonidos_0F96(PunteroCanalIX + &H0D - &H0F96) = ValorA
+            PunteroSonidoHL = PunteroSonidoHL + 1
+            ValorA = LeerByteTablaSonidos(PunteroSonidoHL)
+            'actualiza el volumen base
+            TablaDatosSonidos_0F96(PunteroCanalIX + &H14 - &H0F96) = ValorA
+            PunteroSonidoHL = PunteroSonidoHL + 1
+            ValorA = LeerByteTablaSonidos(PunteroSonidoHL)
+            'actualiza el primer contador y su límite
+            TablaDatosSonidos_0F96(PunteroCanalIX + &H10 - &H0F96) = ValorA
+            TablaDatosSonidos_0F96(PunteroCanalIX + &H12 - &H0F96) = ValorA
+            'avanza el índice de la tabla en 3
+            ValorA = TablaDatosSonidos_0F96(PunteroCanalIX + &H0C - &H0F96) + 3
+        End If
+        '1302
+        TablaDatosSonidos_0F96(PunteroCanalIX + &H0C - &H0F96) = ValorA
+    End Sub
+
+    Public Sub ActualizarEnvolventeVolumen_1275(ByVal PunteroCanalIX)
+        'comprueba si hay que actualizar la generación de envolventes y el volumen
+        Dim VolumenA As Byte
+        DecByteArray(TablaDatosSonidos_0F96, PunteroCanalIX + &H12 - &H0F96)
+        If TablaDatosSonidos_0F96(PunteroCanalIX + &H12 - &H0F96) <> 0 Then Exit Sub
+        DecByteArray(TablaDatosSonidos_0F96, PunteroCanalIX + &H0D - &H0F96)
+        If TablaDatosSonidos_0F96(PunteroCanalIX + &H0D - &H0F96) = 0 Then
+            'actualiza unos registros de envolventes y el volumen
+            LeerEnvolventeVolumen_129B(PunteroCanalIX)
+        End If
+        '127F
+        'indica que hay que fijar las envolventes y el volumen
+        SetBitArray(TablaDatosSonidos_0F96, PunteroCanalIX + &H0E - &H0F96, 5)
+        'vuelve a cargar el contador para la generación de envolventes y modificación de volumen
+        TablaDatosSonidos_0F96(PunteroCanalIX + &H12 - &H0F96) = TablaDatosSonidos_0F96(PunteroCanalIX + &H10 - &H0F96)
+        'si se está usando el generador de envolventes, sale
+        If LeerBitArray(TablaDatosSonidos_0F96, PunteroCanalIX + &H0E - &H0F96, 4) <> 0 Then Exit Sub
+        '128E
+        'lee el volumen de la nota
+        VolumenA = TablaDatosSonidos_0F96(PunteroCanalIX + &H07 - &H0F96)
+        'le suma el incremento de volumen
+        If TablaDatosSonidos_0F96(PunteroCanalIX + &H14 - &H0F96) <> &HFF Then
+            VolumenA = VolumenA + TablaDatosSonidos_0F96(PunteroCanalIX + &H14 - &H0F96)
+        Else
+            VolumenA = VolumenA - 1
+        End If
+
+        'limita al máximo valor posible
+        VolumenA = VolumenA And &H0F
+        'actualiza el volumen de la nota
+        TablaDatosSonidos_0F96(PunteroCanalIX + &H07 - &H0F96) = VolumenA
+    End Sub
+
+    Public Sub ActualizarTono_1231(ByVal PunteroCanalIX)
+        'comprueba si hay que actualizar el tono base de las notas
+        Dim PunteroSonidoHL As Integer
+        Dim ValorA As Byte
+        'lee el índice de la tabla y la dirección de los datos
+        Do
+            PunteroSonidoHL = Leer16(TablaDatosSonidos_0F96, PunteroCanalIX + &H05 - &H0F96) + TablaDatosSonidos_0F96(PunteroCanalIX + &H09 - &H0F96)
+            ValorA = LeerByteTablaSonidos(PunteroSonidoHL)
+            If ValorA = &H7F Then
+                '1242
+                'contadores al máximo
+                TablaDatosSonidos_0F96(PunteroCanalIX + &H11 - &H0F96) = &HFF
+                TablaDatosSonidos_0F96(PunteroCanalIX + &H0F - &H0F96) = &HFF
+                TablaDatosSonidos_0F96(PunteroCanalIX + &H08 - &H0F96) = &HFF
+                'no se modifica el tono de las notas
+                TablaDatosSonidos_0F96(PunteroCanalIX + &H13 - &H0F96) = 0
+                Exit Sub
+            End If
+            '1252
+            If ValorA <> &H80 Then Exit Do
+            '1256
+            'limpia el índice de la tabla y vuelve a procesar los datos a partir de esa dirección
+            TablaDatosSonidos_0F96(PunteroCanalIX + &H09 - &H0F96) = 0
+        Loop
+        '125C
+        'en otro caso actualiza los valores
+        'actualiza el contador de cambios
+        TablaDatosSonidos_0F96(PunteroCanalIX + &H08 - &H0F96) = ValorA
+        PunteroSonidoHL = PunteroSonidoHL + 1
+        ValorA = LeerByteTablaSonidos(PunteroSonidoHL)
+        'actualiza la modificación de tono
+        TablaDatosSonidos_0F96(PunteroCanalIX + &H13 - &H0F96) = ValorA
+        PunteroSonidoHL = PunteroSonidoHL + 1
+        ValorA = LeerByteTablaSonidos(PunteroSonidoHL)
+        'inicia el contador principal y su límite
+        TablaDatosSonidos_0F96(PunteroCanalIX + &H0F - &H0F96) = ValorA
+        TablaDatosSonidos_0F96(PunteroCanalIX + &H11 - &H0F96) = ValorA
+        'apunta a la siguiente entrada de la tabla
+        TablaDatosSonidos_0F96(PunteroCanalIX + &H09 - &H0F96) = TablaDatosSonidos_0F96(PunteroCanalIX + &H09 - &H0F96) + 3
+    End Sub
+
+    Public Sub GuardarNotaCanal2_131B(ByVal PunteroSonidoBC As Integer)
+        'graba una nueva dirección de notas en el canal 2 y la activa
+        'graba una nueva dirección de notas en el canal 2
+        Escribir16(TablaDatosSonidos_0F96, &H0FB8 - &H0F96, PunteroSonidoBC)
+        '+ 0x0e = 5
+        TablaDatosSonidos_0F96(&H0FC6 - &H0F96) = 5
+        'pone una duración de nota de 1 unidad
+        TablaDatosSonidos_0F96(&H0FBA - &H0F96) = 1
+    End Sub
+
+    Public Sub GuardarNotaCanal3_132A(ByVal PunteroSonidoBC As Integer)
+        'graba una nueva dirección de notas en el canal 3 y la activa
+        'graba una nueva dirección de notas en el canal 3
+        Escribir16(TablaDatosSonidos_0F96, &H0FD0 - &H0F96, PunteroSonidoBC)
+        'y activa el canal 3
+        TablaDatosSonidos_0F96(&H0FDE - &H0F96) = 5
+        'pone una duración de nota de 1 unidad
+        TablaDatosSonidos_0F96(&H0FD2 - &H0F96) = 1
+    End Sub
+
+    Public Sub GuardarTono_1339(ByVal PunteroSonidoBC As Integer, ByVal PunteroCanalIX As Integer)
+        'graba una nueva dirección de tono base de las notas
+        'guarda lo leido en la tabla de cambios del tono base
+        Escribir16(TablaDatosSonidos_0F96, PunteroCanalIX + &H05 - &H0F96, PunteroSonidoBC)
+    End Sub
+
+    Public Sub HacerNadaSonido_1347()
+        'no hace nada
+    End Sub
+
+    Public Sub GuardarVolumen_1340(ByVal PunteroSonidoBC As Integer, ByVal PunteroCanalIX As Integer)
+        'graba una nueva dirección de cambios en el volumen y el generador de envolventes
+        'guarda lo leido en la tabla de cambios en el volumen y el generador de envolventes
+        Escribir16(TablaDatosSonidos_0F96, PunteroCanalIX + &H0A - &H0F96, PunteroSonidoBC)
+    End Sub
+
+    Public Sub CambiarDireccionMusica_1318(ByRef PunteroSonidoDE As Integer, ByVal PunteroSonidoBC As Integer)
+        'cambia de por bc (cambia a otra posición de la tabla de música)
+        PunteroSonidoDE = PunteroSonidoBC
+    End Sub
+
+    Public Sub ProcesarCanalSonido_114C(ByVal PunteroCanalIX As Integer)
+        'procesa un canal de sonido
+        Dim ValorA As Byte
+        Dim ValorB As Byte
+        Dim ValorC As Byte
+        Dim NotaC As Byte
+        Dim ValorBC As Integer
+        Dim ValorAInt As Integer
+        Dim PunteroSonidoDE As Integer
+        Dim PunteroSonidoHL As Integer
+        ValorA = TablaDatosSonidos_0F96(PunteroCanalIX + &H0E - &H0F96)
+        'comprueba si la entrada esta activa
+        'si no es así sale
+        If LeerBitByte(ValorA, 0) = 0 Then Exit Sub
+        '(10000111) ignora los bits que no interesan y actualiza el valor
+        TablaDatosSonidos_0F96(PunteroCanalIX + &H0E - &H0F96) = ValorA And &H87
+        'carga el tempo. si es igual a 0 procesa la parte de actualización de tonos
+        If TablaDatosSonidos_0F96(&H0F98 - &H0F96) = 0 Then
+            '115E
+            'decrementa la duración de la nota actual
+            TablaDatosSonidos_0F96(PunteroCanalIX + &H02 - &H0F96) = TablaDatosSonidos_0F96(PunteroCanalIX + &H02 - &H0F96) - 1
+            If TablaDatosSonidos_0F96(PunteroCanalIX + &H02 - &H0F96) = 0 Then
+                '1164
+                'si ha concluido
+                'marca entrada para ser procesada
+                TablaDatosSonidos_0F96(PunteroCanalIX + &H0E - &H0F96) = 1
+                'carga en de la dirección de la última nota
+                PunteroSonidoDE = Leer16(TablaDatosSonidos_0F96, PunteroCanalIX + &H00 - &H0F96)
+                '1173
+                'compara el byte leido con los comandos posibles
+                Do
+                    ValorA = LeerByteTablaSonidos(PunteroSonidoDE)
+                    If ValorA = &HFE Or ValorA = &HFD Or ValorA = &HFB Or ValorA = &HFC Or ValorA = &HFA Or ValorA = &HF9 Then
+                        '1180
+                        ValorC = LeerByteTablaSonidos(PunteroSonidoDE + 1)
+                        ValorB = LeerByteTablaSonidos(PunteroSonidoDE + 2)
+                        PunteroSonidoDE = PunteroSonidoDE + 3
+                        ValorBC = Nibbles2Integer(ValorB, ValorC)
+                    End If
+                    '; tabla de 6 entradas(relacionada con 0x114c y tablas 0x0fac)
+                    '; formato
+                    '	Byte 1: patron a buscar
+                    '    bytes 2 y 3: dirección a la que saltar si se encuentra el patrón
+                    '1306:           FE 131B -> graba una nueva dirección de notas en el canal 2 y la activa
+                    '        FD 132A -> graba una nueva dirección de notas en el canal 3 y la activa
+                    '        FB 1339 -> graba una nueva dirección de tono base de las notas
+                    '		FC 1347 -> no hace nada
+                    '		FA 1340 -> graba una nueva dirección de cambios en el volumen y el generador de envolventes
+                    '		F9 1318 -> cambia de por bc (cambia a otra posición de la tabla de música)
+                    Select Case ValorA
+                        Case = &HFE
+                            GuardarNotaCanal2_131B(ValorBC)
+                        Case = &HFD
+                            GuardarNotaCanal3_132A(ValorBC)
+                        Case = &HFB
+                            GuardarTono_1339(ValorBC, PunteroCanalIX)
+                        Case = &HFC
+                            HacerNadaSonido_1347()
+                        Case = &HFA
+                            GuardarVolumen_1340(ValorBC, PunteroCanalIX)
+                        Case = &HF9
+                            CambiarDireccionMusica_1318(PunteroSonidoDE, ValorBC)
+                        Case Else
+                            Exit Do
+                    End Select
+                Loop
+                '118d
+                'aquí llega después de procesar los comandos
+                If ValorA = &HFF Then
+                    '118F
+                    'si a = 0xff, terminan las notas
+                    'marca el canal como no activo
+                    TablaDatosSonidos_0F96(PunteroCanalIX + &H0E - &H0F96) = 0
+                    Exit Sub
+                End If
+                '1196
+                'sigue procesando la entrada
+                PunteroSonidoHL = PunteroSonidoDE
+                'pone valores para que se produzcan cambios en la generación de envolventes, el volumen y en la frecuencia base
+                TablaDatosSonidos_0F96(PunteroCanalIX + &H11 - &H0F96) = 1
+                TablaDatosSonidos_0F96(PunteroCanalIX + &H08 - &H0F96) = 1
+                TablaDatosSonidos_0F96(PunteroCanalIX + &H12 - &H0F96) = 1
+                TablaDatosSonidos_0F96(PunteroCanalIX + &H0D - &H0F96) = 1
+                'inicia los índices en las tablas de generación de envolventes y de frecuencia base
+                TablaDatosSonidos_0F96(PunteroCanalIX + &H0C - &H0F96) = 0
+                TablaDatosSonidos_0F96(PunteroCanalIX + &H09 - &H0F96) = 0
+                'lee el primer byte de los datos (nota + octava)
+                NotaC = LeerByteTablaSonidos(PunteroSonidoHL)
+                'guarda el segundo byte de los datos (duración de la nota)
+                TablaDatosSonidos_0F96(PunteroCanalIX + &H02 - &H0F96) = LeerByteTablaSonidos(PunteroSonidoHL + 1)
+                PunteroSonidoHL = PunteroSonidoHL + 2
+                If LeerBitByte(NotaC, 7) = True Then
+                    '11B7
+                    'si el bit 7 del primer byte = 1, se activa el generador de ruido
+                    'se lee el periodo del generador de ruido y se guarda
+                    TablaDatosSonidos_0F96(&HF9C - &H0F96) = LeerByteTablaSonidos(PunteroSonidoHL)
+                    'activa los bits 1 y 3 (generador de ruido y actualización de periodo de ruido)
+                    SetBitArray(TablaDatosSonidos_0F96, PunteroCanalIX + &H0E - &H0F96, 1)
+                    SetBitArray(TablaDatosSonidos_0F96, PunteroCanalIX + &H0E - &H0F96, 3)
+                    PunteroSonidoHL = PunteroSonidoHL + 1
+                End If
+                '11C4
+                'pone el volumen del canal a 0
+                TablaDatosSonidos_0F96(PunteroCanalIX + &H07 - &H0F96) = 0
+                'guarda la dirección actual de notas
+                Escribir16(TablaDatosSonidos_0F96, PunteroCanalIX + &H00 - &H0F96, PunteroSonidoHL)
+                'activa el bit 7 por si se el byte uno no contiene una nota
+                SetBitArray(TablaDatosSonidos_0F96, PunteroCanalIX + &H0E - &H0F96, 7)
+                '11D2
+                'si el byte leido & 0x0f = 0x0f, sale
+                ValorA = NotaC And &H0F
+                If ValorA = &H0F Then Exit Sub
+                '11D8
+                'desactiva el bit 7 de 0x0e
+                ClearBitArray(TablaDatosSonidos_0F96, PunteroCanalIX + &H0E - &H0F96, 7)
+                '11DC
+                'si se llega hasta aquí, en a hay una nota de la escala cromática
+                'ajusta entrada en tabla de tonos de las notas
+                'de = tono de la nota
+                PunteroSonidoDE = Leer16(TablaDatosSonidos_0F96, &H0FE5 + 2 * ValorA - &H0F96)
+                'se queda con los 4 bits más significativos del primer byte leido
+                ValorA = NotaC >> 4
+                'obtiene la octava de la nota
+                ValorA = ValorA And &H07
+                'hl = hl / (2 ^ a) (ajusta el tono de la octava)
+                PunteroSonidoHL = PunteroSonidoDE >> ValorA
+                '11F1
+                'guarda el resultado
+                Escribir16(TablaDatosSonidos_0F96, PunteroCanalIX + &H03 - &H0F96, PunteroSonidoHL)
+            End If
+        End If
+        '11F7
+        'sale si lo que leyó no era una nota
+        If LeerBitArray(TablaDatosSonidos_0F96, PunteroCanalIX + &H0E - &H0F96, 7) <> 0 Then Exit Sub
+        'sale si no hay que actualizar envolventes ni el volumen
+        If LeerBitArray(TablaDatosSonidos_0F96, PunteroCanalIX + &H0E - &H0F96, 2) <> 0 Then Exit Sub
+        '1201
+        'actualiza unos registros (comprueba si hay que actualizar la generación de envolventes y el volumen)
+        ActualizarEnvolventeVolumen_1275(PunteroCanalIX)
+        'decrementa el contador y si no es 0, sale
+        DecByteArray(TablaDatosSonidos_0F96, PunteroCanalIX + &H11 - &H0F96)
+        If TablaDatosSonidos_0F96(PunteroCanalIX + &H11 - &H0F96) <> 0 Then Exit Sub
+        '1208
+        DecByteArray(TablaDatosSonidos_0F96, PunteroCanalIX + &H08 - &H0F96)
+        If TablaDatosSonidos_0F96(PunteroCanalIX + &H08 - &H0F96) = 0 Then
+            'actualiza unos registros (comprueba si hay que actualizar el tono base de las notas)
+            ActualizarTono_1231(PunteroCanalIX)
+        End If
+        '120E
+        'reinicia  los contadores
+        TablaDatosSonidos_0F96(PunteroCanalIX + &H11 - &H0F96) = TablaDatosSonidos_0F96(PunteroCanalIX + &H0F - &H0F96)
+        'obtiene la modificación del tono
+        ValorA = TablaDatosSonidos_0F96(PunteroCanalIX + &H13 - &H0F96)
+        ValorAInt = SignedByte2Int(ValorA)
+        'hl = frecuencia de la nota
+        PunteroSonidoHL = Leer16(TablaDatosSonidos_0F96, PunteroCanalIX + &H03 - &H0F96)
+        PunteroSonidoHL = PunteroSonidoHL + ValorAInt
+        'actualiza la frecuencia de la nota
+        Escribir16(TablaDatosSonidos_0F96, PunteroCanalIX + &H03 - &H0F96, PunteroSonidoHL)
+        'indica que hay que cambiar la frecuencia del PSG
+        SetBitArray(TablaDatosSonidos_0F96, PunteroCanalIX + &H0E - &H0F96, 6)
+    End Sub
+
+    Public Sub ActualizarSonidos_1060()
+        'actualiza la música si fuera necesario
+        Dim ValorA As Byte
+        'si ninguna de las 3 entradas tenían activo el bit 0, finaliza la interrupcion
+        If ((TablaDatosSonidos_0F96(&H0FAE - &H0F96) Or TablaDatosSonidos_0F96(&H0FC6 - &H0F96) Or TablaDatosSonidos_0F96(&H0FDE - &H0F96)) And &H01) = False Then Exit Sub
+        '1079
+        'rutina que actualiza la música (según valga 0x0f98, el tempo es mayor o menor)
+        ValorA = TablaDatosSonidos_0F96(&H0F98 - &H0F96)
+        'decrementa el tempo de la música, pero lo mantiene entre 0 y [0x1086]
+        If ValorA = 0 Then
+            ValorA = TempoMusica_1086
+        Else
+            ValorA = ValorA - 1
+        End If
+        TablaDatosSonidos_0F96(&H0F98 - &H0F96) = ValorA
+        '108A
+        'activa los tonos y el generador de ruido para todos los canales
+        TablaDatosSonidos_0F96(&H0F96 - &H0F96) = &H3F
+        'procesa la primera entrada de sonido
+        ProcesarCanalSonido_114C(&H0FA0)
+        'procesa la segunda entrada de sonido
+        ProcesarCanalSonido_114C(&H0FB8)
+        'procesa la tercera entrada de sonido
+        ProcesarCanalSonido_114C(&H0FD0)
+        '10A4
+        'escribe los datos del canal 0 en el PSG
+        EscribirDatosSonido_10D0(&H0FA0)
+        'escribe los datos del canal 1 en el PSG
+        EscribirDatosSonido_10D0(&H0FB8)
+        'escribe los datos del canal 2 en el PSG
+        EscribirDatosSonido_10D0(&H0FD0)
+        '10B9
+        'si la máscara no ha cambiado, sale
+        If TablaDatosSonidos_0F96(&H0F96 - &H0F96) = TablaDatosSonidos_0F96(&H0F97 - &H0F96) Then Exit Sub
+        '10C0
+        'si la máscara ha cambiado, fija el estado de los canales
+        'copia la máscara para evitar fijar el estado si no hay modificaciones
+        TablaDatosSonidos_0F96(&H0F97 - &H0F96) = TablaDatosSonidos_0F96(&H0F96 - &H0F96)
+        'escribe en el PSG en qué canales están activos los tonos y el generador de ruido
+        EscribirRegistroValorPSG_134E(7, TablaDatosSonidos_0F96(&H0F96 - &H0F96))
+    End Sub
+
+    Public Sub Interrupcion_2D48()
+        'no usar.sustituida por tm_tick
+    End Sub
+
+    Public Sub ReproducirSonidoMelodia_1007()
+        'apunta al registro de control del canal 3
+        If TablaDatosSonidos_0F96(&H0FD0 + &H0E - &H0F96) <> 0 Then Exit Sub
+        IniciarCanal_104F(&H0FD0, &H13FE)
+    End Sub
+
+
+    Public Sub ReproducirSonidoPuertaSeverino_102A()
+        IniciarCanal_104F(&H0FB8, &H1550)
+    End Sub
+
+    Public Sub ReproducirSonidoAbrir_101B()
+        'sonido ??? por el canal 2
+        'apunta a la entrada 2
+        IniciarCanal_104F(&H0FB8, &H14E7)
+    End Sub
+
+    Public Sub ReproducirSonidoCerrar_1016()
+        'sonido ??? por el canal 2
+        'apunta a la entrada 2
+        IniciarCanal_104F(&H0FB8, &H1560)
+    End Sub
+
+    Public Sub ReproducirSonidoCampanas_100C()
+        'sonido ??? por el canal 1
+        IniciarCanal_104F(&H0FA0, &H14F3)
+    End Sub
+
+    Public Sub ReproducirSonidoCampanillas_1011()
+        'sonido de campanas después de la espiral cuadrada por el canal 1
+        IniciarCanal_104F(&H0FA0, &H14BA)
+    End Sub
+
+    Public Sub ReproducirSonidoCoger_1025()
+        IniciarCanal_104F(&H0FB8, &H149F)
+    End Sub
+
+    Public Sub ReproducirSonidoDejar_102F()
+        IniciarCanal_104F(&H0FB8, &H14A8)
+    End Sub
+
+    Public Sub ReproducirSonidoCogerDejar_5088(ByVal ObjetosAntesA As Byte, ByVal ObjetosDespuesC As Byte)
+        If ((ObjetosAntesA Xor ObjetosDespuesC) And ObjetosDespuesC) = 0 Then
+            'se ha dejado un objeto
+            ReproducirSonidoDejar_102F()
+        Else
+            'se ha cogido un objeto
+            ReproducirSonidoCoger_1025()
+        End If
+    End Sub
+
+    Public Sub ReproducirPasos_1002()
+        'sonido de guillermo moviéndose por el canal 3
+        IniciarCanal_104F(&H0FD0, &H1496)
+    End Sub
+
+    Public Sub ReproducirSonidoAbrirEspejoCanal1_0FFD()
+        'sonido ??? por el canal 1
+        IniciarCanal_104F(&H0FA0, &H1480)
+    End Sub
+
+    Public Sub ReproducirSonidoVoz_1020()
+        'apunta a los datos de inicialización y al canal 3
+        IniciarCanal_104F(&H0FD0, &H14B1)
+    End Sub
+
+    Public Sub ReproducirSonidoPergamino()
+        IniciarCanal_104F(&H0FA0, &H8000) ' inicializa la tabla del sonido y habilita las interrupciones
+    End Sub
+
+    Public Sub ReproducirSonidoPergaminoFinal()
+        'los datos del pergamino inicial y final tienen la misma dirección pero están en 
+        'distintos bancos de memoria. Como del manuscrito final no se va a ningún otro
+        'sitio, se sobreescriben los datos del manuscrito inicial
+        Dim Contador As Integer
+        For Contador = &H000 To &H2FF
+            TablaMusicaPergamino_8000(Contador) = TablaDatosPergaminoFinal_8000(Contador)
+        Next
+        IniciarCanal_104F(&H0FA0, &H8000)
+    End Sub
+
+
+    Public Sub ApagarSonido_1376()
+        'para la generación de sonido
+        TablaDatosSonidos_0F96(&H0FAE - &H0F96) = &H84
+        TablaDatosSonidos_0F96(&H0FC6 - &H0F96) = &H84
+        TablaDatosSonidos_0F96(&H0FDE - &H0F96) = &H84
+        '0011 1111 (apaga los 3 canales de sonido), registro 7 (PSG enable)
+        EscribirRegistroValorPSG_134E(7, &H3F)
+    End Sub
+
+    Public Sub TareaSonido()
+        TareaSonidoActiva = True
+        Do
+            If ContadorInterrupcion_2D4B = &HFF Then
+                ContadorInterrupcion_2D4B = 0
+            Else
+                ContadorInterrupcion_2D4B = ContadorInterrupcion_2D4B + 1
+            End If
+            ActualizarSonidos_1060()
+            If CancelarTareaSonido Then Exit Do
+            Sleep(2)
+        Loop
+        TareaSonidoActiva = False
+    End Sub
+
+    Public Sub ArrancarTareaSonido()
+        CancelarTareaSonido = False
+        Thread1 = New System.Threading.Thread(AddressOf TareaSonido)
+        Thread1.Start()
+    End Sub
+
+    Public Sub PararTareaSonido()
+        CancelarTareaSonido = True
+        Do
+            Application.DoEvents()
+            If TareaSonidoActiva = False Then Exit Do
+            Sleep(1)
+        Loop
+    End Sub
+
+    Public Sub ComprobarEfectoEspejo_5374()
+        'si el espejo no está abierto, realiza el efecto del espejo
+        Dim PersonajeIY As Integer
+        Dim SpriteIX As Integer
+        Dim BufferFlipHL As Integer
+        Dim AnimacionDE As Integer
+        Dim VariablesEspejoBC As Integer
+        'lee si está abierta la habitación secreta del espejo
+        If Not HabitacionEspejoCerrada_2D8C Then Exit Sub 'si está abierta, sale
+        '5379
+        'apunta a las características de guillermo
+        PersonajeIY = &H3036
+        'apunta al sprite del abad
+        SpriteIX = &H2E53
+        'apunta a un buffer para flipear los gráficos
+        BufferFlipHL = &H9ADC
+        'apunta a la tabla de animaciones de guillermo
+        AnimacionDE = &H319F
+        'apunta a un buffer con variables del espejo
+        VariablesEspejoBC = &H2D8D
+        'hace el efecto del espejo en la habitación del espejo para guillermo
+        HacerEfectoEspejo_539E(PersonajeIY, SpriteIX, BufferFlipHL, AnimacionDE, VariablesEspejoBC)
+        'apunta a un buffer con variables del espejo
+        VariablesEspejoBC = &H2D92
+        'apunta a un buffer para flipear los gráficos
+        BufferFlipHL = &H9BD6
+        'apunta a la tabla de animaciones de adso
+        AnimacionDE = &H31BF
+        'apunta a las características de adso
+        PersonajeIY = &H3045
+        'apunta al sprite de berengario
+        SpriteIX = &H2E67
+        'hace el efecto del espejo en la habitación del espejo para adso
+        HacerEfectoEspejo_539E(PersonajeIY, SpriteIX, BufferFlipHL, AnimacionDE, VariablesEspejoBC)
+    End Sub
+
+    Public Sub HacerEfectoEspejo_539E(ByVal PersonajeIY As Integer, ByVal SpriteIX As Integer, ByVal BufferFlipHL As Integer, ByVal AnimacionDE As Integer, ByVal VariablesEspejoBC As Integer)
+        'hace el efecto del espejo en la habitación del espejo para el personaje indicado
+        'iy apunta a los datos de posición del personaje
+        'ix apunta a un sprite
+        'hl apunta a un buffer para flipear los gráficos
+        'de apunta a la tabla de animaciones del personaje
+        'bc apunta a un buffer con las variables del espejo
+        Dim VisibilidadL As Byte
+        'hace el efecto del espejo en la habitación del espejo
+        VisibilidadL = HacerEfectoEspejo_53AD(PersonajeIY, SpriteIX, BufferFlipHL, AnimacionDE, VariablesEspejoBC)
+        'graba el estado de visibilidad del sprite
+        TablaVariablesEspejo_2D8D(VariablesEspejoBC - &H2D8D) = VisibilidadL
+        'si el sprite es visible, sale
+        If VisibilidadL <> &HFE Then Exit Sub
+        '53A8
+        'indica que el sprite es de un monje
+        ClearBitArray(TablaSprites_2E17, SpriteIX + &H0B - &H2E17, 7)
+    End Sub
+
+    Public Function HacerEfectoEspejo_53AD(ByVal PersonajeIY As Integer, ByVal SpriteIX As Integer, ByVal BufferFlipHL As Integer, ByVal AnimacionDE As Integer, ByVal VariablesEspejoBC As Integer) As Byte
+        'si el personaje está frente al espejo, rellena el sprite que se le pasa en ix para realizar el efecto del espejo
+        'iy apunta a los datos de posición del personaje
+        'ix apunta a un sprite
+        'hl apunta a un buffer para flipear los gráficos
+        'de apunta a la tabla de animaciones del personaje
+        'bc apunta a un buffer con las variables del espejo
+        Dim EstadoAnterior_5453 As Byte
+        Dim AlturaA As Byte
+        Dim AlturaPlantaB As Byte
+        Dim PosicionX As Byte
+        Dim PosicionY As Byte
+        Dim OrientacionC As Byte
+        Dim AnimacionA As Byte
+        Dim EstadoSpriteA As Byte
+        Dim VariableEspejoAnteriorHL As Integer
+        Dim VariableEspejoAnteriorDE As Integer
+        'guarda la dirección del buffer para flipear los sprites del espejo
+        PunteroEspejo_5483 = BufferFlipHL
+        'indica que inicialmente el sprite no es visible
+        HacerEfectoEspejo_53AD = &HFE
+        'si no está en la habitación del espejo, sale
+        If MinimaPosicionXVisible_27A9 <> &H1C Then Exit Function
+        '53B8
+        'si no está en la habitación del espejo, sale
+        If MinimaPosicionYVisible_279D <> &H5C Then Exit Function
+        '53BE
+        'obtiene el estado anterior del sprite
+        EstadoAnterior_5453 = TablaVariablesEspejo_2D8D(VariablesEspejoBC - &H2D8D)
+        '53C2
+        '5444=bc+1
+        '544C=bc+1
+        VariableEspejoAnteriorHL = Leer16(TablaVariablesEspejo_2D8D, VariablesEspejoBC + 1 - &H2D8D)
+        '53CB
+        '5448=bc+3
+        '5450=bc+3
+        VariableEspejoAnteriorDE = Leer16(TablaVariablesEspejo_2D8D, VariablesEspejoBC + 3 - &H2D8D)
+        'a = altura del personaje
+        AlturaA = TablaCaracteristicasPersonajes_3036(PersonajeIY + &H04 - &H3036)
+        'dependiendo de la altura, devuelve la altura base de la planta en b
+        AlturaPlantaB = LeerAlturaBasePlanta_2473(AlturaA)
+        'si la altura sobre la base de la planta es >= 0x08, sale
+        If (AlturaA - AlturaPlantaB) >= 8 Then Exit Function
+        '53DF
+        'si no está en la segunda planta, sale
+        If AlturaPlantaB <> &H16 Then Exit Function
+        '53E3
+        'a = posición x del personaje
+        PosicionX = TablaCaracteristicasPersonajes_3036(PersonajeIY + &H02 - &H3036)
+        'si no está en la zona visible del espejo en x, sale
+        If PosicionX < &H20 Or (PosicionX - &H20) >= &H0A Then Exit Function
+        '53ED
+        PosicionY = TablaCaracteristicasPersonajes_3036(PersonajeIY + &H03 - &H3036)
+        'si no está en la zona visible del espejo en y, sale
+        If PosicionY < &H62 Or (PosicionY - &H62) >= &H0A Then Exit Function
+        '53F6
+        'c = orientación del personaje
+        OrientacionC = TablaCaracteristicasPersonajes_3036(PersonajeIY + &H01 - &H3036)
+        'a = animación del personaje
+        AnimacionA = TablaCaracteristicasPersonajes_3036(PersonajeIY + &H00 - &H3036)
+        'invierte la animación
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + &H00 - &H3036) = AnimacionA Xor &H02
+        '5402
+        'refleja la posición x con respecto al espejo
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + &H02 - &H3036) = &H21 - PosicionX + &H21
+        '540D
+        'refleja la orientación del personaje
+        If LeerBitByte(OrientacionC, 0) = 0 Then
+            TablaCaracteristicasPersonajes_3036(PersonajeIY + &H01 - &H3036) = OrientacionC Xor &H02
+        End If
+        '5417
+        'si el personaje ocupa 2 posiciones
+        If LeerBitArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + &H05 - &H3036, 7) <> 0 Then
+            'decrementa la posición en x
+            DecByteArray(TablaCaracteristicasPersonajes_3036, PersonajeIY + &H02 - &H3036)
+        End If
+        '5420
+        'modifica la dirección de la rutina encargada de flipear los gráficos
+        PunteroRutinaFlipPersonaje_2A59 = &H5473
+        'modifica la tabla de animaciones del personaje
+        PunteroTablaAnimacionesPersonaje_2A84 = AnimacionDE
+        'indica que no es un monje
+        SetBitArray(TablaSprites_2E17, SpriteIX + &H0B - &H2E17, 7)
+        '542E
+        'lee y preserva el estado del sprite
+        EstadoSpriteA = TablaSprites_2E17(SpriteIX + &H00 - &H2E17)
+        'avanza la animación del sprite y lo redibuja
+        AvanzarAnimacionSprite_2A27(SpriteIX, PersonajeIY)
+        '5436
+        'lee la posición del sprite y actualiza las variables del espejo
+        TablaVariablesEspejo_2D8D(VariablesEspejoBC + 1 - &H2D8D) = TablaSprites_2E17(SpriteIX + &H01 - &H2E17)
+        TablaVariablesEspejo_2D8D(VariablesEspejoBC + 2 - &H2D8D) = TablaSprites_2E17(SpriteIX + &H02 - &H2E17)
+        'lee el ancho y el alto del sprite  y actualiza las variables del espejo
+        TablaVariablesEspejo_2D8D(VariablesEspejoBC + 3 - &H2D8D) = TablaSprites_2E17(SpriteIX + &H05 - &H2E17)
+        TablaVariablesEspejo_2D8D(VariablesEspejoBC + 4 - &H2D8D) = TablaSprites_2E17(SpriteIX + &H06 - &H2E17)
+        '5452
+        'si el sprite no es visible, no cambia los registros
+        If TablaVariablesEspejo_2D8D(VariablesEspejoBC + 0 - &H2D8D) = &HFE Then
+            'escribe la posición anterior y el anterior ancho y alto del sprite
+            TablaSprites_2E17(SpriteIX + &H03 - &H2E17) = TablaSprites_2E17(SpriteIX + &H01 - &H2E17)
+            TablaSprites_2E17(SpriteIX + &H04 - &H2E17) = TablaSprites_2E17(SpriteIX + &H02 - &H2E17)
+            TablaSprites_2E17(SpriteIX + &H09 - &H2E17) = TablaSprites_2E17(SpriteIX + &H05 - &H2E17)
+            TablaSprites_2E17(SpriteIX + &H0A - &H2E17) = TablaSprites_2E17(SpriteIX + &H06 - &H2E17)
+        Else
+            Escribir16(TablaSprites_2E17, SpriteIX + &H03 - &H2E17, VariableEspejoAnteriorHL)
+            Escribir16(TablaSprites_2E17, SpriteIX + &H09 - &H2E17, VariableEspejoAnteriorDE)
+        End If
+        '5465
+        'restaura la orientación del personaje y la posición en x
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + &H02 - &H3036) = PosicionX
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + &H01 - &H3036) = OrientacionC
+        'restaura el contador de animación del personaje
+        TablaCaracteristicasPersonajes_3036(PersonajeIY + &H00 - &H3036) = AnimacionA
+        'indica que el sprite es visible
+        HacerEfectoEspejo_53AD = 0
+    End Function
+
+    Public Sub FlipearGraficosEspejo_5473(ByVal PunteroSpriteIX As Integer)
+        'rutina encargada de flipear los gráficos
+        Dim AnchoL As Byte
+        Dim AltoH As Byte
+        Dim ContadorBC As Integer
+        Dim PunteroGraficosHL As Integer
+        Dim PunteroSpritesDE As Integer
+        'obtiene el ancho y el alto del sprite
+        AnchoL = TablaSprites_2E17(PunteroSpriteIX + 5 - &H2E17)
+        AltoH = TablaSprites_2E17(PunteroSpriteIX + 6 - &H2E17)
+        'bc = ancho*alto
+        ContadorBC = AnchoL * AltoH
+        PunteroSpritesDE = PunteroEspejo_5483
+        'hl = dirección de los gráficos del sprite
+        PunteroGraficosHL = Leer16(TablaSprites_2E17, PunteroSpriteIX + &H07 - &H2E17)
+        'pone la nueva dirección de los gráficos
+        Escribir16(TablaSprites_2E17, PunteroSpriteIX + &H07 - &H2E17, PunteroEspejo_5483)
+        'copia los gráficos al destino
+        Do
+            BufferSprites_9500(PunteroSpritesDE - &H9500) = TablaGraficosObjetos_A300(PunteroGraficosHL - &HA300)
+            PunteroSpritesDE = PunteroSpritesDE + 1
+            PunteroGraficosHL = PunteroGraficosHL + 1
+            ContadorBC = ContadorBC - 1
+            If ContadorBC = 0 Then Exit Do
+        Loop
+        'flipea los gráficos apuntados por hl según las características indicadas por bc
+        GirarGraficosRespectoX_3552(BufferSprites_9500, PunteroEspejo_5483 - &H9500, AnchoL, AltoH)
+    End Sub
+
+
+    Public Sub DibujarPergaminoFinal_3868()
+        ModPantalla.SeleccionarPaleta(0) 'pone una paleta de colores negra
+        TempoMusica_1086 = &H08 '###pendiente de ajustar bien
+        TempoMusica_1086 = &H09
+        ReproducirSonidoPergaminoFinal()
+        DibujarPergaminoIntroduccion_659D(&H8330) 'dibuja el Pergamino y cuenta la introducción. De aquí vuelve al pulsar espacio
     End Sub
 
 End Module
