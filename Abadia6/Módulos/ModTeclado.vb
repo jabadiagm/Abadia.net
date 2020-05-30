@@ -14,12 +14,12 @@ Public Enum EnumTecla
     TeclaPunto = 11
     TeclaS = 12
     TeclaN = 13
-    TeclaQ = 13
-    TeclaR = 14
+    TeclaQ = 14
+    TeclaR = 15
 End Enum
 
 Module ModTeclado
-    Const NumeroTeclas = 10
+    Const NumeroTeclas = 15
     Dim TeclasNivel(NumeroTeclas) As Boolean 'interesa su estado
     Dim TeclasFlanco(NumeroTeclas) As Boolean 'interesa su pulsación
 

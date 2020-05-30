@@ -196,21 +196,6 @@
     End Sub
 
 
-    Public Sub Refrescar2()
-        Dim nose As Graphics
-        nose = pbPantalla.CreateGraphics()
-        nose.InterpolationMode = Drawing2D.InterpolationMode.NearestNeighbor
-        nose.DrawImage(cBitmap, 0, 0, 640, 400) '1x
-        cGraphics.DrawImage(cBitmap, 0, 0, 640, 400) '1x
-        'nose.DrawImage(cBitmap, 0 - 45, 0, 1280 - 45, 800) 'pantalla completa zoom 4x
-        'nose.DrawImage(cBitmap, 56, 0, 1024, 640) 'pantalla completa 2x
-        'nose.FillRectangle(New SolidBrush(Color.Black), 0, 0, 56, 640)
-        'nose.FillRectangle(New SolidBrush(Color.Black), 1079, 0, 1135, 640)
-        'pbPantalla.Refresh ()
-        nose.Dispose()
-        'pbPantalla.Refresh()
-        'Application.DoEvents()
-    End Sub
 
     Public Sub Refrescar()
         On Error Resume Next

@@ -6,9 +6,9 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{BA29FB3E-C0E1-4F90-A501-D91B1C5B0E2E}</ProjectGuid>
     <OutputType>WinExe</OutputType>
-    <StartupObject>Abadia5.My.MyApplication</StartupObject>
-    <RootNamespace>Abadia5</RootNamespace>
-    <AssemblyName>Abadia5</AssemblyName>
+    <StartupObject>Abadia6.My.MyApplication</StartupObject>
+    <RootNamespace>Abadia6</RootNamespace>
+    <AssemblyName>Abadia6</AssemblyName>
     <FileAlignment>512</FileAlignment>
     <MyType>WindowsForms</MyType>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
@@ -22,7 +22,7 @@
     <DefineDebug>true</DefineDebug>
     <DefineTrace>true</DefineTrace>
     <OutputPath>bin\Debug\</OutputPath>
-    <DocumentationFile>Abadia5.xml</DocumentationFile>
+    <DocumentationFile>Abadia6.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
@@ -33,7 +33,7 @@
     <DefineTrace>true</DefineTrace>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
-    <DocumentationFile>Abadia5.xml</DocumentationFile>
+    <DocumentationFile>Abadia6.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
@@ -158,6 +158,7 @@
     <EmbeddedResource Include="Recursos\ABADIA6.BIN" />
     <EmbeddedResource Include="Recursos\ABADIA7.BIN" />
     <EmbeddedResource Include="Recursos\ABADIA8.BIN" />
+    <EmbeddedResource Include="Recursos\BugDejarObjeto.bin" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />

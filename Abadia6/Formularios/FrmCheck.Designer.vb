@@ -57,11 +57,11 @@ Partial Class FrmCheck
         Me.TxRutaArchivoPosiciones.Name = "TxRutaArchivoPosiciones"
         Me.TxRutaArchivoPosiciones.Size = New System.Drawing.Size(339, 20)
         Me.TxRutaArchivoPosiciones.TabIndex = 1
-        Me.TxRutaArchivoPosiciones.Text = "D:\datos\proyectos\16_Abadía\Vbasic\Abadia5\Posiciones.txt"
+        Me.TxRutaArchivoPosiciones.Text = "D:\datos\proyectos\16_Abadía\Vbasic\Abadia6\Posiciones.txt"
         '
         'Label2
         '
-        Me.Label2.AutoSize = true
+        Me.Label2.AutoSize = True
         Me.Label2.Location = New System.Drawing.Point(9, 48)
         Me.Label2.Name = "Label2"
         Me.Label2.Size = New System.Drawing.Size(81, 13)
@@ -86,7 +86,7 @@ Partial Class FrmCheck
         '
         'Label4
         '
-        Me.Label4.AutoSize = true
+        Me.Label4.AutoSize = True
         Me.Label4.Location = New System.Drawing.Point(9, 87)
         Me.Label4.Name = "Label4"
         Me.Label4.Size = New System.Drawing.Size(125, 13)
@@ -103,7 +103,7 @@ Partial Class FrmCheck
         '
         'Label5
         '
-        Me.Label5.AutoSize = true
+        Me.Label5.AutoSize = True
         Me.Label5.Location = New System.Drawing.Point(12, 126)
         Me.Label5.Name = "Label5"
         Me.Label5.Size = New System.Drawing.Size(91, 13)
@@ -120,7 +120,7 @@ Partial Class FrmCheck
         '
         'Label6
         '
-        Me.Label6.AutoSize = true
+        Me.Label6.AutoSize = True
         Me.Label6.Location = New System.Drawing.Point(12, 165)
         Me.Label6.Name = "Label6"
         Me.Label6.Size = New System.Drawing.Size(139, 13)
@@ -133,7 +133,7 @@ Partial Class FrmCheck
         Me.TxRutaCheck.Name = "TxRutaCheck"
         Me.TxRutaCheck.Size = New System.Drawing.Size(339, 20)
         Me.TxRutaCheck.TabIndex = 10
-        Me.TxRutaCheck.Text = "D:\datos\proyectos\16_Abadía\Vbasic\Abadia5\Check"
+        Me.TxRutaCheck.Text = "D:\datos\proyectos\16_Abadía\Vbasic\Abadia6\Check"
         '
         'BtGenerarModelos
         '

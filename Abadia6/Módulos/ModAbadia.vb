@@ -2,6 +2,7 @@
 Imports System.Reflection
 Module ModAbadia
     'Dim bug As Boolean
+    Dim Cronometro As New Stopwatch 'usado para las pruebas de tiempos
     Dim PilaDebug(210) As Integer
     Public WithEvents TmTick As New Timer
     Public Reloj As New Stopwatch 'reloj para retardos
@@ -15,10 +16,8 @@ Module ModAbadia
     Dim Entradas(6) As Boolean
 
     Public Depuracion As New cDepuracion
-    'tablas del juego
-    Private Parar As Boolean
     Public Parado As Boolean
-    Private Check As Boolean 'true para hacer una pasada por el bucle principal, ajustando la posición y orientación de guillermo, y guardando las tablas en disco
+    Public Check As Boolean 'true para hacer una pasada por el bucle principal, ajustando la posición y orientación de guillermo, y guardando las tablas en disco
     Private CheckPantalla As String
     Private CheckOrientacion As Byte
     Private CheckX As Byte
@@ -27,6 +26,8 @@ Module ModAbadia
     Private CheckEscaleras As Byte
     Private CheckRuta As String
 
+    'tablas del juego
+    Public TablaBugDejarObjetos_0000(&HFF) As Byte 'primeros 256 bytes del juego, usados por error en la rutina de dejar objetos
     Public TablaBufferAlturas_01C0(&H23F) As Byte '576 bytes (24x24) = (4 + 16 + 4)x2  RAM
     Public TablaPosicionesAlternativas_0593() As Byte = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, &HFF} 'buffer de posiciones alternativas. Cada posición ocupa 3 bytes: x, y, z+orientación. sin byte final  RAM
     Public TablaConexionesHabitaciones_05CD(&H12F) As Byte 'tablas con las conexiones de las habitaciones de las plantas
@@ -40,33 +41,27 @@ Module ModAbadia
     Dim TablaHabitaciones_2255(&HFF) As Byte '(realmente empieza en 0x2265 porque en Y = 0 no hay nada)
     Dim TablaAvancePersonaje4Tiles_284D(31) As Byte
     Dim TablaAvancePersonaje1Tile_286D(31) As Byte
-    Dim TablaDatosPersonajes_2BAE(&H3D) As Byte 'tabla con datos para mover los personajes
+    Dim TablaPunterosPersonajes_2BAE(&H3D) As Byte 'tabla con datos para mover los personajes
     Public BufferAuxiliar_2D68() As Byte = {&H01, &H23, &H3E, &H20, &H12, &H13, &H78, &H04, &HB9, &H38} 'buffer auxiliar con copia de los datos del personaje
     Dim TablaVariablesAuxiliares_2D8D(&H37) As Byte '2d8d-2dd8. variables auxiliares de algunas rutinas
     Public BufferAuxiliar_2DC5(&HF) As Integer 'buffer auxiliar para el cálculo de las alturas a los movimientos usado en 27cb
     Dim TablaPermisosPuertas_2DD9(18) As Byte 'copiado en 0x122-0x131. puertas a las que pueden entrar los personajes
     Dim CopiaTablaPermisosPuertas_2DD9(18) As Byte
-    Dim TablaObjetosPersonajes_2DEC(&H2A) As Byte '2dec-2e16. RAM. copiado en 0x132-0x154. objetos de los personajes
+    Public TablaObjetosPersonajes_2DEC(&H2A) As Byte '2dec-2e16. RAM. copiado en 0x132-0x154. objetos de los personajes
     Dim CopiaTablaObjetosPersonajes_2DEC(&H2A) As Byte
-    Public TablaSprites_2E17(&H1CC) As Byte 'sprites de los personajes, puertas y objetos
-    Dim TablaDatosPuertas_2FE4(&H23) As Byte 'datos de las puertas del juego. 5 bytes por entrada
+    Public TablaSprites_2E17(&H1CC) As Byte '2e17-2fe3    .sprites de los personajes, puertas y objetos
+    Dim TablaDatosPuertas_2FE4(&H23) As Byte '2fe4-3007. datos de las puertas del juego. 5 bytes por entrada
     Dim CopiaTablaDatosPuertas_2FE4(&H23) As Byte
-    Dim TablaPosicionObjetos_3008(&H2D) As Byte 'posición de los objetos del juego 5 bytes por entrada
+    Public TablaPosicionObjetos_3008(&H2D) As Byte 'posición de los objetos del juego 5 bytes por entrada
     Dim CopiaTablaPosicionObjetos_3008(&H2D) As Byte
     Public TablaCaracteristicasPersonajes_3036(&H59) As Byte
     Dim TablaPunterosCarasMonjes_3097(&H7) As Byte
     Dim TablaDesplazamientoAnimacion_309F(&HFF) As Byte 'tabla para el cálculo del desplazamiento según la animación de una entidad del juego
     Dim TablaAnimacionPersonajes_319F(&H5F) As Byte
-    Dim DatosAlturaEspejoCerrado_34DB(4) As Byte  'datos de altura si el espejo está cerrado
+    Dim DatosAlturaEspejoCerrado_34DB(4) As Byte  '34db-34df. datos de altura si el espejo está cerrado
     Public TablaSimbolos_38E2() As Byte = {&HC0, &HBF, &HBB, &HBD, &HBC}
     Dim TablaAccesoHabitaciones_3C67(&H1D) As Byte
     Public TablaVariablesLogica_3C85(&H97) As Byte '3c85-3d1c
-    'Dim TablaVariablesLogica_3C85(&H20) As Byte
-    'Dim TablaPosicionesPredefinidasMalaquias_3CA8(&H1D) As Byte
-    'Dim TablaPosicionesPredefinidasAbad_3CC6(&H20) As Byte
-    'Dim TablaPosicionesPredefinidasBerengario_3CE7(&H17) As Byte 'berengario/bernardo gui/encapuchado/jorge
-    'Dim TablaPosicionesPredefinidasSeverino_3CFF(&H11) As Byte 'severino/jorge
-    'Dim TablaPosicionesPredefinidasAdso_3D11(&HB) As Byte
     Dim TablaPunterosVariablesScript_3D1D(&H81) As Byte 'tabla de asociación de constantes a direcciones de memoria importantes para el programa (usado por el sistema de script) ROM
     Public TablaDistanciaPersonajes_3D9F(&H0F) As Byte 'tabla de valores para el computo de la distancia entre personajes, indexada según la orientación del personaje.
     Dim DatosHabitaciones_4000(&H2329) As Byte
@@ -75,7 +70,7 @@ Module ModAbadia
     Dim TablaPunterosTrajesMonjes_48C8(&H1F) As Byte
     Dim TablaPatronRellenoLuz_48E8(&H1F) As Byte
     Dim TablaAlturasPantallas_4A00(&HA1F) As Byte
-    Dim TablaEtapasDia_4F7A(&H72) As Byte '4F7A:tabla de duración de las etapas del día para cada día y periodo del día 4FA7:tabla usada para rellenar el número del día en el marcador 4FBC:tabla de los nombres de los momentos del día
+    Dim TablaEtapasDia_4F7A(&H72) As Byte '4F7A-4FEC. tabla de duración de las etapas del día para cada día y periodo del día 4FA7:tabla usada para rellenar el número del día en el marcador 4FBC:tabla de los nombres de los momentos del día
     Public TablaNotasOctavasFrases_5659(&H37) As Byte 'tabla de octavas y notas para las frases del juego. ROM
     Dim DatosMarcador_6328(&H7FF) As Byte 'datos del marcador (de 0x6328 a 0x6b27)
     Dim DatosCaracteresPergamino_6947(&H9B8) As Byte
@@ -112,7 +107,7 @@ Module ModAbadia
     Public MinimaPosicionXVisible_27A9 As Byte 'mínima posición x visible en pantalla
     Public MinimaAlturaVisible_27BA As Byte 'mínima altura visible en pantalla
     Dim EstadoGuillermo_288F As Byte
-    Dim AjustePosicionYSpriteGuillermo_28B1 As Integer
+    Dim AjustePosicionYSpriteGuillermo_28B1 As Byte
     Public PunteroRutinaFlipPersonaje_2A59 As Integer 'rutina a la que llamar si hay que flipear los gráficos
     Public PunteroTablaAnimacionesPersonaje_2A84 As Integer 'dirección de la tabla de animaciones para el personaje
     Dim LimiteInferiorVisibleX_2AE1 As Byte 'limite inferior visible de X
@@ -125,8 +120,15 @@ Module ModAbadia
     Public PosicionXPersonajeActual_2D75 As Byte 'posición en x del personaje que se muestra en pantalla
     Public PosicionYPersonajeActual_2D76 As Byte 'posición en y del personaje que se muestra en pantalla
     Public PosicionZPersonajeActual_2D77 As Byte = 0 'posición en z del personaje que se muestra en pantalla
-    Dim NumeroDia_2D80 As Byte 'número de día (del 1 al 7)
-    Dim MomentoDia_2D81 As Byte 'momento del día 0=noche, 1=prime,2=tercia,4=nona,5=vísperas,6=completas
+    Public PuertasFlipeadas_2D78 As Boolean = True 'indica si se flipearon los gráficos de las puertas
+    Dim Obsequium_2D7F As Byte = &H1F 'energía (obsequium)
+    Dim NumeroDia_2D80 As Byte = 1 'número de día (del 1 al 7)
+    Dim MomentoDia_2D81 As Byte = 4 'momento del día 0=noche, 1=prima,2=tercia,4=nona,5=vísperas,6=completas
+    Dim PunteroProximaHoraDia_2D82 As Integer = &H4FBC 'puntero a la próxima hora del día
+    Dim PunteroTablaDesplazamientoAnimacion_2D84 As Integer = &H309F 'dirección de la tabla para el cálculo del desplazamiento según la animación de una entidad del juego para la orientación de la pantalla actual
+    Public TiempoRestanteMomentoDia_2D86 As Integer = &H0DAC 'cantidad de tiempo a esperar para que avance el momento del día (siempre y cuando sea distinto de cero)
+    Dim PunteroDatosPersonajeActual_2D88 As Integer = &H3036 'puntero a los datos del personaje actual que se sigue la cámara
+    Public PunteroBufferAlturas_2D8A As Integer = &H01C0 'puntero al buffer de alturas de la pantalla actual (buffer de 576 (24*24) bytes)
     Dim HabitacionEspejoCerrada_2D8C As Boolean 'si vale true indica que no se ha abierto el espejo
     Public PunteroCaracteresPantalla_2D97 As Integer 'dirección para poner caracteres en pantalla
     Public CaracteresPendientesFrase_2D9B As Byte 'caracteres que quedan por decir en la frase actual
@@ -146,61 +148,109 @@ Module ModAbadia
     Public AlturaBasePlantaActual_2DBA As Byte 'altura base de la planta en la que está el personaje de la rejilla ###en 2af9 hay otra
     Dim NumeroRomanoHabitacionEspejo_2DBC As Byte 'si es != 0, contiene el número romano generado para el enigma de la habitación del espejo
     Dim NumeroPantallaActual_2DBD As Byte 'pantalla del personaje al que sigue la cámara
+    Public Bonus1_2DBE As Integer 'bonus conseguidos
+    Public Bonus2_2DBF As Integer 'bonus conseguidos
     Dim MovimientoRealizado_2DC1 As Boolean 'indica que ha habido movimiento
-    Public ObjetosMalaquias_2DFA As Byte
     Dim PunteroDatosAlturaHabitacionEspejo_34D9 As Integer
     Dim PunteroHabitacionEspejo_34E0 As Integer
+    '3c85-3d1c: variables usadas por la lógica
+    Public Const ObjetosGuillermo_2DEF = &H2DEF 'apunta a TablaObjetosPersonajes_2DEC
+    Const LamparaAdso_2DF3 = &H2DF3 'apunta a TablaObjetosPersonajes_2DEC. indica si adso tiene la lámpara
+    Public Const ObjetosAdso_2DF6 = &H2DF6 'apunta a TablaObjetosPersonajes_2DEC
+    Public Const ObjetosMalaquias_2DFA = &H2DFA
+    Const ObjetosMalaquias_2DFD = &H2DFD 'apunta a TablaObjetosPersonajes_2DEC
+    Const MascaraObjetosMalaquias_2DFF = &H2DFF 'apunta a TablaObjetosPersonajes_2DEC. máscara con los objetos que puede coger malaquías
+    Public Const ObjetosAbad_2E04 = &H2E04 'apunta a TablaObjetosPersonajes_2DEC
+    Const MascaraObjetosAbad_2E06 = &H2E06 'apunta a TablaObjetosPersonajes_2DEC
+    Const ObjetosBerengario_2E0B = &H2E0B 'apunta a TablaObjetosPersonajes_2DEC
+    Const MascaraObjetosBerengarioBernardo_2E0D = &H2E0D 'apunta a TablaObjetosPersonajes_2DEC. máscara con los objetos que puede coger berengario/bernardo gui
+    Const ObjetosJorge_2E13 = &H2E12 'apunta a TablaObjetosPersonajes_2DEC
+
+    Const Puerta1_2FFE = &H2FFE 'apunta a TablaDatosPuertas_2FE4. número y estado de la puerta 1 que cierra el paso al ala izquierda de la abadía
+    Const Puerta2_3003 = &H3003 'apunta a TablaDatosPuertas_2FE4. número y estado de la puerta 2 que cierra el paso al ala izquierda de la abadía
+    Const ContadorLeyendoLibroSinGuantes_3C85 = &H3C85 'contador del tiempo que está leyendo el libro sin guantes
     Const TiempoUsoLampara_3C87 = &H3C87 'contador de uso de la lámpara
     Const LamparaEncendida_3C8B = &H3C8B 'indica que la lámpara se está usando
+    Const NocheAcabandose_3C8C = &H3C8C 'si se está acabando la noche, se pone a 1. En otro caso, se pone a 0
+    Const EstadoLampara_3C8D = &H3C8D
+    Const ContadorTiempoOscuras_3C8E = &H3C8E 'contador del tiempo que pueden ir a oscuras
     Const PersonajeSeguidoPorCamara_3C8F = &H3C8F 'personaje al que sigue la cámara
+    Const EstadoPergamino_3C90 = &H3C90 '1:indica que el pergamino lo tiene el abad en su habitación o está detrás de la habitación del espejo. 0:si guillermo tiene el pergamino
     Const LamparaEnCocina_3C91 = &H3C91
+    Public Const PersonajeSeguidoPorCamaraReposo_3C92 = &H3C92 'personaje al que sigue la cámara si se está sin pulsar las teclas un rato
+    Const ContadorReposo_3C93 = &H3C93 'contador que se incrementa si no pulsamos los cursores
+    Const BerengarioChivato_3C94 = &H3C94 'indica que berengario le ha dicho al abad que guillermo ha cogido el pergamino
+    Const MomentoDiaUltimasAcciones_3C95 = &H3C95 'indica el momento del día de las últimas acciones ejecutadas
+    Public Const MonjesListos_3C96 = &H3C96 'indica si están listos para empezar la misa/la comida
     Const GuillermoMuerto_3C97 = &H3C97 '1 si guillermo está muerto
+    Const Contador_3C98 = &H3C98 'contador para usos varios
     Const ContadorRespuestaSN_3C99 = &H3C99 'contador del tiempo de respuesta de guillermo a la pregunta de adso de dormir
+    Const AvanzarMomentoDia_3C9A = &H3C9A 'indica si hay que avanzar el momento del día
+    Const GuillermoBienColocado_3C9B = &H3C9B 'indica si guillermo está en su sitio en el refectorio o en misa
     Const PersonajeNoquiereMoverse_3C9C = &H3C9C 'el personaje no tiene que ir a ninguna parte
     Const ValorAleatorio_3C9D = &H3C9D 'valor aleatorio obtenido de los movimientos de adso
-    Const DondeVaAdso_3d13 = &H3D13
-
+    Const ContadorGuillermoDesobedeciendo_3C9E = &H3C9E 'cuanto tiempo está guillermo en el scriptorium sin obedecer
+    Const JorgeOBernardoActivo_3CA1 = &H3CA1 'indica que jorge o bernardo gui están activos para la rutina de pensar de berengario
+    Const MalaquiasMuriendose_3CA2 = &H3CA2 'indica si malaquías está muerto o muriéndose
+    Const JorgeActivo_3CA3 = &H3CA3 'indica que jorge está activo para la rutina de pensar de severino
+    Const GuillermoAvisadoLibro_3CA4 = &H3CA4 'indica que Severino ha avisado a Guillermo de la presencia del libro, o que guillermo ha perdido la oportunidad por no estar el quinto día en el ala izquierda de la abadía
+    Const EstadosVarios_3CA5 = &H3CA5 'bit7: berengario no ha llegado a su puesto de trabajo. bit6:malaquías ofrece visita scriptorium. bit4:berengario ha dicho que aquí trabajan los mejores copistas de occidente.bit 3: berengario ha enseñado el sitio de venancio. bit2: severino se ha presentado. bit1: severino va a su celda.bit0: el abad ha sido advertido de que guillermo ha cogido el pergamino
+    Const PuertasAbribles_3CA6 = &H3CA6 'máscara para las puertas donde cada bit indica que puerta se comprueba si se abre
+    Const InvestigacionNoTerminada_3CA7 = &H3CA7 'si es 0, indica que se ha completado la investigación
+    Const DondeEstaMalaquias_3CA8 = &H3CA8 'a dónde ha llegado malaquías
+    Const EstadoMalaquias_3CA9 = &H3CA9 'estado de malaquías
+    Const DondeVaMalaquias_3CAA = &H3CAA 'a dónde va malaquías
+    Public Const DondeEstaAbad_3CC6 = &H3CC6 'a dónde ha llegado el abad
+    Const EstadoAbad_3CC7 = &H3CC7 'estado del abad
+    Const DondeVaAbad_3CC8 = &H3CC8 'a dónde va el abad
+    Const DondeEsta_Berengario_3CE7 = &H3CE7 'a donde ha llegado berengario
+    Const EstadoBerengario_3CE8 = &H3CE8 'estado de berengario
+    Const DondeVa_Berengario_3CE9 = &H3CE9 'a dónde va berengario
+    Const DondeEstaSeverino_3CFF = &H3CFF 'a dónde ha llegado severino
+    Const EstadoSeverino_3D00 = &H3D00 'estado de severino
+    Const DondeVaSeverino_3D01 = &H3D01 'a dónde va severino
+    Const DondeEstaAdso_3D11 = &H3D11 'a dónde ha llegado adso
+    Const EstadoAdso_3D12 = &H3D12 'estado de adso
+    Const DondeVaAdso_3D13 = &H3D13 'a dónde va adso
+    Public NumeroFrase_3F0E As Byte 'frase dependiente del estado del personaje
     Dim MalaquiasAscendiendo_4384 As Boolean 'indica que malaquías está ascendiendo mientras se está muriendo
     Public PunteroTablaConexiones_440A As Integer = &H05CD 'dirección de la tabla de conexiones de la planta en la que está el personaje
-
     Dim SpriteLuzAdsoX_4B89 As Byte 'posición x del sprite de adso dentro del tile
     Dim SpriteLuzAdsoX_4BB5 As Byte '4 - (posición x del sprite de adso & 0x03)
     Dim SpriteLuzTipoRelleno_4B6B As Byte 'bytes a rellenar (tile/ tile y medio)
     Dim SpriteLuzTipoRelleno_4BD1 As Byte 'bytes a rellenar (tile y medio / tile)
     Dim SpriteLuzFlip_4BA0 As Boolean 'true si los gráficos de adso están flipeados
-
     Dim SpritesPilaProcesados_4D85 As Boolean 'false si no ha terminado de procesar los sprites de la pila. true: limpia el bit 7 de (ix+0) del buffer de tiles (si es una posición válida del buffer)
+    Public AlturaPersonajeCoger_5167 As Byte 'altura del personaje que coge un objeto
+    Public PosicionXPersonajeCoger_516E As Byte 'posición x del personaje que coge un objeto + 2*desplazamiento en x según orientación
+    Public PosicionYPersonajeCoger_5173 As Byte 'posición y del personaje que coge un objeto + 2*desplazamiento en y según orientación
     Dim PosicionPergaminoY_680A As Integer
     Dim PosicionPergaminoX_680B As Integer
-
-    Dim PunteroPantalla As Integer 'posición actual dentro de la pantalla mientras se procesa
+    Dim PunteroPantallaGlobal As Integer 'posición actual dentro de la pantalla mientras se procesa
     Dim PunteroPilaCamino As Integer
     Dim InvertirDireccionesGeneracionBloques As Boolean
     Dim Pila(100) As Integer
     Dim PunteroPila As Integer
+    Public Pintar As Boolean
+
     Enum EnumIncremento
         IncSumarX
         IncRestarX
         IncRestarY
     End Enum
-    Public Pintar As Boolean
-    '
-    'Variables que necesitan un valor inicial
-    Dim Obsequium_2D7F As Byte
-    Dim PunteroProximaHoraDia_2D82 As Integer  'puntero a la próxima hora del día
-    Dim PunteroTablaDesplazamientoAnimacion_2D84 As Integer 'dirección de la tabla para el cálculo del desplazamiento según la animación de una entidad del juego para la orientación de la pantalla actual
-    Dim TiempoRestanteMomentoDia_2D86 As Integer 'cantidad de tiempo a esperar para que avance el momento del día (siempre y cuando sea distinto de cero)
-    Dim PunteroDatosPersonajeActual_2D88 As Integer 'puntero a los datos del personaje actual que se sigue la cámara
-    Public PunteroBufferAlturas_2D8A As Integer 'puntero al buffer de alturas de la pantalla actual (buffer de 576 (24*24) bytes)
 
-    Dim PuertasAbribles_3CA6 As Byte
-    Dim InvestigacionNoTerminada_3CA7 As Boolean
-
-    Public Sub PararAbadia()
+    Public Sub Parar()
         TmTick.Enabled = False
         Reloj.Stop()
         RelojFPS.Stop()
         Parado = True
+    End Sub
+
+    Public Sub Continuar()
+        TmTick.Enabled = True
+        Reloj.Start()
+        RelojFPS.Start()
+        Parado = False
     End Sub
 
     Public Sub CheckDefinir(ByVal NumeroPantalla As Byte, ByVal Orientacion As Byte, ByVal X As Byte, ByVal Y As Byte, ByVal Z As Byte, ByVal Escaleras As Byte, ByVal RutaCheck As String)
@@ -231,34 +281,36 @@ Module ModAbadia
         Dim Abadia6(16383) As Byte
         Dim Abadia7(16383) As Byte
         Dim Abadia8(16383) As Byte
+        Dim BugDejarObjeto(255) As Byte
         Try
             Conjunto = [Assembly].GetExecutingAssembly()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia5.ABADIA0.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.ABADIA0.BIN")
             StrArchivo.Read(Abadia0, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia5.ABADIA1.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.ABADIA1.BIN")
             StrArchivo.Read(Abadia1, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia5.ABADIA2.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.ABADIA2.BIN")
             StrArchivo.Read(Abadia2, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia5.ABADIA3.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.ABADIA3.BIN")
             StrArchivo.Read(Abadia3, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia5.ABADIA5.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.ABADIA5.BIN")
             StrArchivo.Read(Abadia5, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia5.ABADIA6.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.ABADIA6.BIN")
             StrArchivo.Read(Abadia6, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia5.ABADIA7.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.ABADIA7.BIN")
             StrArchivo.Read(Abadia7, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia5.ABADIA8.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.ABADIA8.BIN")
             StrArchivo.Read(Abadia8, 0, 16384)
             StrArchivo.Dispose()
-
-
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia6.BugDejarObjeto.bin")
+            StrArchivo.Read(BugDejarObjeto, 0, 256)
+            StrArchivo.Dispose()
         Catch ex As Exception
             MsgBox("Error accediendo a recursos")
             End
@@ -270,6 +322,7 @@ Module ModAbadia
         CargarTablaArchivo(Abadia0, TablaPresentacion_C000, 0)
         'abadia1.bin
         'CargarArchivo("D:\datos\vbasic\Abadia\Abadia2\abadia1.bin", Archivo)
+        CargarTablaArchivo(BugDejarObjeto, TablaBugDejarObjetos_0000, &H0000)
         CargarTablaArchivo(Abadia1, TablaConexionesHabitaciones_05CD, &H05CD)
         CargarTablaArchivo(Abadia1, TablaDestinos_0C8A, &H0C8A)
         CargarTablaArchivo(Abadia1, TablaTonosNotasVoces_1388, &H1388)
@@ -281,7 +334,7 @@ Module ModAbadia
 
         CargarTablaArchivo(Abadia1, TablaAvancePersonaje4Tiles_284D, &H284D)
         CargarTablaArchivo(Abadia1, TablaAvancePersonaje1Tile_286D, &H286D)
-        CargarTablaArchivo(Abadia1, TablaDatosPersonajes_2BAE, &H2BAE)
+        CargarTablaArchivo(Abadia1, TablaPunterosPersonajes_2BAE, &H2BAE)
         CargarTablaArchivo(Abadia1, TablaVariablesAuxiliares_2D8D, &H2D8D)
         CargarTablaArchivo(Abadia1, TablaPermisosPuertas_2DD9, &H2DD9)
         CargarTablaArchivo(Abadia1, TablaObjetosPersonajes_2DEC, &H2DEC)
@@ -366,11 +419,18 @@ Module ModAbadia
             ColorFondo = &HFF 'color de fondo = negro
         End If
         LimpiarRejilla_1A70(ColorFondo) 'limpia la rejilla y rellena un rectángulo de 256x160 a partir de (32, 0) con el color de fondo
-        PunteroPantalla = PunteroPantallaActual_156A + 1 'avanza el byte de longitud
+        PunteroPantallaGlobal = PunteroPantallaActual_156A + 1 'avanza el byte de longitud
         GenerarEscenario_1A0A() 'genera el escenerio y lo proyecta a la rejilla
         'si es una habitación iluminada, dibuja en pantalla el contenido de la rejilla desde el centro hacia afuera
-
-        If Not HabitacionOscura_156C Then DibujarPantalla_4EB2() 'dibuja en pantalla el contenido de la rejilla desde el centro hacia afuera
+        If Not HabitacionOscura_156C Then
+            If Not Check Then
+                DibujarPantalla_4EB2() 'dibuja en pantalla el contenido de la rejilla desde el centro hacia afuera
+            Else
+                DibujarPantalla_4EB2_anterior() 'función sin retardos
+            End If
+        Else
+            SiguienteTick(20, "BuclePrincipal_25B7_PantallaDibujada")
+        End If
     End Sub
 
     Public Sub LimpiarRejilla_1A70(ByVal ColorFondo As Byte)
@@ -385,23 +445,22 @@ Module ModAbadia
 
     Public Sub PintarAreaJuego_1A7D(ByVal ColorFondo As Byte)
         'rellena un rectángulo de 160 de alto por 256 de ancho a partir de la posición (32, 0) con ColorFondo
-        PunteroPantalla = &H8&    'posición (32, 0)
+        PunteroPantallaGlobal = &H8&    'posición (32, 0)
         For Linea = 1 To 160
             For Columna = 0 To 63 'rellena 64 bytes (256 pixels)
-                PantallaCGA(PunteroPantalla + Columna) = ColorFondo
-                PantallaCGA2PC(PunteroPantalla + Columna, ColorFondo)
+                PantallaCGA(PunteroPantallaGlobal + Columna) = ColorFondo
+                PantallaCGA2PC(PunteroPantallaGlobal + Columna, ColorFondo)
             Next
-            PunteroPantalla = DireccionSiguienteLinea_3A4D_68F2(PunteroPantalla)
+            PunteroPantallaGlobal = DireccionSiguienteLinea_3A4D_68F2(PunteroPantallaGlobal)
         Next
-        ModPantalla.Refrescar()
     End Sub
 
-    Function DireccionSiguienteLinea_3A4D_68F2(ByVal PunteroPantalla As Integer) As Integer
+    Function DireccionSiguienteLinea_3A4D_68F2(ByVal PunteroPantallaHL As Integer) As Integer
         'devuelve la dirección de la siguiente línea de pantalla
         Dim Puntero As Integer
-        Puntero = PunteroPantalla + &H800 'pasa al siguiente banco
+        Puntero = PunteroPantallaHL + &H800 'pasa al siguiente banco
         If Puntero > &H3FFF& Then
-            Puntero = PunteroPantalla And &H7FF&
+            Puntero = PunteroPantallaHL And &H7FF&
             Puntero = Puntero + &H50
         End If
         'pasa a la siguiente línea y ajusta para que esté en el rango 0xc000-0xffff
@@ -432,7 +491,7 @@ Module ModAbadia
 
         Do 'provisional
             Pintar = True
-            Bloque = DatosHabitaciones_4000(PunteroPantalla)
+            Bloque = DatosHabitaciones_4000(PunteroPantallaGlobal)
             BloqueHex = Hex$(Bloque)
             '1A0D
             If Bloque = 255 Then Exit Sub '0xff indica el fin de pantalla
@@ -440,13 +499,13 @@ Module ModAbadia
             '1A10
             PunteroCaracteristicasBloque = Leer16(TablaBloquesPantallas_156D, Bloque And &HFE&) 'desprecia el bit inferior para indexar
             '1A21
-            Byte1 = DatosHabitaciones_4000(PunteroPantalla + 1)
+            Byte1 = DatosHabitaciones_4000(PunteroPantallaGlobal + 1)
             '1A24
             X = Byte1 And &H1F 'pos en x del elemento (sistema de coordenadas del buffer de tiles)
             '1A28
             nX = ModFunciones.shr(Byte1, 5) And &H7 'longitud del elemento en x
             '1A2F
-            Byte2 = DatosHabitaciones_4000(PunteroPantalla + 2)
+            Byte2 = DatosHabitaciones_4000(PunteroPantallaGlobal + 2)
             '1A32
             Y = Byte2 And &H1F 'pos en y del elemento (sistema de coordenadas del buffer de tiles)
             '1A36
@@ -455,13 +514,13 @@ Module ModAbadia
             VariablesBloques_1FCD(&H1FDE - &H1FCD) = 0 'inicia a (0, 0) la posición del bloque en la rejilla (sistema de coordenadas local de la rejilla)
             VariablesBloques_1FCD(&H1FDF - &H1FCD) = 0 'inicia a (0, 0) la posición del bloque en la rejilla (sistema de coordenadas local de la rejilla)
             '1A47
-            PunteroPantalla = PunteroPantalla + 3
+            PunteroPantallaGlobal = PunteroPantallaGlobal + 3
             If Bloque Mod 2 = 0 Then
                 Byte3 = &HFF 'la entrada es de 3 bytes
             Else
                 '1A53
-                Byte3 = DatosHabitaciones_4000(PunteroPantalla)
-                PunteroPantalla = PunteroPantalla + 1
+                Byte3 = DatosHabitaciones_4000(PunteroPantallaGlobal)
+                PunteroPantallaGlobal = PunteroPantallaGlobal + 1
             End If
             '1A58
             VariablesBloques_1FCD(&H1FDD - &H1FCD) = Byte3
@@ -472,13 +531,9 @@ Module ModAbadia
             If salir Then Exit Sub
             Pintar = False
         Loop
-
-        Exit Sub
-        ModFunciones.GuardarArchivo("BufferTiles0", BufferTiles_8D80) '&H77f
-
     End Sub
 
-    Public Sub DibujarPantalla_4EB2()
+    Public Sub DibujarPantalla_4EB2_anterior()
         'dibuja en pantalla el contenido de la rejilla desde el centro hacia afuera
         Dim PunteroPantalla As Integer
         Dim PunteroRejilla As Integer
@@ -491,10 +546,11 @@ Module ModAbadia
         Dim DistanciaPantalla As Integer 'distancia entre elementos consecutivos en la pantalla. cambia si se dibuja en vertical o en horizontal
         PunteroPantalla = &H2A4&  '(144, 64) coordenadas de pantalla
         PunteroRejilla = &H90AA& '(7, 8) coordenadas de rejilla
-        NAbajo = 4
-        NArriba = 5
-        NDerecha = 1
-        NIzquierda = 2
+        NAbajo = 4 'inicialmente dibuja 4 posiciones verticales hacia abajo
+        NArriba = 5 'inicialmente dibuja 5 posiciones verticales hacia arriba
+        NDerecha = 1 'inicialmente dibuja 1 posición horizontal hacia la derecha
+        NIzquierda = 2 'inicialmente dibuja 2 posiciones horizontal hacia la izquierda
+        '4ECB
         Do
             If NAbajo >= 20 Then Exit Sub 'si dibuja más de 20 posiciones verticales, sale
             NTiles = NAbajo
@@ -502,28 +558,80 @@ Module ModAbadia
             DistanciaRejilla = &H60 'tamaño entre líneas de la rejilla
             DistanciaPantalla = &H50 'tamaño entre líneas en la memoria de vídeo
             DibujarTiles_4F18(NTiles, DistanciaRejilla, DistanciaPantalla, PunteroRejilla, PunteroPantalla) 'dibuja posiciones verticales de la rejilla en la memoria de video
-            ModPantalla.Refrescar()
+            'ModPantalla.Refrescar()
             NTiles = NDerecha
             NDerecha = NDerecha + 2 'en la próxima iteración dibujará 2 posiciones horizontales más hacia la derecha
             DistanciaRejilla = 6 'tamaño entre posiciones x de la rejilla
             DistanciaPantalla = 4 'tamaño entre cada 16 pixels en la memoria de video
             DibujarTiles_4F18(NTiles, DistanciaRejilla, DistanciaPantalla, PunteroRejilla, PunteroPantalla) 'dibuja posiciones horizontales de la rejilla en la memoria de video
-            ModPantalla.Refrescar()
+            'ModPantalla.Refrescar()
             NTiles = NArriba
             NArriba = NArriba + 2 'en la próxima iteración dibujará 2 posiciones verticales más hacia arriba
             DistanciaRejilla = -&H60 'valor para volver a la línea anterior de la rejilla
             DistanciaPantalla = -&H50 'valor para volver a la línea anterior de la pantalla
             DibujarTiles_4F18(NTiles, DistanciaRejilla, DistanciaPantalla, PunteroRejilla, PunteroPantalla) 'dibuja  posiciones verticales de la rejilla en la memoria de video
-            ModPantalla.Refrescar()
+            'ModPantalla.Refrescar()
             NTiles = NIzquierda
             NIzquierda = NIzquierda + 2 'en la próxima iteración dibujará 2 posiciones horizontales más hacia la izquierda
             DistanciaRejilla = -6 'valor para volver a la anterior posicion x de la rejilla
             DistanciaPantalla = -4 'valor para volver a la anterior posicion x de la pantalla
             DibujarTiles_4F18(NTiles, DistanciaRejilla, DistanciaPantalla, PunteroRejilla, PunteroPantalla) ' dibuja posiciones horizontales de la rejilla en la memoria de video
-            ModPantalla.Refrescar()
-            If Not Depuracion.QuitarRetardos Then Retardo(10)
+            'ModPantalla.Refrescar()
         Loop 'repite hasta que se termine
 
+    End Sub
+
+    Public Sub DibujarPantalla_4EB2()
+        'dibuja en pantalla el contenido de la rejilla desde el centro hacia afuera
+        Static PunteroPantalla As Integer
+        Static PunteroRejilla As Integer
+        Static NAbajo As Integer 'nº de posiciones a dibujar hacia abajo
+        Static NArriba As Integer 'nº de posiciones a dibujar hacia arriba
+        Static NDerecha As Integer 'nº de posiciones a dibujar hacia la derecha
+        Static NIzquierda As Integer  'nº de posiciones a dibujar hacia la izquierda
+        Dim NTiles As Integer 'nº de posiciones a dibujar
+        Dim DistanciaRejilla As Integer 'distancia entre elementos consecutivos en la rejilla. cambia si se dibuja en vertical o en horizontal
+        Dim DistanciaPantalla As Integer 'distancia entre elementos consecutivos en la pantalla. cambia si se dibuja en vertical o en horizontal
+        Static Estado As Byte = 0
+        Select Case Estado
+            Case = 0
+                PunteroPantalla = &H2A4&  '(144, 64) coordenadas de pantalla
+                PunteroRejilla = &H90AA& '(7, 8) coordenadas de rejilla
+                NAbajo = 4 'inicialmente dibuja 4 posiciones verticales hacia abajo
+                NArriba = 5 'inicialmente dibuja 5 posiciones verticales hacia arriba
+                NDerecha = 1 'inicialmente dibuja 1 posición horizontal hacia la derecha
+                NIzquierda = 2 'inicialmente dibuja 2 posiciones horizontal hacia la izquierda
+                Estado = 1
+                DibujarPantalla_4EB2()
+            Case = 1
+                '4ECB
+                If NAbajo >= 20 Then 'si dibuja más de 20 posiciones verticales, sale
+                    Estado = 0
+                    SiguienteTick(20, "BuclePrincipal_25B7_PantallaDibujada")
+                    Exit Sub
+                End If
+                NTiles = NAbajo
+                NAbajo = NAbajo + 2 'en la próxima iteración dibujará 2 posiciones verticales más hacia abajo
+                DistanciaRejilla = &H60 'tamaño entre líneas de la rejilla
+                DistanciaPantalla = &H50 'tamaño entre líneas en la memoria de vídeo
+                DibujarTiles_4F18(NTiles, DistanciaRejilla, DistanciaPantalla, PunteroRejilla, PunteroPantalla) 'dibuja posiciones verticales de la rejilla en la memoria de video
+                NTiles = NDerecha
+                NDerecha = NDerecha + 2 'en la próxima iteración dibujará 2 posiciones horizontales más hacia la derecha
+                DistanciaRejilla = 6 'tamaño entre posiciones x de la rejilla
+                DistanciaPantalla = 4 'tamaño entre cada 16 pixels en la memoria de video
+                DibujarTiles_4F18(NTiles, DistanciaRejilla, DistanciaPantalla, PunteroRejilla, PunteroPantalla) 'dibuja posiciones horizontales de la rejilla en la memoria de video
+                NTiles = NArriba
+                NArriba = NArriba + 2 'en la próxima iteración dibujará 2 posiciones verticales más hacia arriba
+                DistanciaRejilla = -&H60 'valor para volver a la línea anterior de la rejilla
+                DistanciaPantalla = -&H50 'valor para volver a la línea anterior de la pantalla
+                DibujarTiles_4F18(NTiles, DistanciaRejilla, DistanciaPantalla, PunteroRejilla, PunteroPantalla) 'dibuja  posiciones verticales de la rejilla en la memoria de video
+                NTiles = NIzquierda
+                NIzquierda = NIzquierda + 2 'en la próxima iteración dibujará 2 posiciones horizontales más hacia la izquierda
+                DistanciaRejilla = -6 'valor para volver a la anterior posicion x de la rejilla
+                DistanciaPantalla = -4 'valor para volver a la anterior posicion x de la pantalla
+                DibujarTiles_4F18(NTiles, DistanciaRejilla, DistanciaPantalla, PunteroRejilla, PunteroPantalla) ' dibuja posiciones horizontales de la rejilla en la memoria de video
+                SiguienteTick(20, "DibujarPantalla_4EB2") 'repite hasta que se termine
+        End Select
     End Sub
 
     Sub DibujarTiles_4F18(ByVal NTiles As Integer, ByVal DistanciaRejilla As Integer, ByVal DistanciaPantalla As Integer, ByRef PunteroRejilla As Integer, ByRef PunteroPantalla As Integer)
@@ -871,8 +979,6 @@ Module ModAbadia
         Dim PunteroRutinasBloqueAnterior As Integer
         Dim Valor As Integer
         Dim Altura As Byte
-
-        'On Error Resume Next
 
         PunteroRutinasBloqueAnterior = PunteroRutinasBloque + 2 'dirección para continuar con el proceso
         PunteroCaracteristicasBloque = Leer16(TablaCaracteristicasMaterial_1693, PunteroRutinasBloque - &H1693)
@@ -1322,15 +1428,16 @@ Module ModAbadia
     End Sub
 
     Public Sub InicializarJuego_249A()
-        Depuracion.Init()
-
-
+        If Not Check Then
+            Depuracion.Init()
+        Else
+            Depuracion.Check()
+        End If
         'inicio real del programa
         DeshabilitarInterrupcion()
         CargarDatos()
-
         If Not Check Then
-            TmTick.Interval = 20
+            TmTick.Interval = 20 'aprox. 30.9ms el ciclo real
             TmTick.Enabled = True
             Reloj.Start()
             RelojFPS.Start()
@@ -1342,7 +1449,6 @@ Module ModAbadia
             SiguienteTick(5000, "BuclePrincipal_25B7")
             InicializarJuego_249A_b()
         End If
-
     End Sub
 
     Public Sub InicializarJuego_249A_b()
@@ -1351,6 +1457,7 @@ Module ModAbadia
         'ModPantalla.SeleccionarPaleta(2)
         If Not Inicializado_00FE Or Check = True Then 'comprueba si es la primera vez que llega aquí
             Inicializado_00FE = True
+            ModTeclado.Inicializar()
             ModPantalla.DefinirModo(1) 'fija el modo 0 (320x200 4 colores)
             ModPantalla.SeleccionarPaleta(0) 'pone una paleta de colores negra
             'InicializarInterrupcion 'coloca el código a ejecutar al producirse una interrupción ###pendiente
@@ -1424,7 +1531,6 @@ Module ModAbadia
             Next 'completa 16 bytes (64 pixels)
             Contador = DireccionSiguienteLinea_3A4D_68F2(Contador) 'pasa a la siguiente línea de pantalla
         Next 'repite para 200 lineas
-        ModPantalla.Refrescar()
         'limpia las 8 líneas de debajo de la pantalla
         Contador = &H780  'apunta a una línea (la octava empezando por abajo)
         For Linea = 0 To 7 'repetir para 8 líneas
@@ -1434,14 +1540,14 @@ Module ModAbadia
             Next
             Contador = DireccionSiguienteLinea_3A4D_68F2(Contador) 'avanza hl 0x0800 bytes y si llega al final, pasa a la siguiente línea (+0x50)
         Next
-        PunteroPantalla = CalcularDesplazamientoPantalla_68C7(32, 0) 'calcula el desplazamiento en pantalla
-        DibujarParteSuperiorInferiorPergamino_661B(PunteroPantalla, &H788A - &H788A) 'dibuja la parte superior del pergamino
-        PunteroPantalla = CalcularDesplazamientoPantalla_68C7(218, 0) 'calcula el desplazamiento en pantalla
-        DibujarParteDerechaIzquierdaPergamino_662E(PunteroPantalla, &H7A0A - &H788A) 'dibuja la parte derecha del pergamino
-        PunteroPantalla = CalcularDesplazamientoPantalla_68C7(32, 0) 'calcula el desplazamiento en pantalla
-        DibujarParteDerechaIzquierdaPergamino_662E(PunteroPantalla, &H7B8A - &H788A) 'dibuja la parte derecha del pergamino
-        PunteroPantalla = CalcularDesplazamientoPantalla_68C7(32, 184) 'calcula el desplazamiento en pantalla
-        DibujarParteSuperiorInferiorPergamino_661B(PunteroPantalla, &H7D0A - &H788A) 'dibuja la parte superior del pergamino
+        PunteroPantallaGlobal = CalcularDesplazamientoPantalla_68C7(32, 0) 'calcula el desplazamiento en pantalla
+        DibujarParteSuperiorInferiorPergamino_661B(PunteroPantallaGlobal, &H788A - &H788A) 'dibuja la parte superior del pergamino
+        PunteroPantallaGlobal = CalcularDesplazamientoPantalla_68C7(218, 0) 'calcula el desplazamiento en pantalla
+        DibujarParteDerechaIzquierdaPergamino_662E(PunteroPantallaGlobal, &H7A0A - &H788A) 'dibuja la parte derecha del pergamino
+        PunteroPantallaGlobal = CalcularDesplazamientoPantalla_68C7(32, 0) 'calcula el desplazamiento en pantalla
+        DibujarParteDerechaIzquierdaPergamino_662E(PunteroPantallaGlobal, &H7B8A - &H788A) 'dibuja la parte derecha del pergamino
+        PunteroPantallaGlobal = CalcularDesplazamientoPantalla_68C7(32, 184) 'calcula el desplazamiento en pantalla
+        DibujarParteSuperiorInferiorPergamino_661B(PunteroPantallaGlobal, &H7D0A - &H788A) 'dibuja la parte superior del pergamino
 
     End Sub
 
@@ -1493,45 +1599,7 @@ Module ModAbadia
     End Sub
 
 
-    Sub DibujarTextosPergamino_6725_Anterior()
-        'dibuja los textos en el Pergamino mientras no se pulse el espacio
-        Dim PunteroDatosPergamino As Integer
-        Dim Caracter As Byte 'caracter a imprimir
-        Dim PosicionPergaminoY_680A As Integer
-        Dim PosicionPergaminoX_680B As Integer
-        Dim ColorLetra_67C0 As Byte
-        Dim PunteroCaracter As Integer
-        PosicionPergaminoY_680A = 16
-        PosicionPergaminoX_680B = 44
-        Do
-            'LeerEstadoTeclas_32BC ###pendiente 'lee el estado de las teclas
-            If TeclaPulsadaNivel_3482(&H2F) Then Exit Sub '###pendiente 'comprueba si se pulsó el espacio
-            Caracter = TextoPergaminoPresentacion_7300(PunteroDatosPergamino) 'lee el caracter a imprimir
-            'si ha encontrado el carácter de fin de pergamino (&H1A), espera a que se pulse espacio para terminar
-            If Caracter <> &H1A Then
-                PunteroDatosPergamino = PunteroDatosPergamino + 1 'apunta al siguiente carácter
-                Select Case Caracter
-                    Case Is = &HD 'salto de línea
-                        'ImprimirRetornoCarroPergamino_67DE(PosicionPergaminoX_680B, PosicionPergaminoY_680A)
-                    Case Is = &H20 'espacio
-                        ImprimirEspacioPergamino_67CD(&HA, PosicionPergaminoX_680B)'espera un poco y avanza la posición en 10 pixels
-                    Case Is = &HA  'avanzar una página. dibuja el triángulo
-                        'PasarPaginaPergamino_67F0(PosicionPergaminoX_680B, PosicionPergaminoY_680A)
-                    Case Else
-                        If (Caracter And &H60) = &H40 Then
-                            ColorLetra_67C0 = &HFF 'mayúsculas en rojo
-                        Else
-                            ColorLetra_67C0 = &HF 'minúsculas en negro
-                        End If
-                        PunteroCaracter = Caracter - &H20 'solo tiene caracteres a partir de 0x20
-                        PunteroCaracter = 2 * PunteroCaracter 'cada entrada ocupa 2 bytes
-                        PunteroCaracter = PunterosCaracteresPergamino_680C(PunteroCaracter) + 256 * PunterosCaracteresPergamino_680C(PunteroCaracter + 1)
-                        'DibujarCaracterPergamino_6781(Caracter, PosicionPergaminoX_680B, PosicionPergaminoY_680A, PunteroCaracter, ColorLetra_67C0)
-                End Select
-            End If
-            Application.DoEvents()
-        Loop
-    End Sub
+
 
     Sub DibujarTextosPergamino_6725()
         'dibuja los textos en el Pergamino mientras no se pulse el espacio
@@ -1590,6 +1658,7 @@ Module ModAbadia
     End Sub
 
     Sub Retardo_67C6(ByVal Ciclos As Integer)
+        'no usar!!
         'retardo hasta que Ciclos = 0x0000. Cada iteración son 32 ciclos (aprox 10 microsegundos, puesto
         'que aunque el Z80 funciona a 4 MHz, la arquitectura del CPC tiene una sincronización para los
         'el video que hace que funcione de forma efectiva entorno a los 3.2 MHz)
@@ -1600,16 +1669,6 @@ Module ModAbadia
         'Loop While Ciclos > 0
         Milisegundos = 0.01 * Ciclos
         Retardo(Milisegundos)
-    End Sub
-
-    Sub ImprimirRetornoCarroPergamino_67DE_anterior(ByRef X As Integer, ByRef Y As Integer)
-        Retardo_67C6(&HEA60&) 'espera un rato (aprox. 600 ms)
-        'calcula la posición de la siguiente línea
-        X = &H2C
-        Y = Y + &H10
-        If Y > &HA4 Then
-            'PasarPaginaPergamino_67F0(X, Y) 'se ha llegado a fin de hoja?
-        End If
     End Sub
 
     Sub ImprimirRetornoCarroPergamino_67DE()
@@ -1686,13 +1745,6 @@ Module ModAbadia
         PunteroPantalla = DireccionSiguienteLinea_3A4D_68F2(PunteroPantalla)
     End Sub
 
-    Sub PasarPaginaPergamino_67F0_anterior(ByRef X As Integer, ByRef Y As Integer)
-        X = &H2C 'reinicia la posición al principio de la línea
-        Y = &H10 'reinicia la posición al principio de la línea
-        Retardo_67C6(3 * 65536) '(aprox. 655 ms), repite 3 veces los retardos
-        PasarPaginaPergamino_6697() 'pasa de hoja
-    End Sub
-
     Sub PasarPaginaPergamino_67F0()
         Static Estado As Byte = 0
         If Estado = 0 Then
@@ -1707,53 +1759,6 @@ Module ModAbadia
         PasarPaginaPergamino_6697() 'pasa de hoja
     End Sub
 
-
-    Sub PasarPaginaPergamino_6697_anterior()
-        Dim Linea As Integer
-        Dim X As Integer
-        Dim Y As Integer
-        Dim TamañoTriangulo As Integer
-        Dim PunteroPantalla As Integer
-        Dim PunteroDatos As Integer
-        Dim Contador As Integer
-        Dim PunteroPantallaAnterior As Integer
-        X = 211 - 4 * Linea '(00, 211) -> posición de inicio
-        Y = 0
-        TamañoTriangulo = 3
-        For Linea = 0 To &H2C 'repite para 45 líneas
-            DibujarTrianguloRectanguloPergamino_6906(X, Y, TamañoTriangulo) 'dibuja un triángulo rectángulo de lado TamañoTriangulo
-            If Linea Mod 2 = 0 Then ModPantalla.Refrescar()
-            Retardo_67C6(&H7D0) 'pequeño retardo (20 ms)
-            LimpiarParteSuperiorDerechaPergamino_663E(X, Y, TamañoTriangulo)
-            X = X - 4
-            TamañoTriangulo = TamañoTriangulo + 1
-        Next
-        LimpiarParteSuperiorDerechaPergamino_663E(X, Y, TamañoTriangulo)
-        X = 32 '(32, 4) -> posición de inicio
-        Y = 4
-        TamañoTriangulo = &H2F
-        For Contador = 0 To &H2D 'repite 46 veces
-            DibujarTrianguloRectanguloPergamino_6906(X, Y, TamañoTriangulo) 'dibuja un triángulo rectángulo de lado TamañoTriangulo
-            If Contador Mod 2 = 0 Then ModPantalla.Refrescar()
-            Retardo_67C6(&H7D0) 'pequeño retardo (20 ms)
-            PunteroPantalla = CalcularDesplazamientoPantalla_68C7(X, Y) ' - 4)
-            PunteroDatos = 2 * Y + &H7B8A - &H788A 'desplazamiento de los datos borrados de la parte izquierda del pergamino
-            For Linea = 0 To 3 '4 líneas de alto
-                PantallaCGA(PunteroPantalla) = DatosGraficosPergamino_788A(PunteroDatos + 2 * Linea)
-                PantallaCGA2PC(PunteroPantalla, DatosGraficosPergamino_788A(PunteroDatos + 2 * Linea))
-                PantallaCGA(PunteroPantalla + 1) = DatosGraficosPergamino_788A(PunteroDatos + 2 * Linea + 1)
-                PantallaCGA2PC(PunteroPantalla + 1, DatosGraficosPergamino_788A(PunteroDatos + 2 * Linea + 1))
-                PunteroPantalla = DireccionSiguienteLinea_3A4D_68F2(PunteroPantalla)
-            Next
-            LimpiarParteInferiorPergamino_6705(TamañoTriangulo)
-            Y = Y + 4
-            TamañoTriangulo = TamañoTriangulo - 1
-        Next
-        LimpiarParteInferiorPergamino_6705(TamañoTriangulo)
-        LimpiarParteInferiorPergamino_6705(0)
-        ModPantalla.Refrescar()
-    End Sub
-
     Sub PasarPaginaPergamino_6697()
         Static Linea As Integer
         Static X As Integer
@@ -1765,16 +1770,15 @@ Module ModAbadia
         Static Estado As Byte = 0
         Select Case Estado
             Case = 0
-                X = 211 - 4 * Linea '(00, 211) -> posición de inicio
-                Y = 0
                 TamañoTriangulo = 3
                 Linea = 0
                 Contador = 0
+                X = 211 - 4 * Linea '(00, 211) -> posición de inicio
+                Y = 0
                 Estado = 1
                 PasarPaginaPergamino_6697()
             Case = 1
                 DibujarTrianguloRectanguloPergamino_6906(X, Y, TamañoTriangulo) 'dibuja un triángulo rectángulo de lado TamañoTriangulo
-                If Linea Mod 2 = 0 Then ModPantalla.Refrescar()
                 Estado = 2
                 SiguienteTick(20, "PasarPaginaPergamino_6697") 'pequeño retardo (20 ms)
             Case = 2
@@ -1782,7 +1786,6 @@ Module ModAbadia
                 LimpiarParteSuperiorDerechaPergamino_663E(X, Y, TamañoTriangulo)
                 X = X - 4
                 TamañoTriangulo = TamañoTriangulo + 1
-                If Linea Mod 2 = 0 Then ModPantalla.Refrescar()
                 Linea = Linea + 1
                 If Linea > &H2C Then 'repite para 45 líneas
                     Estado = 3
@@ -1800,7 +1803,6 @@ Module ModAbadia
                 PasarPaginaPergamino_6697()
             Case = 4
                 DibujarTrianguloRectanguloPergamino_6906(X, Y, TamañoTriangulo) 'dibuja un triángulo rectángulo de lado TamañoTriangulo
-                If Contador Mod 2 = 0 Then ModPantalla.Refrescar()
                 Estado = 5
                 SiguienteTick(20, "PasarPaginaPergamino_6697") 'pequeño retardo (20 ms)
             Case = 5
@@ -1826,7 +1828,6 @@ Module ModAbadia
             Case = 6
                 LimpiarParteInferiorPergamino_6705(TamañoTriangulo)
                 LimpiarParteInferiorPergamino_6705(0)
-                ModPantalla.Refrescar()
                 Estado = 0
                 SiguienteTick(20, "DibujarTextosPergamino_6725")
         End Select
@@ -1892,57 +1893,10 @@ Module ModAbadia
 
     End Sub
 
-    Sub ImprimirEspacioPergamino_67CD_anterior(ByVal Hueco As Byte, ByRef X As Integer)
-        'añade un hueco del tamaño indicado, en píxeles
-        Retardo_67C6(&HBB8) 'espera un poco (aprox. 30 ms)
-        X = X + Hueco
-    End Sub
-
     Sub ImprimirEspacioPergamino_67CD(ByVal Hueco As Byte, ByRef X As Integer)
         'añade un hueco del tamaño indicado, en píxeles
         X = X + Hueco
         SiguienteTick(30, "DibujarTextosPergamino_6725") 'espera un poco (aprox. 30 ms)
-    End Sub
-
-    Sub DibujarCaracterPergamino_6781_anterior(ByVal Caracter As Byte, ByRef X As Integer, ByRef Y As Integer, ByVal PunteroCaracter As Integer, ByVal Color As Byte)
-        'dibuja un carácter en el pergamino
-        Dim Valor As Byte 'dato del carácter
-        Dim AvanceX As Integer
-        Dim AvanceY As Integer
-        Dim PunteroPantalla As Integer
-        Dim Pixel As Integer
-        Dim InversaMascaraAND As Byte
-        Dim MascaraOr As Byte
-        Dim MascaraAnd As Byte
-        Dim PunteroHex As String
-        Dim ValorHex As String
-        Dim Contador As Integer
-        Do
-            If Not Depuracion.QuitarRetardos Then Retardo_67C6(&H320) 'pequeño retardo (aprox. 8 ms)
-            Valor = DatosCaracteresPergamino_6947(PunteroCaracter - &H6947)
-            PunteroCaracter = PunteroCaracter + 1
-            If (Valor And &HF0) = &HF0 Then 'si es el último byte del carácter
-                ImprimirEspacioPergamino_67CD(Valor And &HF, X) 'imprime un espacio y sale al bucle para imprimir más caracteres
-                Exit Sub
-            End If
-            AvanceX = Valor And &HF 'avanza la posición x según los 4 bits menos significativos del byte leido de dibujo del caracter
-            AvanceY = ModFunciones.shr(Valor, 4) And &HF& 'avanza la posición y según los 4 bits más significativos del byte leido de dibujo del caracter
-            PunteroPantalla = CalcularDesplazamientoPantalla_68C7(X + AvanceX, Y + AvanceY) 'calcula el desplazamiento de las coordenadas en pantalla
-            Pixel = (X + AvanceX) And &H3&        'se queda con los 2 bits menos significativos de la posición para saber que pixel pintar
-            MascaraAnd = ModFunciones.ror8(&H88, Pixel)
-            InversaMascaraAND = MascaraAnd Xor &HFF&
-            MascaraOr = InversaMascaraAND And PantallaCGA(PunteroPantalla) 'obtiene el valor del resto de pixels de la pantalla
-            PunteroHex = Hex$(PunteroPantalla)
-            ValorHex = Hex$((Color And MascaraAnd) Or MascaraOr)
-            PantallaCGA(PunteroPantalla) = (Color And MascaraAnd) Or MascaraOr 'combina con los pixels de pantalla. actualiza la memoria de video con el nuevo pixel
-            PantallaCGA2PC(PunteroPantalla, (Color And MascaraAnd) Or MascaraOr)
-            Contador = Contador + 1
-            If Contador > 2 Then
-                ModPantalla.Refrescar()
-                Contador = 0
-            End If
-
-        Loop
     End Sub
 
     Sub DibujarCaracterPergamino_6781(Optional ByVal PunteroCaracter_ As Integer = 0, Optional ByVal Color_ As Byte = 0)
@@ -1991,7 +1945,6 @@ Module ModAbadia
         MascaraOr = InversaMascaraAND And PantallaCGA(PunteroPantalla) 'obtiene el valor del resto de pixels de la pantalla
         PantallaCGA(PunteroPantalla) = (Color And MascaraAnd) Or MascaraOr 'combina con los pixels de pantalla. actualiza la memoria de video con el nuevo pixel
         PantallaCGA2PC(PunteroPantalla, (Color And MascaraAnd) Or MascaraOr)
-        'ModPantalla.Refrescar()
         If Estado <= 4 Or Depuracion.QuitarRetardos Then
             DibujarCaracterPergamino_6781()
         Else
@@ -2070,17 +2023,21 @@ Module ModAbadia
         Next
     End Sub
 
-    Sub InicializarPartida_2509()
-        Dim Contador As Integer
-        ModTeclado.Inicializar()
+    Public Sub InicializarPartida_2509()
         'aquí ya se ha completado la inicialización de datos para el juego
         'ahora realiza la inicialización para poder empezar a jugar una partida
         DeshabilitarInterrupcion()
         'ApagarSonido_1376 'apaga el sonido '###pendiente
         'LeerEstadoTeclas_32BC ###pendiente 'lee el estado de las teclas y lo guarda en los buffers de teclado
-        Do
-            Application.DoEvents()
-        Loop While TeclaPulsadaNivel_3482(&H2F)  'mientras no se suelte el espacio, espera
+        If TeclaPulsadaNivel_3482(&H2F) Then  'mientras no se suelte el espacio, espera
+            SiguienteTick(100, "InicializarPartida_2509")
+        Else
+            SiguienteTick(100, "InicializarPartida_2509_b")
+        End If
+    End Sub
+
+    Sub InicializarPartida_2509_b()
+        Dim Contador As Integer
         InicializarVariables_381E()
         DibujarAreaJuego_275C() 'dibuja un rectángulo de 256 de ancho en las 160 líneas superiores de pantalla
         DibujarMarcador_272C()
@@ -2123,9 +2080,9 @@ Module ModAbadia
         TeclaPulsadaNivel_3482 = ModTeclado.TeclaPulsadaNivel(TraducirCodigoTecla(CodigoTecla))
     End Function
 
-    Function TeclaPulsadaNivel_3472(ByVal CodigoTecla As Byte)
+    Function TeclaPulsadaFlanco_3472(ByVal CodigoTecla As Byte)
         'comprueba si ha sido pulsanda la tecla con el código indicado. si no ha sido pulsada o ya se ha preguntado antes, devuelve true
-        TeclaPulsadaNivel_3472 = ModTeclado.TeclaPulsadaFlanco(TraducirCodigoTecla(CodigoTecla))
+        TeclaPulsadaFlanco_3472 = ModTeclado.TeclaPulsadaFlanco(TraducirCodigoTecla(CodigoTecla))
     End Function
 
     Function TraducirCodigoTecla(ByVal CodigoTecla As Byte) As EnumTecla
@@ -2186,7 +2143,6 @@ Module ModAbadia
             If Valor = &HFF Then Exit Do
             TablaSprites_2E17(Puntero - &H2E17) = &HFE 'pone todos los sprites como no visibles
             Puntero = Puntero + Contador
-            Application.DoEvents()
         Loop
         Puntero = &H3036 'apunta a la tabla de características de los personajes
         For Contador = 0 To 5 '6 entradas
@@ -2220,9 +2176,7 @@ Module ModAbadia
                 PantallaCGA2PC(PunteroPantalla + 72 + Contador2, &HFF)
             Next
             PunteroPantalla = DireccionSiguienteLinea_3A4D_68F2(PunteroPantalla)
-            Application.DoEvents()
         Next
-        ModPantalla.Refrescar()
     End Sub
 
     Sub DibujarMarcador_272C()
@@ -2246,7 +2200,6 @@ Module ModAbadia
             Next
             PunteroPantalla = PunteroPantallaAnterior
             PunteroPantalla = PunteroPantalla + &H50
-            ModPantalla.Refrescar()
         Next
 
 
@@ -2264,9 +2217,7 @@ Module ModAbadia
         Dim Valor2 As Byte
         Dim PunteroValor1 As Integer
         Dim PunteroValor2 As Integer
-        Dim HL As String
-        HL = Hex$(PunteroTablaHL)
-        NumeroCambios = Int(AnchoC + 1) / 2
+        NumeroCambios = (AnchoC + 1) >> 1 'Int(AnchoC + 1) / 2
         For Bloque = 0 To NGraficosB - 1
             For Contador = 0 To NumeroCambios - 1
                 PunteroValor1 = PunteroTablaHL + AnchoC * Bloque + Contador 'valor por la izquierda
@@ -2298,19 +2249,21 @@ Module ModAbadia
         For Contador = 0 To 4
             TablaAlturasPantallas_4A00(PunteroDatosAlturaHabitacionEspejo_34D9 + Contador - &H4A00) = DatosAlturaEspejoCerrado_34DB(Contador)
         Next
-        EscribirValorBloqueHabitacionEspejo_336F(&H11) 'modifica la habitación del espejo para que el espejo aparezca cerrado
-        EscribirValorBloqueHabitacionEspejo_3372(&H1F) 'modifica la habitación del espejo para que la trampa esté cerrada
+        'modifica la habitación del espejo para que el espejo aparezca cerrado
+        EscribirValorBloqueHabitacionEspejo_336F(&H11)
+        'modifica la habitación del espejo para que la trampa esté cerrada
+        EscribirValorBloqueHabitacionEspejo_3372(&H1F, PunteroHabitacionEspejo_34E0 - 2)
         HabilitarInterrupcion()
     End Sub
 
     Sub EscribirValorBloqueHabitacionEspejo_336F(ByVal Valor As Byte)
         'graba el valor en el bloque que forma el espejo en la habitación el espejo
-        DatosHabitaciones_4000(PunteroHabitacionEspejo_34E0 - &H4000) = Valor
+        EscribirValorBloqueHabitacionEspejo_3372(Valor, PunteroHabitacionEspejo_34E0)
     End Sub
 
-    Sub EscribirValorBloqueHabitacionEspejo_3372(ByVal Valor As Byte)
-        'graba el valor dos posiciones antes del bloque que forma el espejo en la habitación el espejo
-        DatosHabitaciones_4000(PunteroHabitacionEspejo_34E0 - 2 - &H4000) = Valor
+    Sub EscribirValorBloqueHabitacionEspejo_3372(ByVal Valor As Byte, ByVal BloqueEspejoHL As Integer)
+        'graba el valor en el bloque que forma el espejo en la habitación el espejo
+        DatosHabitaciones_4000(BloqueEspejoHL - &H4000) = Valor
     End Sub
 
     Sub InicializarDiaMomento_54D2()
@@ -2367,8 +2320,6 @@ Module ModAbadia
 
     End Sub
 
-
-
     Sub CopiarVariables_37B6()
         CopiarTabla(TablaPermisosPuertas_2DD9, CopiaTablaPermisosPuertas_2DD9) 'puertas a las que pueden entrar los personajes
         CopiarTabla(TablaObjetosPersonajes_2DEC, CopiaTablaObjetosPersonajes_2DEC) 'objetos de los personajes
@@ -2378,8 +2329,8 @@ Module ModAbadia
     End Sub
 
     Sub RestaurarVariables_37B9()
-        PuertasAbribles_3CA6 = &HEF ' máscara para las puertas donde cada bit indica que puerta se comprueba si se abre
-        InvestigacionNoTerminada_3CA7 = True
+        TablaVariablesLogica_3C85(PuertasAbribles_3CA6 - &H3C85) = &HEF ' máscara para las puertas donde cada bit indica que puerta se comprueba si se abre
+        TablaVariablesLogica_3C85(InvestigacionNoTerminada_3CA7 - &H3C85) = 2 'no se ha completado lainvestigación
         TablaVariablesLogica_3C85(&H3CA8 - &H3C85) = &HFA 'TablaPosicionesPredefinidasMalaquias_3CA8(0) = &HFA
         TablaVariablesLogica_3C85(&H3CA8 + 1 - &H3C85) = 0 'TablaPosicionesPredefinidasMalaquias_3CA8(1) = 0
         TablaVariablesLogica_3C85(&H3CA8 + 2 - &H3C85) = 0 'TablaPosicionesPredefinidasMalaquias_3CA8(2) = 0
@@ -2392,7 +2343,7 @@ Module ModAbadia
         TablaVariablesLogica_3C85(&H3CFF - &H3C85) = &HFA 'TablaPosicionesPredefinidasSeverino_3CFF(0) = &HFA
         TablaVariablesLogica_3C85(&H3CFF + 1 - &H3C85) = 0 'TablaPosicionesPredefinidasSeverino_3CFF(1) = 0
         TablaVariablesLogica_3C85(&H3CFF + 2 - &H3C85) = 0 'TablaPosicionesPredefinidasSeverino_3CFF(2) = 0
-        TablaVariablesLogica_3C85(&H3D11 - &H3C85) = &HFA 'TablaPosicionesPredefinidasAdso_3D11(0) = &HFF
+        TablaVariablesLogica_3C85(&H3D11 - &H3C85) = &HFF 'TablaPosicionesPredefinidasAdso_3D11(0) = &HFF
         TablaVariablesLogica_3C85(&H3D11 + 1 - &H3C85) = 0 'TablaPosicionesPredefinidasAdso_3D11(1) = 0
         TablaVariablesLogica_3C85(&H3D11 + 2 - &H3C85) = 0 'TablaPosicionesPredefinidasAdso_3D11(2) = 0
         Obsequium_2D7F = &H1F
@@ -2430,12 +2381,12 @@ Module ModAbadia
 
     Sub DibujarObjetosMarcador_51D4()
         'dibuja los objetos que tiene guillermo en el marcador
-        Dim Objetos As Byte
-        Objetos = TablaObjetosPersonajes_2DEC(&H2DEF - &H2DEC) 'lee los objetos que tenemos
-        ActualizarMarcador_51DA(Objetos, &HFF) 'comprobar todos los objetos posibles. y si están, se dibujan
+        Dim ObjetosC As Byte
+        ObjetosC = TablaObjetosPersonajes_2DEC(ObjetosGuillermo_2DEF - &H2DEC) 'lee los objetos que tenemos
+        ActualizarMarcador_51DA(ObjetosC, &HFF) 'comprobar todos los objetos posibles. y si están, se dibujan
     End Sub
 
-    Sub ActualizarMarcador_51DA(ByVal Objetos As Byte, ByVal Mascara As Byte)
+    Sub ActualizarMarcador_51DA(ByVal ObjetosC As Byte, ByVal MascaraA As Byte)
         'comprueba si se tienen los objetos que se le pasan (se comprueban los indicados por la máscara), y si se tienen se dibujan
         Dim PunteroPosicionesObjetos As Integer
         Dim PunteroSpritesObjetos As Integer
@@ -2451,10 +2402,10 @@ Module ModAbadia
         PunteroSpritesObjetos = &H2F1B
         PunteroPantalla = &H6F9& 'apunta a la memoria de video del primer hueco (100, 176)
         For Contador = 1 To 6 'hay 6 huecos donde colocar los objetos
-            If Mascara = 0 Then Exit Sub 'ya no hay objetos por comprobar
-            If (Mascara And &H80) <> 0 Then 'comprobar objeto
+            If MascaraA = 0 Then Exit Sub 'ya no hay objetos por comprobar
+            If (MascaraA And &H80) <> 0 Then 'comprobar objeto
                 PunteroPantallaAnterior = PunteroPantalla
-                If (Objetos And &H80) <> 0 Then 'objeto presente. lo dibuja
+                If (ObjetosC And &H80) <> 0 Then 'objeto presente. lo dibuja
                     Alto = TablaSprites_2E17(PunteroSpritesObjetos + 6 - &H2E17) 'lee el alto del objeto
                     Ancho = TablaSprites_2E17(PunteroSpritesObjetos + 5 - &H2E17) 'lee el ancho del objeto
                     Ancho = Ancho And &H7F& 'pone a 0 el bit 7
@@ -2475,17 +2426,16 @@ Module ModAbadia
                         PunteroPantalla = DireccionSiguienteLinea_3A4D_68F2(PunteroPantalla)
                     Next
                 End If
-                ModPantalla.Refrescar()
                 PunteroPantalla = PunteroPantallaAnterior
             End If
             PunteroPantalla = PunteroPantalla + 5 'pasa al siguiente hueco
             PunteroPosicionesObjetos = PunteroPosicionesObjetos + 5 'avanza las posiciones sobre los objetos del juego
             PunteroSpritesObjetos = PunteroSpritesObjetos + &H14 'avanza a la siguiente entrada de las características del objeto
             If Contador = 3 Then PunteroPantalla = PunteroPantalla + 1 'al pasar del hueco 3 al 4 hay 4 pixels extra
-            Mascara = Mascara And &H7F
-            Mascara = Mascara * 2 'desplaza la máscara un bit hacia la izquierda
-            Objetos = Objetos And &H7F
-            Objetos = Objetos * 2 'desplaza los objetos un bit hacia la izquierda
+            MascaraA = MascaraA And &H7F
+            MascaraA = MascaraA * 2 'desplaza la máscara un bit hacia la izquierda
+            ObjetosC = ObjetosC And &H7F
+            ObjetosC = ObjetosC * 2 'desplaza los objetos un bit hacia la izquierda
         Next
     End Sub
 
@@ -2499,8 +2449,12 @@ Module ModAbadia
         PunteroDia = &H4FA7 + (Dia - 1) * 3 'indexa en la tabla de los días. ajusta el índice a 0. cada entrada en la tabla ocupa 3 bytes
         PunteroPantalla = &HEE51 - &HC000 'apunta a pantalla (68, 165)
         DibujarNumeroDia_5583(PunteroDia, PunteroPantalla) 'coloca el primer número de día en el marcador
+        ModPantalla.Refrescar()
         DibujarNumeroDia_5583(PunteroDia, PunteroPantalla) 'coloca el segundo número de día en el marcador
+        ModPantalla.Refrescar()
         DibujarNumeroDia_5583(PunteroDia, PunteroPantalla) 'coloca el tercer número de día en el marcador
+        ModPantalla.Refrescar()
+
         InicializarScrollMomentoDia_5575(0) 'pone la primera hora del día
     End Sub
 
@@ -2516,6 +2470,7 @@ Module ModAbadia
         Dim PunteroGraficos As Integer
         Dim Contador As Integer
         Dim PunteroPantallaAnterior As Integer
+
         PunteroPantallaAnterior = PunteroPantalla
         Sumar = True
         Valor = TablaEtapasDia_4F7A(PunteroDia - &H4F7A) 'lee un byte de los datos que forman el número del día
@@ -2525,16 +2480,26 @@ Module ModAbadia
             Case Is = 1
                 PunteroGraficos = &HAB39&
             Case Else
-                PunteroGraficos = &HA3BB&   'cambiado para que apunte a una zona con FF FF en TablaGraficosObjetos_A300
+                PunteroGraficos = &H5581   'apunta a pixels con colores 3, 3, 3, 3
                 Sumar = False
         End Select
         For Contador = 0 To 7 'rellena las 8 líneas que ocupa la letra (8x8)
-            PantallaCGA(PunteroPantalla) = TablaGraficosObjetos_A300(PunteroGraficos - &HA300&)
-            PantallaCGA2PC(PunteroPantalla, TablaGraficosObjetos_A300(PunteroGraficos - &HA300&))
+            If PunteroGraficos = &H5581 Then
+                PantallaCGA(PunteroPantalla) = &HFF
+                PantallaCGA2PC(PunteroPantalla, &HFF)
+            Else
+                PantallaCGA(PunteroPantalla) = TablaGraficosObjetos_A300(PunteroGraficos - &HA300&)
+                PantallaCGA2PC(PunteroPantalla, TablaGraficosObjetos_A300(PunteroGraficos - &HA300&))
+            End If
             PunteroPantalla = PunteroPantalla + 1
             PunteroGraficos = PunteroGraficos + 1
-            PantallaCGA(PunteroPantalla) = TablaGraficosObjetos_A300(PunteroGraficos - &HA300&)
-            PantallaCGA2PC(PunteroPantalla, TablaGraficosObjetos_A300(PunteroGraficos - &HA300&))
+            If PunteroGraficos = &H5582 Then
+                PantallaCGA(PunteroPantalla) = &HFF
+                PantallaCGA2PC(PunteroPantalla, &HFF)
+            Else
+                PantallaCGA(PunteroPantalla) = TablaGraficosObjetos_A300(PunteroGraficos - &HA300&)
+                PantallaCGA2PC(PunteroPantalla, TablaGraficosObjetos_A300(PunteroGraficos - &HA300&))
+            End If
             PunteroPantalla = PunteroPantalla - 1
             If Sumar Then
                 PunteroGraficos = PunteroGraficos + 1
@@ -2543,7 +2508,6 @@ Module ModAbadia
             End If
             PunteroPantalla = DireccionSiguienteLinea_3A4D_68F2(PunteroPantalla)
         Next
-        ModPantalla.Refrescar()
         PunteroPantalla = PunteroPantallaAnterior + 2
         PunteroDia = PunteroDia + 1
     End Sub
@@ -2551,8 +2515,10 @@ Module ModAbadia
     Sub ColocarDiaHora_550A()
         'pone en 0x2d86 un valor dependiente del día y la hora
         Dim PunteroDuracionEtapaDia As Integer
-        PunteroDuracionEtapaDia = &H4F7A + 7 * NumeroDia_2D80 + MomentoDia_2D81
-        TiempoRestanteMomentoDia_2D86 = Leer16(TablaEtapasDia_4F7A, PunteroDuracionEtapaDia - &H4F7A)
+        PunteroDuracionEtapaDia = &H4F7A + 7 * (NumeroDia_2D80 - 1) + MomentoDia_2D81
+        TiempoRestanteMomentoDia_2D86 = CInt(TablaEtapasDia_4F7A(PunteroDuracionEtapaDia - &H4F7A)) << 8
+        'el tiempo pasa más rápido que en eljuego original. ###pendiente ajustar mejor
+        TiempoRestanteMomentoDia_2D86 = TiempoRestanteMomentoDia_2D86 * 1.5
     End Sub
 
     Sub FijarPaletaMomentoDia_54DF()
@@ -2564,6 +2530,7 @@ Module ModAbadia
         Else
             ModPantalla.SeleccionarPaleta(3) 'paleta de noche
         End If
+        '54EE
         ActualizarDiaMarcador_5559(NumeroDia_2D80) 'dibuja el número de día en el marcador
         MomentoDia_2D81 = MomentoDia_2D81Anterior - 1 'recupera el momento del día en el que estaba
         PunteroProximaHoraDia_2D82 = &H4FBC + 7 * (MomentoDia_2D81 + 1) 'apunta al nombre del momento del día
@@ -2572,15 +2539,35 @@ Module ModAbadia
 
     Sub ActualizarMomentoDia_553E()
         'actualiza el momento del día
-        MomentoDia_2D81 = MomentoDia_2D81 + 1 'avanza la hora del día
-        If MomentoDia_2D81 = 7 Then 'si se salió de la tabla vuelve al primer momento del día
+
+
+        'prueba para evitar la deriva de severino
+        DescartarMovimientosPensados_08BE(&H3045)
+        DescartarMovimientosPensados_08BE(&H3054)
+        DescartarMovimientosPensados_08BE(&H3063)
+        DescartarMovimientosPensados_08BE(&H3072)
+        DescartarMovimientosPensados_08BE(&H3081)
+
+
+
+        Dim MomentoDiaA As Byte
+        'obtiene el momento del día
+        MomentoDiaA = MomentoDia_2D81
+        'avanza la hora del día
+        MomentoDiaA = MomentoDiaA + 1
+        '5542
+        If MomentoDiaA = 7 Then 'si se salió de la tabla vuelve al primer momento del día
+            '5546
             PunteroProximaHoraDia_2D82 = &H4FBC
             NumeroDia_2D80 = NumeroDia_2D80 + 1 'avanza un día
+            'en el caso de que se haya pasado del séptimo día, vuelve al primer día
             If NumeroDia_2D80 = 8 Then
-                ActualizarDiaMarcador_5559(1) 'en el caso de que se haya pasado del séptimo día, vuelve al primer día
+                NumeroDia_2D80 = 1
             End If
+            ActualizarDiaMarcador_5559(NumeroDia_2D80)
         Else
-            InicializarScrollMomentoDia_5575(MomentoDia_2D81)
+            '5575
+            InicializarScrollMomentoDia_5575(MomentoDiaA)
         End If
     End Sub
 
@@ -2594,8 +2581,8 @@ Module ModAbadia
         TablaRellenoObsequium(1) = &H7F
         TablaRellenoObsequium(2) = &H3F
         TablaRellenoObsequium(3) = &H1F
-        Obsequium_2D7F = Obsequium_2D7F - Decremento 'lee la energía y le resta las unidades leidas
-        If Obsequium_2D7F < 0 Then 'aquí llega si ya no queda energía
+        Obsequium_2D7F = Z80Sub(Obsequium_2D7F, Decremento) 'lee la energía y le resta las unidades leidas
+        If Obsequium_2D7F > &H80 Then 'aquí llega si ya no queda energía
             '55DD
             If Not TablaVariablesLogica_3C85(GuillermoMuerto_3C97 - &H3C85) Then 'si guillermo está vivo
                 'cambia el estado del abad para que le eche de la abadía
@@ -2627,7 +2614,6 @@ Module ModAbadia
             Next
             PunteroPantalla = PunteroPantallaAnterior + 1
         Next
-        ModPantalla.Refrescar()
     End Sub
 
     Sub LimpiarZonaFrasesMarcador_5001()
@@ -2643,129 +2629,87 @@ Module ModAbadia
             Next
             PunteroPantalla = DireccionSiguienteLinea_3A4D_68F2(PunteroPantalla) 'pasa a la siguiente línea de pantalla
         Next
-        ModPantalla.Refrescar()
     End Sub
 
     Sub BuclePrincipal_25B7()
-        Dim Contador As Integer
         Dim PunteroPersonajeHL As Integer
-        Dim NBuclesRetardo As Byte
-        Dim EstadoTeclado As String = ""
-        Dim Guardar As Boolean = False
         Static Inicializado As Boolean = False
-
         'el bucle principal del juego empieza aquí
-
-        'puerta en primera pantalla:
-        'TablaDatosPuertas_2FE4(17) = &H88
-        'TablaDatosPuertas_2FE4(18) = &HAD
-        'TablaDatosPuertas_2FE4(19) = 0
-        'libro en la primera pantalla:4
-        'TablaPosicionObjetos_3008(2) = &H81
-        'TablaPosicionObjetos_3008(3) = &HA6
-        'TablaPosicionObjetos_3008(4) = 0
-
-
-        'TablaCaracteristicasPersonajes_3036(&H3047 - &H3036) = &H88 - 0 'coloca la posición inicial de adso
-        'TablaCaracteristicasPersonajes_3036(&H3048 - &H3036) = &HA8 + 0 'coloca la posición inicial de adso
-
-        'guillermo enla biblioteca
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H21
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H69
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H1A
-
-        'bug de biblioteca
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H3
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H45
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H28
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H20
-
-
-        'bug buffer auxiliar
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H0
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H58
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H69
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H7
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 5 - &H3036) = &H80
-
-        'prueba 0b0e
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H1
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H88
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H95
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H0
-        'TablaCaracteristicasPersonajes_3036(&H3036 + 5 - &H3036) = &H0
-
-        'bug escaleras 11-09-2018
-        'If Not Inicializado Then
-        '    TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H1
-        '    TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H88
-        '    TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H91
-        '    TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H0
-        '    TablaCaracteristicasPersonajes_3036(&H3036 + 5 - &H3036) = &H0
-        '    Inicializado = True
-        'End If
-
         If Not Inicializado Then
             'el abad una posición a la derecha para dejar paso
             'TablaCaracteristicasPersonajes_3036(&H3063 + 2 - &H3036) = &H89
             'guillermo
-            'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H37
-            'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H38
-            'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H0F
+            'TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) = &H9D
+            'TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H27
+            'TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H2
             'adso
-            'TablaCaracteristicasPersonajes_3036(&H3045 + 2 - &H3036) = &H3A
-            'TablaCaracteristicasPersonajes_3036(&H3045 + 3 - &H3036) = &H38
-            'TablaCaracteristicasPersonajes_3036(&H3045 + 4 - &H3036) = &H0F
+            'TablaCaracteristicasPersonajes_3036(&H3045 + 2 - &H3036) = &H8D
+            'TablaCaracteristicasPersonajes_3036(&H3045 + 3 - &H3036) = &H85
+            'TablaCaracteristicasPersonajes_3036(&H3045 + 4 - &H3036) = &H2
             Inicializado = True
         End If
-
-
-        FrmPrincipal.Label1.Text = "ON"
-        Application.DoEvents()
-        If ModTeclado.TeclaPulsadaNivel(EnumTecla.TeclaArriba) Then EstadoTeclado = EstadoTeclado + "UP"
-        If ModTeclado.TeclaPulsadaNivel(EnumTecla.TeclaIzquierda) Then EstadoTeclado = EstadoTeclado + "<-"
-        If ModTeclado.TeclaPulsadaNivel(EnumTecla.TeclaDerecha) Then EstadoTeclado = EstadoTeclado + "->"
-        FrmPrincipal.LbEstadoTeclado.Text = EstadoTeclado
 
         Parado = False
         'Do
         ContadorAnimacionGuillermo_0990 = TablaCaracteristicasPersonajes_3036(&H3036 - &H3036) 'obtiene el contador de la animación de guillermo
+        '25BE
+        'comprueba si se pulsó QR en la habitación del espejo y actúa en consecuencia
+        ComprobarQREspejo_3311()
+        '25CF
+        'comprueba si hay que modificar las variables relacionadas con el tiempo (momento del día, combustible de la lámpara, etc)
+        ActualizarVariablesTiempo_55B6()
+        '25d5
+        MostrarResultadoJuego_42E7()
+        '25D8
+        ComprobarSaludGuillermo_42AC()
+        '25DB
+        'si no se ha completado el scroll del cambio del momento del día, lo avanza un paso
+        AvanzarScrollMomentoDia_5499()
+        '25DE
+        'obtiene el estado de las voces, y ejecuta unas acciones dependiendo del momento del día
+        EjecutarAccionesMomentoDia_3EEA()
+        '25E1
+        'comprueba si hay que cambiar el personaje al que sigue la cámara y calcula los bonus que hemos conseguido (interpretado)
+        AjustarCamara_Bonus_41D6()
         '25e4
         ComprobarCambioPantalla_2355() 'comprueba si el personaje que se muestra ha cambiado de pantalla y si es así hace muchas cosas
         '25E7
         If CambioPantalla_2DB8 Then
             DibujarPantalla_19D8() 'si hay que redibujar la pantalla
+            Exit Sub 'DibujarPantalla_19D8 tiene retardos, hay que salir del bucle
             PintarPantalla_0DFD = True 'modifica una instrucción de las rutinas de las puertas indicando que pinta la pantalla
         Else
             PintarPantalla_0DFD = False
         End If
+        '25f5
+        'comprueba si guillermo y adso cogen o dejan algún objeto
+        CogerDejarObjetos_5096()
+        '25f8
+        'comprueba si hay que abrir o cerrar alguna puerta y actualiza los sprites de las puertas en consecuencia
+        AbrirCerrarPuertas_0D67()
+
+        '25fb
         PunteroPersonajeHL = &H2BAE 'hl apunta a la tabla de guillermo
         '25fe
         ActualizarDatosPersonaje_291D(PunteroPersonajeHL) 'comprueba si guillermo puede moverse a donde quiere y actualiza su sprite y el buffer de alturas
+        '2601
+        EjecutarComportamientoPersonajes_2664() 'mueve a adso y los monjes
 
-        If Depuracion.PersonajesAdso Then EjecutarComportamientoAdso_087B()
         '2604
         CambioPantalla_2DB8 = False 'indica que no hay que redibujar la pantalla
         CaminoEncontrado_2DA9 = False 'indica que no se ha encontrado ningún camino
         '260b
         ModificarCaracteristicasSpriteLuz_26A3() 'modifica las características del sprite de la luz si puede ser usada por adso
+        '260e
+        FlipearGraficosPuertas_0E66() 'comprueba si tiene que flipear los gráficos de las puertas y si es así, lo hace
+
+
         '2627
         DibujarSprites_2674() 'dibuja los sprites
 
-        FrmPrincipal.TxOrientacion.Text = Hex$(TablaCaracteristicasPersonajes_3036(1))
-        FrmPrincipal.TxX.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(2))
-        FrmPrincipal.TxY.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(3))
-        FrmPrincipal.TxZ.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(4))
-        FrmPrincipal.TxEscaleras.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(5))
-        FrmPrincipal.Label1.Text = "OFF"
-        Application.DoEvents()
+        ActualizarVariablesFormulario()
 
-        If Parar Then
-            Parar = False
-            Parado = True
-            MsgBox("Parado")
-            'Exit Do
-        Else
+        If SiguienteTickNombreFuncion = "BuclePrincipal_25B7" Then
             If Depuracion.QuitarRetardos Then
                 SiguienteTick(5, "BuclePrincipal_25B7")
             Else
@@ -2776,6 +2720,57 @@ Module ModAbadia
         'Loop
         'Parado = True
         'Exit Sub
+
+    End Sub
+
+    Public Sub ActualizarVariablesFormulario()
+        Dim Guardar As Boolean = False
+        Dim EstadoTeclado As String = ""
+        Dim BonusString As String
+
+        FrmPrincipal.Label1.Text = "ON"
+        If ModTeclado.TeclaPulsadaNivel(EnumTecla.TeclaArriba) Then EstadoTeclado = EstadoTeclado + "UP"
+        If ModTeclado.TeclaPulsadaNivel(EnumTecla.TeclaIzquierda) Then EstadoTeclado = EstadoTeclado + "<-"
+        If ModTeclado.TeclaPulsadaNivel(EnumTecla.TeclaDerecha) Then EstadoTeclado = EstadoTeclado + "->"
+        FrmPrincipal.LbEstadoTeclado.Text = EstadoTeclado
+
+        FrmPrincipal.TxOrientacion.Text = Hex$(TablaCaracteristicasPersonajes_3036(1))
+        FrmPrincipal.TxX.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(2))
+        FrmPrincipal.TxY.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(3))
+        FrmPrincipal.TxZ.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(4))
+        FrmPrincipal.TxEscaleras.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(5))
+
+        FrmPrincipal.TxOrientacionAdso.Text = Hex$(TablaCaracteristicasPersonajes_3036(&H3045 + 1 - &H3036))
+        FrmPrincipal.TxXAdso.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3045 + 2 - &H3036))
+        FrmPrincipal.TxYAdso.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3045 + 3 - &H3036))
+        FrmPrincipal.TxZAdso.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3045 + 4 - &H3036))
+        FrmPrincipal.TxEscalerasAdso.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3045 + 5 - &H3036))
+
+        FrmPrincipal.TxXMalaquias.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3054 + 2 - &H3036))
+        FrmPrincipal.TxYMalaquias.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3054 + 3 - &H3036))
+        FrmPrincipal.TxZMalaquias.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3054 + 4 - &H3036))
+
+        FrmPrincipal.TxXAbad.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3063 + 2 - &H3036))
+        FrmPrincipal.TxYAbad.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3063 + 3 - &H3036))
+        FrmPrincipal.TxZAbad.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3063 + 4 - &H3036))
+
+        FrmPrincipal.TxXBerengario.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3072 + 2 - &H3036))
+        FrmPrincipal.TxYBerengario.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3072 + 3 - &H3036))
+        FrmPrincipal.TxZBerengario.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3072 + 4 - &H3036))
+
+        FrmPrincipal.TxXSeverino.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3081 + 2 - &H3036))
+        FrmPrincipal.TxYSeverino.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3081 + 3 - &H3036))
+        FrmPrincipal.TxZSeverino.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(&H3081 + 4 - &H3036))
+
+        FrmPrincipal.TxTiempoRestante.Text = CStr(TiempoRestanteMomentoDia_2D86)
+
+        FrmPrincipal.Label1.Text = "OFF"
+
+        BonusString = Convert.ToString(Bonus1_2DBE, 2).PadLeft(8, "0"c)
+        BonusString = BonusString + " " + Convert.ToString(Bonus2_2DBF, 2).PadLeft(8, "0"c)
+        FrmPrincipal.TxBonus.Text = BonusString
+        FrmPrincipal.TxEstadoAbad.Text = Convert.ToString(TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85), 16).PadLeft(2, "0"c)
+
         'Guardar = True
         If Guardar Then
             ModFunciones.GuardarArchivo("Buffer0", TablaBufferAlturas_01C0) '&H23F
@@ -2790,6 +2785,31 @@ Module ModAbadia
             ModFunciones.GuardarArchivo("CGA0", PantallaCGA) '&H2000
             Guardar = False
         End If
+    End Sub
+
+
+    Sub BuclePrincipal_25B7_PantallaDibujada()
+        Dim PunteroPersonajeHL As Integer
+        'llamado cuando se acaba de dibujar la pantalla. termina el bucle principal
+        PintarPantalla_0DFD = True 'modifica una instrucción de las rutinas de las puertas indicando que pinta la pantalla
+        PunteroPersonajeHL = &H2BAE 'hl apunta a la tabla de guillermo
+        '25f8
+        AbrirCerrarPuertas_0D67()
+        '25fe
+        ActualizarDatosPersonaje_291D(PunteroPersonajeHL) 'comprueba si guillermo puede moverse a donde quiere y actualiza su sprite y el buffer de alturas
+        '2601
+        EjecutarComportamientoPersonajes_2664() 'mueve a adso y los monjes
+        '2604
+        CambioPantalla_2DB8 = False 'indica que no hay que redibujar la pantalla
+        CaminoEncontrado_2DA9 = False 'indica que no se ha encontrado ningún camino
+        '260b
+        ModificarCaracteristicasSpriteLuz_26A3() 'modifica las características del sprite de la luz si puede ser usada por adso
+        '260e
+        FlipearGraficosPuertas_0E66() 'comprueba si tiene que flipear los gráficos de las puertas y si es así, lo hace
+        '2627
+        DibujarSprites_2674() 'dibuja los sprites
+        ModPantalla.Refrescar()
+        SiguienteTick(100, "BuclePrincipal_25B7")
     End Sub
 
     Sub BuclePrincipal_Check()
@@ -2826,7 +2846,7 @@ Module ModAbadia
         ModificarCaracteristicasSpriteLuz_26A3() 'modifica las características del sprite de la luz si puede ser usada por adso
         '2627
         DibujarSprites_2674() 'dibuja los sprites
-
+        ModPantalla.Refrescar()
         FrmPrincipal.TxOrientacion.Text = Hex$(TablaCaracteristicasPersonajes_3036(1))
         FrmPrincipal.TxX.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(2))
         FrmPrincipal.TxY.Text = "&H" + Hex$(TablaCaracteristicasPersonajes_3036(3))
@@ -2867,6 +2887,12 @@ Module ModAbadia
         Dim PunteroDatosPersonajeIY As Integer 'dirección a los datos de posición del personaje asociado al sprite
         Dim PunteroRutinaScriptPersonaje As Integer 'dirección de la rutina en la que el personaje piensa
         Dim ValorBufferAlturas As Byte 'valor a poner en las posiciones que ocupa el personaje en el buffer de alturas
+        'cambio de cámara para depuración
+        If Depuracion.CamaraManual Then 'hay que ajustar manualmente la cámara al personaje indicado
+            TablaVariablesLogica_3C85(PersonajeSeguidoPorCamara_3C8F - &H3C85) = Depuracion.CamaraPersonaje
+            PunteroDatosPersonajeActual_2D88 = &H3036 + &H0F * Depuracion.CamaraPersonaje
+        End If
+
         PosicionX = TablaCaracteristicasPersonajes_3036(PunteroDatosPersonajeActual_2D88 + 2 - &H3036) 'lee la posición en X del personaje actual
         '2361
         PosicionX = PosicionX And &HF0
@@ -2966,12 +2992,12 @@ Module ModAbadia
         Dim HL As String
         Do
             '2423
-            PunteroSpritePersonajeIX = Leer16(TablaDatosPersonajes_2BAE, PunteroDatosPersonajesHL - &H2BAE) 'dirección del sprite asociado al personaje
+            PunteroSpritePersonajeIX = Leer16(TablaPunterosPersonajes_2BAE, PunteroDatosPersonajesHL - &H2BAE) 'dirección del sprite asociado al personaje
             DE = Hex$(PunteroSpritePersonajeIX)
             If PunteroSpritePersonajeIX = &HFFFF& Then Exit Sub
             'mientras no lea 0xff, continúa
             '242a
-            PunteroDatosPersonajeIY = Leer16(TablaDatosPersonajes_2BAE, PunteroDatosPersonajesHL + 2 - &H2BAE) 'dirección a los datos de posición del personaje asociado al sprite
+            PunteroDatosPersonajeIY = Leer16(TablaPunterosPersonajes_2BAE, PunteroDatosPersonajesHL + 2 - &H2BAE) 'dirección a los datos de posición del personaje asociado al sprite
             HL = Hex$(PunteroDatosPersonajesHL + 2)
             DE = Hex$(PunteroDatosPersonajeIY)
             '242f
@@ -2980,11 +3006,11 @@ Module ModAbadia
             'HL = Hex$(PunteroDatosPersonajesHL + 4)
             'DE = Hex$(PunteroRutinaScriptPersonaje)
             '2436
-            PunteroRutinaFlipPersonaje_2A59 = Leer16(TablaDatosPersonajes_2BAE, PunteroDatosPersonajesHL + 6 - &H2BAE) 'rutina a la que llamar si hay que flipear los gráficos
+            PunteroRutinaFlipPersonaje_2A59 = Leer16(TablaPunterosPersonajes_2BAE, PunteroDatosPersonajesHL + 6 - &H2BAE) 'rutina a la que llamar si hay que flipear los gráficos
             HL = Hex$(PunteroDatosPersonajesHL + 6)
             DE = Hex$(PunteroRutinaFlipPersonaje_2A59)
             '2441
-            PunteroTablaAnimacionesPersonaje_2A84 = Leer16(TablaDatosPersonajes_2BAE, PunteroDatosPersonajesHL + 8 - &H2BAE) 'dirección de la tabla de animaciones para el personaje
+            PunteroTablaAnimacionesPersonaje_2A84 = Leer16(TablaPunterosPersonajes_2BAE, PunteroDatosPersonajesHL + 8 - &H2BAE) 'dirección de la tabla de animaciones para el personaje
             HL = Hex$(PunteroDatosPersonajesHL + 8)
             DE = Hex$(PunteroTablaAnimacionesPersonaje_2A84)
             '2449
@@ -2995,7 +3021,6 @@ Module ModAbadia
             RellenarBufferAlturasPersonaje_28EF(PunteroDatosPersonajeIY, ValorBufferAlturas)
             '245B
             PunteroDatosPersonajesHL = PunteroDatosPersonajesHL + 10 'pasa al siguiente personaje
-            Application.DoEvents()
         Loop
     End Sub
 
@@ -3051,7 +3076,6 @@ Module ModAbadia
                 PunteroAlturasPantalla = &H5080 'valores de altura de la segunda planta
         End Select
         RellenarBufferAlturas_3945_3973(PunteroAlturasPantalla) 'rellena el buffer de pantalla con los datos leidos de la abadia recortados para la pantalla actual
-        'GuardarArchivo "BufferAlturas", BufferAlturas
     End Sub
 
     Function CalcularMinimosVisibles_0B8F(ByVal PunteroDatosPersonaje As Integer) As Byte
@@ -3215,7 +3239,6 @@ Module ModAbadia
                     End If
                 End If
             End If
-            Application.DoEvents()
         Loop
     End Sub
 
@@ -3232,7 +3255,6 @@ Module ModAbadia
         Dim Ancho As Integer
         Dim Altura As Integer
         Dim AlturaAnterior As Byte
-        'On Error Resume Next
         'tabla de instrucciones para modificar un bucle del cálculo de alturas
         '38EF:   00 00 -> 0 nop, nop (caso imposible)
         '        3C 00 -> 1 inc a, nop
@@ -3334,10 +3356,10 @@ Module ModAbadia
     Sub ProcesarObjetos_0D3B(ByVal PunteroRutinaProcesarObjetos As Integer, ByVal PunteroSpritesObjetosIX As Integer, ByVal PunteroDatosObjetosIY As Integer, ByVal ProcesarSoloUno As Boolean)
         Dim Valor As Byte
         Dim Visible As Boolean
-        Dim X As Byte
-        Dim Y As Byte
+        Dim XL As Byte
+        Dim YH As Byte
         Dim Z As Byte
-        Dim Yp As Byte
+        Dim YpC As Byte
         Dim PunteroSpritesObjetosIXAnterior As Integer
         Do
             If PunteroDatosObjetosIY < &H3008 Then 'el puntero apunta a la tabla de puertas
@@ -3346,14 +3368,15 @@ Module ModAbadia
                 Valor = TablaPosicionObjetos_3008(PunteroDatosObjetosIY - &H3008) 'lee un byte y si encuentra 0xff termina
             End If
             If Valor = &HFF Then Exit Sub
-            Visible = ObtenerCoordenadasObjeto_0E4C(PunteroSpritesObjetosIX, PunteroDatosObjetosIY, X, Y, Z, Yp) 'obtiene en X,Y,Z la posición en pantalla del objeto. Si no es visible devuelve False
+            '0D44
+            Visible = ObtenerCoordenadasObjeto_0E4C(PunteroSpritesObjetosIX, PunteroDatosObjetosIY, XL, YH, Z, YpC) 'obtiene en X,Y,Z la posición en pantalla del objeto. Si no es visible devuelve False
             If Visible Then 'si el objeto es visible, salta a la rutina siguiente
                 PunteroSpritesObjetosIXAnterior = PunteroSpritesObjetosIX
                 Select Case PunteroRutinaProcesarObjetos
                     Case Is = &HDD2 'rutina a la que saltar para procesar los sprites de las puertas
-                        ProcesarPuertaVisible_0DD2(PunteroSpritesObjetosIX, PunteroDatosObjetosIY, X, Y, Yp)
+                        ProcesarPuertaVisible_0DD2(PunteroSpritesObjetosIX, PunteroDatosObjetosIY, XL, YH, YpC)
                     Case Is = &HDBB 'rutina a la que saltar para procesar los objetos del juego
-                        ProcesarObjetoVisible_0DBB(PunteroSpritesObjetosIX, PunteroDatosObjetosIY, X, Y, Yp)
+                        ProcesarObjetoVisible_0DBB(PunteroSpritesObjetosIX, PunteroDatosObjetosIY, XL, YH, YpC)
                 End Select
                 PunteroSpritesObjetosIX = PunteroSpritesObjetosIXAnterior
             End If
@@ -3363,16 +3386,15 @@ Module ModAbadia
             PunteroDatosObjetosIY = PunteroDatosObjetosIY + 5 'avanza a la siguiente entrada
             PunteroSpritesObjetosIX = PunteroSpritesObjetosIX + &H14 'apunta al siguiente sprite
             If ProcesarSoloUno Then Exit Sub
-            Application.DoEvents()
         Loop
     End Sub
 
-    Function ObtenerCoordenadasObjeto_0E4C(ByVal PunteroSpritesObjetosIX As Integer, ByVal PunteroDatosObjetosIY As Integer, ByRef X As Byte, ByRef Y As Byte, ByRef Z As Byte, ByRef Yp As Byte) As Boolean
+    Function ObtenerCoordenadasObjeto_0E4C(ByVal PunteroSpritesObjetosIX As Integer, ByVal PunteroDatosObjetosIY As Integer, ByRef XL As Byte, ByRef YH As Byte, ByRef Z As Byte, ByRef YpC As Byte) As Boolean
         'devuelve la posición la entidad en coordenadas de pantalla. Si no es visible sale con False
         'si es visible devuelve en Z la profundidad del sprite y en X,Y devuelve la posición en pantalla del sprite
         Dim Visible As Boolean
         ModificarPosicionSpritePantalla_2B2F = False
-        Visible = ProcesarObjeto_2ADD(PunteroSpritesObjetosIX, PunteroDatosObjetosIY, X, Y, Z, Yp)
+        Visible = ProcesarObjeto_2ADD(PunteroSpritesObjetosIX, PunteroDatosObjetosIY, XL, YH, Z, YpC)
         ModificarPosicionSpritePantalla_2B2F = True
         If Not Visible Then
             TablaSprites_2E17(PunteroSpritesObjetosIX + 0 - &H2E17) = &HFE 'marca el sprite como no visible
@@ -3426,6 +3448,9 @@ Module ModAbadia
 
     Function LeerByteTablaCualquiera(ByVal Puntero As Integer) As Byte
         'lee un byte que puede pertenecer a cualquier tabla. usado en los errores de overflow del programa original
+        If PunteroPerteneceTabla(Puntero, TablaBugDejarObjetos_0000, &H0000) Then
+            LeerByteTablaCualquiera = TablaBugDejarObjetos_0000(Puntero)
+        End If
         If PunteroPerteneceTabla(Puntero, TablaBufferAlturas_01C0, &H1C0&) Then
             LeerByteTablaCualquiera = TablaBufferAlturas_01C0(Puntero - &H1C0&)
         End If
@@ -3453,8 +3478,8 @@ Module ModAbadia
         If PunteroPerteneceTabla(Puntero, TablaAvancePersonaje1Tile_286D, &H286D&) Then
             LeerByteTablaCualquiera = TablaAvancePersonaje1Tile_286D(Puntero - &H286D&)
         End If
-        If PunteroPerteneceTabla(Puntero, TablaDatosPersonajes_2BAE, &H2BAE&) Then
-            LeerByteTablaCualquiera = TablaDatosPersonajes_2BAE(Puntero - &H2BAE&)
+        If PunteroPerteneceTabla(Puntero, TablaPunterosPersonajes_2BAE, &H2BAE&) Then
+            LeerByteTablaCualquiera = TablaPunterosPersonajes_2BAE(Puntero - &H2BAE&)
         End If
         If PunteroPerteneceTabla(Puntero, TablaVariablesAuxiliares_2D8D, &H2D8D&) Then
             LeerByteTablaCualquiera = TablaVariablesAuxiliares_2D8D(Puntero - &H2D8D&)
@@ -3578,7 +3603,7 @@ Module ModAbadia
 
 
 
-    Function ProcesarObjeto_2ADD(ByVal PunteroSpritesObjetosIX As Integer, ByVal PunteroDatosObjetosIY As Integer, ByRef X As Byte, ByRef Y As Byte, ByRef Z As Byte, ByRef Yp As Byte) As Boolean
+    Function ProcesarObjeto_2ADD(ByVal PunteroSpritesObjetosIX As Integer, ByVal PunteroDatosObjetosIY As Integer, ByRef XL As Byte, ByRef YH As Byte, ByRef Z As Byte, ByRef YpC As Byte) As Boolean
         'comprueba si el sprite está dentro de la zona visible de pantalla.
         'Si no es así, sale. Si está dentro de la zona visible lo transforma
         'a otro sistema de coordenadas. Dependiendo de un parámetro sigue o no.
@@ -3588,6 +3613,7 @@ Module ModAbadia
         Dim ValorY As Integer
         Dim ValorZ As Byte
         Dim AlturaBase As Byte
+        On Error Resume Next 'desplazamiento puede ser <0
         'If PunteroDatosObjetosIY = &H3036 Then Stop
         ValorX = CInt(LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 2)) - LimiteInferiorVisibleX_2AE1
         ValorY = CInt(LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 3)) - LimiteInferiorVisibleY_2AEB
@@ -3606,8 +3632,8 @@ Module ModAbadia
             ProcesarObjeto_2ADD = False
             Exit Function
         End If
-        X = CByte(ValorX) 'coordenada X del objeto en la pantalla
-        Y = CByte(ValorY) 'coordenada Y del objeto en la pantalla
+        XL = CByte(ValorX) 'coordenada X del objeto en la pantalla
+        YH = CByte(ValorY) 'coordenada Y del objeto en la pantalla
         Z = ValorZ - AlturaBase 'altura del objeto ajustada para esta pantalla
         '2b00
         'al llegar aquí los parámetros son:
@@ -3616,23 +3642,23 @@ Module ModAbadia
         'Z = altura del objeto en la rejilla ajustada para esta planta
         Select Case RutinaCambioCoordenadas_2B01 'rutina que cambia el sistema de coordenadas dependiendo de la orientación de la pantalla
             Case Is = &H248A
-                CambiarCoordenadasOrientacion0_248A(X, Y)
+                CambiarCoordenadasOrientacion0_248A(XL, YH)
             Case Is = &H2485
-                CambiarCoordenadasOrientacion1_2485(X, Y)
+                CambiarCoordenadasOrientacion1_2485(XL, YH)
             Case Is = &H248B
-                CambiarCoordenadasOrientacion2_248B(X, Y)
+                CambiarCoordenadasOrientacion2_248B(XL, YH)
             Case Is = &H2494
-                CambiarCoordenadasOrientacion3_2494(X, Y)
+                CambiarCoordenadasOrientacion3_2494(XL, YH)
         End Select
-        TablaSprites_2E17(PunteroSpritesObjetosIX + &H12 - &H2E17) = X 'graba las nuevas coordenadas x e y en el sprite
-        TablaSprites_2E17(PunteroSpritesObjetosIX + &H13 - &H2E17) = Y 'graba las nuevas coordenadas x e y en el sprite
+        TablaSprites_2E17(PunteroSpritesObjetosIX + &H12 - &H2E17) = XL 'graba las nuevas coordenadas x e y en el sprite
+        TablaSprites_2E17(PunteroSpritesObjetosIX + &H13 - &H2E17) = YH 'graba las nuevas coordenadas x e y en el sprite
         '2b09
         'convierte las coordenadas en la rejilla a coordenadas de pantalla
         Dim Xcalc As Integer
         Dim Ycalc As Integer
         Dim Ypantalla As Integer
         '2b09
-        Ycalc = X + Y 'pos x + pos y = coordenada y en pantalla
+        Ycalc = XL + YH 'pos x + pos y = coordenada y en pantalla
         '2B0B
         Ypantalla = Ycalc
         '2B0C
@@ -3650,72 +3676,48 @@ Module ModAbadia
         'llega aquí si la y calc está entre 8 y 57
         '2b17
         Ycalc = 4 * (Ycalc + 1)
-        Xcalc = 2 * (CInt(X) - CInt(Y)) + &H50 - &H28
+        Xcalc = 2 * (CInt(XL) - CInt(YH)) + &H50 - &H28
         If Xcalc < 0 Then Exit Function
         If Xcalc >= &H50 Then Exit Function
         '2b26
-        X = CByte(Xcalc) 'pos x con nuevo sistema de coordenadas
-        Y = CByte(Ycalc) 'pos y con nuevo sistema de coordenadas
+        XL = CByte(Xcalc) 'pos x con nuevo sistema de coordenadas
+        YH = CByte(Ycalc) 'pos y con nuevo sistema de coordenadas
         ProcesarObjeto_2ADD = True 'el objeto es visible
         Ypantalla = Ypantalla - &H10
         If Ypantalla < 0 Then Ypantalla = 0 'si la posición en y < 16, pos y = 0
-        Yp = Long2Byte(Ypantalla)
+        YpC = Long2Byte(Ypantalla)
         If Not ModificarPosicionSpritePantalla_2B2F Then Exit Function
         'si llega aquí modifica la posición del sprite en pantalla
         '2B30
         Dim Entrada As Byte
-        Dim PruebaEntrada As Byte
         Dim Ocupa1Posicion As Boolean 'true si ocupa una posición. false si ocupa 4 posiciones
         Dim MovimientoPar As Boolean 'true si el contador de animación es 0 ó 2. false si es 1 ó 3
-        Dim OrientadoEscaleras As Boolean 'true si está orientado para siubir o bajar escaleras. false si esta girado
+        Dim OrientadoEscaleras As Boolean 'true si está orientado para subir o bajar escaleras. false si esta girado
         Dim Subiendo As Boolean 'true si está subiendo escaleras, false si está bajando
         Entrada = 0 'primera entrada
-        PruebaEntrada = 0
         If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And &H80) <> 0 Then Ocupa1Posicion = True
         If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 0) And 1) = 0 Then MovimientoPar = True 'lee el bit 0 del contador de animación
         If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And 32) = 0 Then OrientadoEscaleras = True
         If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And &H10) = 0 Then Subiendo = True
         If Ocupa1Posicion Then
-            PruebaEntrada = PruebaEntrada + 2
+            Entrada = Entrada + 2
             If Not OrientadoEscaleras Then
-                If Not MovimientoPar Then PruebaEntrada = PruebaEntrada + 1
+                If Not MovimientoPar Then Entrada = Entrada + 1
             Else
                 If MovimientoPar Then
-                    PruebaEntrada = PruebaEntrada + 2
+                    Entrada = Entrada + 2
                 Else
-                    PruebaEntrada = PruebaEntrada + 3
-                    If Not Subiendo Then PruebaEntrada = PruebaEntrada + 1
+                    Entrada = Entrada + 3
+                    If Not Subiendo Then Entrada = Entrada + 1
                 End If
             End If
         Else 'ocupa 4 posiciones
-            If Not MovimientoPar Then PruebaEntrada = PruebaEntrada + 1
+            If Not MovimientoPar Then Entrada = Entrada + 1
         End If
-
-
-
-        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And &H80) <> 0 Then
-            GoTo H2B78 'si el personaje ocupa una posición
-        Else
-            GoTo H2B3A
-        End If
-
-H2B3A:
-        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 0) And 1) = 0 Then 'lee el bit 0 del contador de animación '5?
-            GoTo H2B41 'si es 1, avanza a la siguiente entrada
-        Else
-            Entrada = Entrada + 1
-        End If
-
-H2B41:
+        '2B41
         Dim Puntero As Integer
         Dim Orientacion As Byte
         Dim Desplazamiento As Integer
-
-        Dim nose As String
-        FrmPrincipal.TextBox1.Text = CStr(Entrada)
-        Entradas(Entrada) = True
-
-        If Entrada <> PruebaEntrada Then Stop
         Orientacion = ModificarOrientacion_2480(LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 1)) 'obtiene la orientación del personaje. modifica la orientación que se le pasa en a con la orientación de la pantalla actual
         '2b4b
         Puntero = (shl(Orientacion, 4) And &H30) + 2 * Entrada + PunteroTablaDesplazamientoAnimacion_2D84
@@ -3723,60 +3725,28 @@ H2B41:
         'Desplazamiento = TablaDesplazamientoAnimacion_309F(Puntero - &H309F) 'lee un byte de la tabla
         Desplazamiento = Leer8Signo(TablaDesplazamientoAnimacion_309F, Puntero - &H309F) 'lee un byte de la tabla
         '2b59
-        Desplazamiento = Desplazamiento + X 'le suma la x del nuevo sistema de coordenadas
+        Desplazamiento = Desplazamiento + XL 'le suma la x del nuevo sistema de coordenadas
         '2b5a
         'Desplazamiento = Desplazamiento - (256 - LeerDatoObjeto(PunteroDatosObjetosIY + 7)) 'le suma un desplazamieno
         Desplazamiento = Desplazamiento + Leer8Signo(TablaCaracteristicasPersonajes_3036, PunteroDatosObjetosIY + 7 - &H3036) 'le suma un desplazamieno
         If Desplazamiento >= 0 Then
-            X = Desplazamiento 'actualiza la x
+            XL = Desplazamiento 'actualiza la x
         Else
-            X = 256 + Desplazamiento 'no deberían aparecer coordenadas negativas. bug del original?
+            XL = 256 + Desplazamiento 'no deberían aparecer coordenadas negativas. bug del original?
         End If
         Puntero = Puntero + 1
         'Desplazamiento = TablaDesplazamientoAnimacion_309F(Puntero - &H309F) 'lee un byte de la tabla
         Desplazamiento = Leer8Signo(TablaDesplazamientoAnimacion_309F, Puntero - &H309F) 'lee un byte de la tabla
-        Desplazamiento = Desplazamiento + Y 'le suma la Y del nuevo sistema de coordenadas
+        Desplazamiento = Desplazamiento + YH 'le suma la Y del nuevo sistema de coordenadas
         'Desplazamiento = Desplazamiento - (256 - LeerDatoObjeto(PunteroDatosObjetosIY + 8)) 'le suma un desplazamieno
         Desplazamiento = Desplazamiento + Leer8Signo(TablaCaracteristicasPersonajes_3036, PunteroDatosObjetosIY + 8 - &H3036) 'le suma un desplazamieno
-        Y = Desplazamiento 'actualiza la Y
-        TablaSprites_2E17(PunteroSpritesObjetosIX + 1 - &H2E17) = X 'graba la posición x del sprite (en bytes)
-        TablaSprites_2E17(PunteroSpritesObjetosIX + 2 - &H2E17) = Y 'graba la posición y del sprite (en pixels)
+        YH = Desplazamiento 'actualiza la Y
+        TablaSprites_2E17(PunteroSpritesObjetosIX + 1 - &H2E17) = XL 'graba la posición x del sprite (en bytes)
+        TablaSprites_2E17(PunteroSpritesObjetosIX + 2 - &H2E17) = YH 'graba la posición y del sprite (en pixels)
         If TablaSprites_2E17(PunteroSpritesObjetosIX + 0 - &H2E17) <> &HFE Then Exit Function
         'si el sprite no es visible, continua
-        TablaSprites_2E17(PunteroSpritesObjetosIX + 3 - &H2E17) = X 'graba la posición anterior x del sprite (en bytes)
-        TablaSprites_2E17(PunteroSpritesObjetosIX + 4 - &H2E17) = Y 'graba la posición anterior y del sprite (en pixels)
-        Exit Function
-
-H2B78:
-        'aquí llega si el personaje ocupa una posición (porque está en los escalones)
-        Entrada = Entrada + 2 'avanza a la tercera entrada
-        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And 32) <> 0 Then
-            GoTo H2B3A
-        End If
-        Entrada = Entrada + 2 'avanza a la quinta entrada
-
-H2B82:
-        'aquí llega si el personaje ocupa una posición y está orientado para subir o bajar las escaleras (ya está apuntando a la 5ª entrada)
-        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And &H3) <> 0 Then
-            GoTo H2B99  'esto nunca pasa???
-        End If
-        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 0) And &H1) = 0 Then GoTo H2B41
-        Entrada = Entrada + 1 'avanza una entrada
-
-H2B90:
-        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And &H10) = 0 Then GoTo H2B41
-        Entrada = Entrada + 1 'avanza una entrada
-        GoTo H2B41
-
-H2B99:
-        '??? cuando llega aquí???
-        Entrada = Entrada + 3 'avanza a la octava entrada
-        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And &H40) <> 0 Then GoTo H2BA6
-        Entrada = Entrada + 4 'avanza a la 12ª entrada
-H2BA6:
-        If (LeerBytePersonajeObjeto(PunteroDatosObjetosIY + 5) And &H3) <> 1 Then GoTo H2B90  'si los bits 0 y 1 de (iy+05) != 1, salta (entrada 12 o 13)
-        Entrada = Entrada + 2 'avanza a la 14ª entrada
-        GoTo H2B90
+        TablaSprites_2E17(PunteroSpritesObjetosIX + 3 - &H2E17) = XL 'graba la posición anterior x del sprite (en bytes)
+        TablaSprites_2E17(PunteroSpritesObjetosIX + 4 - &H2E17) = YH 'graba la posición anterior y del sprite (en pixels)
     End Function
 
     Sub CambiarCoordenadasOrientacion0_248A(ByRef X As Byte, ByRef Y As Byte)
@@ -4284,8 +4254,6 @@ H2BA6:
 
     Sub DibujarSprites_2674()
         'dibuja los sprites
-        Dim PunteroSpritesHL As Integer
-        Dim Valor As Byte
         If HabitacionOscura_156C Then
             DibujarSprites_267B()
         Else
@@ -4310,7 +4278,6 @@ H2BA6:
                 TablaSprites_2E17(PunteroSpritesHL - &H2E17) = Valor And &H7F
             End If
             PunteroSpritesHL = PunteroSpritesHL + &H14 'longitud de cada sprite
-            Application.DoEvents()
         Loop
         '268F
         If Not Depuracion.LuzEnGuillermo Then
@@ -4367,7 +4334,8 @@ H2BA6:
         Dim LongitudY As Byte
         Dim ProfundidadMaxima As Integer 'profundidad máxima de la iteración actual
         Dim PunteroBufferTilesAnterior_3095 As Integer
-
+        Dim NCiclos As Integer
+        ModPantalla.Refrescar()
         If Not Depuracion.PersonajesAdso Then
             TablaSprites_2E17(&H2E2B + 0 - &H2E17) = &HFE 'desconecta a adso ###depuración
         End If
@@ -4411,14 +4379,13 @@ H2BA6:
                     Punteros(NumeroSprites) = PunteroSpriteIX 'ojo, cambiado.  antes NumeroSpritesVisibles
                     NumeroSprites = NumeroSprites + 1
                     If (Valor And &H80) <> 0 Then 'hay que dibujar el sprite
-                        'If (TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) And &H80) <> 0 Then 'hay que dibujar el sprite
                         If LeerBitArray(TablaSprites_2E17, PunteroSpriteIX + 0 - &H2E17, 7) Then 'hay que dibujar el sprite
                             NumeroSpritesVisibles = NumeroSpritesVisibles + 1
                         End If
                     End If
                 End If
                 PunteroSpriteIX = PunteroSpriteIX + &H14 '20 bytes por entrada
-                Application.DoEvents()
+                'Application.DoEvents()
             Loop
             '493b
             'aquí llega una vez que ha metido en la pila las entradas a tratar
@@ -4440,7 +4407,7 @@ H2BA6:
                         End If
                     Next
                     If NumeroCambios = 0 Then Exit Do
-                    Application.DoEvents()
+                    'Application.DoEvents()
                 Loop
             End If
             'aquí llega una vez que las entradas de la pila están ordenadas por la profundidad
@@ -4475,7 +4442,7 @@ H2BA6:
                     '2DD7=nXsprite=tamaño en x del sprite
                     '2DD8=nYsprite=tamaño en y del sprite
                     '49BD
-                    If Not Depuracion.DeshabilitarCalculoDimensionesAmpliadas Then
+                    If Not Depuracion.DeshabilitarCalculoDimensionesAmpliadas And NCiclos < 100 Then
                         CalcularDimensionesAmpliadasSprite_4CBF(Xanterior, Yanterior, nXanterior, nYanterior, nXsprite, nYsprite, TileX, TileY)
                     End If
 
@@ -4567,6 +4534,7 @@ H2BA6:
             Next
             '4BDF
             'aquí llega una vez ha procesado todos los sprites que había que redibujar (o si no había más espacio en el buffer de sprites)
+            NCiclos = NCiclos + 1
             PunteroSpriteIX = &H2E17 'apunta al primer sprite
             Do
                 Valor = TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17)
@@ -4574,6 +4542,7 @@ H2BA6:
                 If Valor <> &HFE Then
                     If (Valor And &H40) <> 0 Then 'si  tiene puesto el bit 6 (sprite procesado)
                         '4BF2
+                        'aquí llega si el sprite actual tiene puesto a 1 el bit 6 (el sprite ha sido procesado)
                         CopiarSpritePantalla_4C1A(PunteroSpriteIX)
                         TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) And &H3F 'limpia el bit 6 y 7 del byte 0
                         'If (TablaSprites_2E17(PunteroSpriteIX + 5 - &H2E17) And &H80) <> 0 Then 'si el sprite va a desaparecer
@@ -4584,9 +4553,9 @@ H2BA6:
                     End If
                 End If
                 PunteroSpriteIX = PunteroSpriteIX + &H14 'pasa al siguiente sprite
-                Application.DoEvents()
+                'Application.DoEvents()
             Loop
-            Application.DoEvents()
+            'Application.DoEvents()
         Loop
     End Sub
 
@@ -4621,7 +4590,7 @@ H2BA6:
         Dim Valor As Byte
         If TileX >= X Then 'si Xtile >= X2
             '4cc5
-            Valor = TileX - X + nXsprite
+            Valor = Z80Add(TileX - X, nXsprite)
             If Valor > nX Then nX = Valor 'si el ancho ampliado es mayor que el mínimo, e = ancho ampliado + Xtile - Xspr (coge el mayor ancho del sprite)
             '4cce
             Valor = X And 3 'posición x dentro del tile actual
@@ -4631,7 +4600,7 @@ H2BA6:
             '4CE3
             'aquí llega si la posición del sprite en x > que el inicio de un tile en x
             Valor = X - TileX 'diferencia de posición en x del tile a x2
-            Valor = Valor + nX 'añade al ancho del sprite la diferencia en x entre el inicio del sprite y el del tile asociado al sprite
+            Valor = Z80Add(Valor, nX) 'añade al ancho del sprite la diferencia en x entre el inicio del sprite y el del tile asociado al sprite
             If nXsprite < Valor Then 'si el ancho ampliado del sprite < el ancho mínimo del sprite
                 nXsprite = ((Valor + 3) And &HFC)  'amplia el ancho mínimo del sprite
             End If
@@ -4888,7 +4857,6 @@ H2BA6:
             Next
         End If
         Exit Sub
-        GuardarArchivo("BufferSprites", BufferSprites_9500)
     End Sub
 
     Function EsValidoPunteroBufferTiles(ByVal Puntero As Integer) As Boolean
@@ -4924,7 +4892,6 @@ H2BA6:
         Dim Contador3 As Integer
         Dim PunteroBufferTilesAnterior3 As Integer
         Dim BugOverflow As Boolean 'true si el puntero a la tabla de tiles está fuera
-        'On Error Resume Next
 
 
         Dim H4dd9 As String
@@ -5125,7 +5092,6 @@ H2BA6:
             Next 'repite hasta que se complete el alto del tile
             '4e91
         End If
-        'GuardarArchivo "D:\datos\vbasic\Abadia\Abadia2\BufferSprites", BufferSprites_9500
     End Sub
 
     Sub CopiarSpritePantalla_4C1A(ByVal PunteroSpriteIX As Integer)
@@ -5217,7 +5183,6 @@ H2BA6:
             End If
             '4CBC
         Next
-        ModPantalla.Refrescar()
     End Sub
 
     Function ObtenerDesplazamientoPantalla_3C42(ByVal X As Byte, ByVal Y As Byte) As Integer
@@ -5254,12 +5219,12 @@ H2BA6:
         Dim PunteroRutinaFlipearGraficos As Integer
         Dim Valor As Byte
         Dim Volver As Boolean
-        PunteroSpriteIX = ModFunciones.Leer16(TablaDatosPersonajes_2BAE, PunteroPersonajeHL + 0 - &H2BAE)
-        PunteroCaracteristicasPersonajeIY = ModFunciones.Leer16(TablaDatosPersonajes_2BAE, PunteroPersonajeHL + 2 - &H2BAE)
-        PunteroRutinaComportamientoHL = ModFunciones.Leer16(TablaDatosPersonajes_2BAE, PunteroPersonajeHL + 4 - &H2BAE)
-        PunteroRutinaFlipearGraficos = ModFunciones.Leer16(TablaDatosPersonajes_2BAE, PunteroPersonajeHL + 6 - &H2BAE)
+        PunteroSpriteIX = ModFunciones.Leer16(TablaPunterosPersonajes_2BAE, PunteroPersonajeHL + 0 - &H2BAE)
+        PunteroCaracteristicasPersonajeIY = ModFunciones.Leer16(TablaPunterosPersonajes_2BAE, PunteroPersonajeHL + 2 - &H2BAE)
+        PunteroRutinaComportamientoHL = ModFunciones.Leer16(TablaPunterosPersonajes_2BAE, PunteroPersonajeHL + 4 - &H2BAE)
+        PunteroRutinaFlipearGraficos = ModFunciones.Leer16(TablaPunterosPersonajes_2BAE, PunteroPersonajeHL + 6 - &H2BAE)
         PunteroRutinaFlipPersonaje_2A59 = PunteroRutinaFlipearGraficos
-        PunteroTablaAnimacionesPersonaje_2A84 = ModFunciones.Leer16(TablaDatosPersonajes_2BAE, PunteroPersonajeHL + 8 - &H2BAE)
+        PunteroTablaAnimacionesPersonaje_2A84 = ModFunciones.Leer16(TablaPunterosPersonajes_2BAE, PunteroPersonajeHL + 8 - &H2BAE)
         DefinirDatosSpriteComoAntiguos_2AB0(PunteroSpriteIX) 'pone la posición y dimensiones actuales del sprite como posición y dimensiones antiguas
         'si la posición del sprite es central y la altura está bien, limpia las posiciones que ocupaba el sprite en el buffer de alturas
         '292f
@@ -5325,15 +5290,19 @@ H2BA6:
             EsSpriteVisible_2AC9 = True
             Exit Function
         End If
+        MarcarSpriteInactivo_2ACE(PunteroSpriteIX)
+    End Function
+
+    Sub MarcarSpriteInactivo_2ACE(ByVal PunteroSpriteIX As Integer)
         'aquí llega si el sprite no es visible
         If TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = &HFE Then 'si el sprite no era visible, sale
-            Exit Function
+            Exit Sub
         Else
             TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = &H80 'en otro caso, indica que hay que redibujar el sprite
             'TablaSprites_2E17(PunteroSpriteIX + 5 - &H2E17) = TablaSprites_2E17(PunteroSpriteIX + 5 - &H2E17) Or &H80 'indica que el sprite va a pasar a inactivo, y solo se quiere redibujar la zona que ocupaba
             SetBitArray(TablaSprites_2E17, PunteroSpriteIX + 5 - &H2E17, 7)  'indica que el sprite va a pasar a inactivo, y solo se quiere redibujar la zona que ocupaba
         End If
-    End Function
+    End Sub
 
     Sub IncrementarContadorAnimacionSprite_2A01(ByVal PunteroSpriteIX As Integer, ByVal PunteroCaracteristicasPersonajeIY As Integer)
         'incrementa el contador de los bits 0 y 1 del byte 0, avanza la animación del sprite y lo redibuja
@@ -5373,24 +5342,24 @@ H2BA6:
                     AvanzarAnimacionSprite_2A27(PunteroSpriteIX, PunteroCaracteristicasPersonajeIY)
                     Exit Sub
                 End If
-                '28a9
-                'si se modifica la y del sprite con 1, salta y marca el sprite como inactivo
-                If EstadoGuillermo_288F <> 1 Then
-                    '28ad
-                    'modifica la posición y del sprite
-                    Valor = TablaSprites_2E17(PunteroSpriteIX + 2 - &H2E17)
-                    Valor = Valor + AjustePosicionYSpriteGuillermo_28B1
-                    TablaSprites_2E17(PunteroSpriteIX + 2 - &H2E17) = Valor
-                    Valor = TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17)
-                    Valor = Valor And &H3F
-                    Valor = Valor Or &H80
-                    TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = Valor 'marca el sprite para dibujar
-                    MovimientoRealizado_2DC1 = True 'indica que ha habido movimiento
-                Else
-                    '28c5
-                    'aquí llega si se modifica la y del sprite con 1 y el estado de guillermo es el 0x13
-                    TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = &HFE 'marca el sprite como inactivo
-                End If
+            End If
+            '28a9
+            'si se modifica la y del sprite con 1, salta y marca el sprite como inactivo
+            If EstadoGuillermo_288F <> 1 Then
+                '28ad
+                'modifica la posición y del sprite
+                Valor = TablaSprites_2E17(PunteroSpriteIX + 2 - &H2E17)
+                Valor = Z80Add(Valor, AjustePosicionYSpriteGuillermo_28B1)
+                TablaSprites_2E17(PunteroSpriteIX + 2 - &H2E17) = Valor
+                Valor = TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17)
+                Valor = Valor And &H3F
+                Valor = Valor Or &H80
+                TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = Valor 'marca el sprite para dibujar
+                MovimientoRealizado_2DC1 = True 'indica que ha habido movimiento
+            Else
+                '28c5
+                'aquí llega si se modifica la y del sprite con 1 y el estado de guillermo es el 0x13
+                TablaSprites_2E17(PunteroSpriteIX + 0 - &H2E17) = &HFE 'marca el sprite como inactivo
             End If
         Else
             '28ca
@@ -5637,11 +5606,11 @@ H2BA6:
                 If Altura1A = 1 Then 'si se va hacia arriba
                     '29c3
                     'aquí llega si se sube
-                    TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) + 1 'incrementa la altura del personaje
+                    TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) = Z80Inc(TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036)) 'incrementa la altura del personaje
                     TamañoOcupadoA = &H80& 'cambia el tamaño ocupado en el buffer de alturas de 4 a 1
                 ElseIf Altura1A = -1 Then 'si se va hacia abajo
                     '29ca
-                    TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) - 1 'decrementa la altura del personaje
+                    TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) = Z80Dec(TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036)) 'decrementa la altura del personaje)
                     TamañoOcupadoA = &H90& 'cambia el tamaño ocupado en el buffer de alturas de 4 a 1 e indica que está bajando
                 End If
                 '29cf
@@ -5683,16 +5652,16 @@ H2BA6:
                 ' aquí salta si el bit 5 es 0. Llega con:
                 '  Altura1A = diferencia de altura con la posición más cercana al personaje según la orientación
                 '  Altura2C = diferencia de altura con la posición del personaje + 2 (según la orientación que tenga)
-                TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) + 1 'incrementa la altura del personaje
+                TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) = Z80Inc(TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036)) 'incrementa la altura del personaje
                 If Altura1A <> 1 Then 'si no se está subiendo una unidad
                     '2984
-                    TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) - 1 'deshace el incremento
+                    TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) = Z80Dec(TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036)) 'deshace el incremento
                     If Altura1A <> -1 Then Exit Sub 'si no se está bajando una unidad, sale
                     '298a
                     'TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 5 - &H3036) Or &H10 'indica que está bajando
                     SetBitArray(TablaCaracteristicasPersonajes_3036, PunteroCaracteristicasPersonajeIY + 5 - &H3036, 4) 'indica que está bajando
                     '298e
-                    TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) - 1 'decrementa la altura del personaje
+                    TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036) = Z80Dec(TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 4 - &H3036)) 'decrementa la altura del personaje
                 End If
                 '2991
                 If Altura1A <> Altura2C Then 'compara la altura de la posición más cercana al personaje con la siguiente
@@ -5760,11 +5729,20 @@ H2BA6:
         Dim AvanceY As Integer
         AvanceX = LeerDatoTablaAvancePersonaje(PunteroTablaAvancePersonajeHL, 8)
         '29e5
-        TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 2 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 2 - &H3036) + AvanceX
+        If AvanceX > 0 Then
+            TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 2 - &H3036) = Z80Add(TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 2 - &H3036), CByte(AvanceX))
+        Else
+            TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 2 - &H3036) = Z80Sub(TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 2 - &H3036), CByte(-AvanceX))
+        End If
         '29eb
         AvanceY = LeerDatoTablaAvancePersonaje(PunteroTablaAvancePersonajeHL + 1, 8)
         '29EC
-        TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 3 - &H3036) = TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 3 - &H3036) + AvanceY
+        If AvanceY > 0 Then
+            TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 3 - &H3036) = Z80Add(TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 3 - &H3036), CByte(AvanceY))
+        Else
+            TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 3 - &H3036) = Z80Sub(TablaCaracteristicasPersonajes_3036(PunteroCaracteristicasPersonajeIY + 3 - &H3036), CByte(-AvanceY))
+        End If
+
     End Sub
 
     Function ObtenerOrientacion_29AE(ByVal PunteroCaracteristicasPersonajeIY As Integer) As Byte
@@ -5852,14 +5830,11 @@ H2BA6:
                 SiguienteTick(2500, "DibujarPresentacion")
             Case = 1
                 ModPantalla.DibujarRectangulo(0, 0, 319, 199, 0) 'fondo rosa
-                ModPantalla.Refrescar()
                 Estado = 2
                 ContadorBanco = 7
                 SiguienteTick(1200, "DibujarPresentacion")
             Case = 2
                 DibujarBancoPresentacion(ContadorBanco)
-                ModPantalla.Refrescar()
-                Application.DoEvents()
                 ContadorBanco = ContadorBanco - 1
                 If ContadorBanco < 0 Then Estado = 3
                 SiguienteTick(100, "DibujarPresentacion")
@@ -5875,39 +5850,6 @@ H2BA6:
                 'SeleccionarPaleta(1)
                 InicializarJuego_249A_b()
         End Select
-    End Sub
-
-    Public Async Sub DibujarPresentacion_anterior()
-        'coloca en pantalla la imagen de presentación, usado el orden
-        'de líneas del original
-        Dim ContadorBanco As Integer
-        SeleccionarPaleta(0)
-        ModPantalla.DibujarRectangulo(0, 0, 319, 199, 6) 'fondo azul oscuro
-        SeleccionarPaleta(4)
-        Await Task.Run(Sub()
-                           Dormir(2500)
-                       End Sub)
-        ModPantalla.DibujarRectangulo(0, 0, 319, 199, 0) 'fondo rosa
-        ModPantalla.Refrescar()
-        Await Task.Run(Sub()
-                           Dormir(1200)
-                       End Sub)
-        For ContadorBanco = 7 To 0 Step -1
-            DibujarBancoPresentacion(ContadorBanco)
-            ModPantalla.Refrescar()
-            Application.DoEvents()
-            Await Task.Run(Sub()
-                               Dormir(100)
-                           End Sub)
-        Next
-        Await Task.Run(Sub()
-                           Dormir(5000)
-                       End Sub)
-        ModPantalla.DibujarRectangulo(0, 0, 319, 199, 1) 'fondo negro
-        SeleccionarPaleta(0) 'paleta negra
-        'ModPantalla.DibujarRectangulo(0, 0, 319, 199, 0) 'fondo rosa
-        'SeleccionarPaleta(1)
-        InicializarJuego_249A_b()
     End Sub
 
     Public Sub DibujarBancoPresentacion(NumeroBanco As Integer)
@@ -5935,16 +5877,6 @@ H2BA6:
         Next
     End Sub
 
-    Private Sub Dormir(Tiempo As Integer)
-        'sale de la tareaactual durante el tiempo indicado. usado con RetardoAsync
-        Threading.Thread.Sleep(Tiempo)
-    End Sub
-
-
-
-
-
-
     Private Function LeerColoresModo0(Pixel As Byte) As Byte()
         'extrae la información de color de un pixel del modo 0 (160x200)
         Dim Resultado(1) As Byte
@@ -5966,6 +5898,7 @@ H2BA6:
     End Function
 
     Public Sub Retardo(Tiempo As Integer)
+        'no usar!!
         'hace una pausa de la duración indicada en "tiempo" (ms)
         Dim Contador As Integer
         TmRetardo.Interval = Tiempo
@@ -6178,6 +6111,7 @@ H2BA6:
         OrientacionA = TablaComandos_440C(&H4418 - &H440C) 'lee la orientación resultado
         OrientacionA = OrientacionA Xor &H02 'invierte la orientación
         BufferSprites_9500(PunteroBufferSpritesHL - &H9500) = OrientacionA 'escribe la orientación
+
         If TablaComandos_440C(&H4419 - &H440C) <> 1 Then 'si el número de iteraciones realizadas no es 1, comienza a iterar
             'si llega aquí, ya se ha encontrado el camino completo del destino al origen
             '4689
@@ -6236,9 +6170,10 @@ H2BA6:
                 If PosicionBC = PosicionOrigen_2DB2 Then Exit Do
                 'si la coordenada del origen no es la misma que la sacada de la pila, continua procesando una iteración más
             Loop
-            'si llega aquí, ya se ha encontrado el camino completo del destino al origen
-            '46d3
-            PunteroBufferSpritesIX = PunteroBufferSpritesHL 'obtiene el principio de la pila de movimientos en ix
+        End If
+        'si llega aquí, ya se ha encontrado el camino completo del destino al origen
+        '46d3
+        PunteroBufferSpritesIX = PunteroBufferSpritesHL 'obtiene el principio de la pila de movimientos en ix
             Do
                 '46db
                 OrientacionB = TablaCaracteristicasPersonajes_3036(PersonajeIY + 1 - &H3036) 'obtiene la orientación del personaje
@@ -6284,7 +6219,7 @@ H2BA6:
                     'en otro caso, sigue procesando entradas
                 Loop
             Loop
-        End If
+
     End Sub
 
     Public Sub CambiarOrientacionPersonaje_464F(ByVal PersonajeIY As Integer, ByVal OrientacionNuevaC As Byte)
@@ -6444,6 +6379,7 @@ H2BA6:
         If PunteroBufferAlturas_2D8A = &H01C0 Then 'buffer principal con la pantalla actual
             SetBitArray(TablaBufferAlturas_01C0, Puntero - &H01C0, NBit)
         Else 'buffer auxiliar para la búsqueda de caminos
+            If (Puntero - &H96F4) > UBound(TablaBufferAlturas_96F4) Or Puntero < &H96F4 Then Exit Sub
             SetBitArray(TablaBufferAlturas_96F4, Puntero - &H96F4, NBit)
         End If
     End Sub
@@ -6452,30 +6388,38 @@ H2BA6:
         If PunteroBufferAlturas_2D8A = &H01C0 Then 'buffer principal con la pantalla actual
             ClearBitArray(TablaBufferAlturas_01C0, Puntero - &H01C0, NBit)
         Else 'buffer auxiliar para la búsqueda de caminos
+            If (Puntero - &H96F4) > UBound(TablaBufferAlturas_96F4) Or Puntero < &H96F4 Then Exit Sub
             ClearBitArray(TablaBufferAlturas_96F4, Puntero - &H96F4, NBit)
         End If
     End Sub
 
     Public Function LeerByteBufferAlturas(ByVal Puntero As Integer) As Byte
-        On Error Resume Next
+        LeerByteBufferAlturas = 0
         If PunteroBufferAlturas_2D8A = &H01C0 Then 'buffer principal con la pantalla actual
+            If Not PunteroPerteneceTabla(Puntero, TablaBufferAlturas_01C0, &H01C0) Then Exit Function
             LeerByteBufferAlturas = TablaBufferAlturas_01C0(Puntero - &H01C0)
         Else 'buffer auxiliar para la búsqueda de caminos
+            If Not PunteroPerteneceTabla(Puntero, TablaBufferAlturas_96F4, &H96F4) Then Exit Function
             LeerByteBufferAlturas = TablaBufferAlturas_96F4(Puntero - &H96F4)
         End If
     End Function
+
     Public Function EscribirByteBufferAlturas(ByVal Puntero As Integer, ByVal Valor As Byte)
         If PunteroBufferAlturas_2D8A = &H01C0 Then 'buffer principal con la pantalla actual
+            If Not PunteroPerteneceTabla(Puntero, TablaBufferAlturas_01C0, &H01C0) Then Exit Function
             TablaBufferAlturas_01C0(Puntero - &H01C0) = Valor
         Else 'buffer auxiliar para la búsqueda de caminos
+            If Not PunteroPerteneceTabla(Puntero, TablaBufferAlturas_96F4, &H96F4) Then Exit Function
             TablaBufferAlturas_96F4(Puntero - &H96F4) = Valor
         End If
     End Function
 
     Public Function LeerBitBufferAlturas(ByVal Puntero As Integer, NBit As Byte) As Byte
+        LeerBitBufferAlturas = 0
         If PunteroBufferAlturas_2D8A = &H01C0 Then 'buffer principal con la pantalla actual
             LeerBitBufferAlturas = LeerBitArray(TablaBufferAlturas_01C0, Puntero - &H01C0, NBit)
         Else 'buffer auxiliar para la búsqueda de caminos
+            If (Puntero - &H96F4) > UBound(TablaBufferAlturas_96F4) Or Puntero < &H96F4 Then Exit Function
             LeerBitBufferAlturas = LeerBitArray(TablaBufferAlturas_96F4, Puntero - &H96F4, NBit)
         End If
     End Function
@@ -6531,7 +6475,7 @@ H2BA6:
             PunteroBufferAlturasHL = PunteroBufferAlturasHL + 1 'pasa a la siguiente columna de la primera línea del buffer de alturas
         Next 'repite hasta haber puesto el bit 7 de todas las posiciones del borde del buffer de alturas
         'ModFunciones.GuardarArchivo("Buffer0", TablaBufferAlturas_01C0) '&H23F
-        ModFunciones.GuardarArchivo("Buffer0", TablaBufferAlturas_96F4) '&H23F
+        'ModFunciones.GuardarArchivo("Buffer0", TablaBufferAlturas_96F4) '&H23F
 
         '4493
         PunteroPilaCamino = &H9CFE 'pone la pila al final del buffer de sprites
@@ -6683,7 +6627,11 @@ H2BA6:
         'b = orientación usada para ir del destino al origen
         Dim DatosHabitacion As Byte
         ComprobarPosicionCaminoHabitacion_489B = False
-        DatosHabitacion = TablaConexionesHabitaciones_05CD(PunteroTablaConexionesHabitacionesIX - &H05CD) 'obtiene los datos de la habitación
+        If PunteroPerteneceTabla(PunteroTablaConexionesHabitacionesIX, TablaConexionesHabitaciones_05CD, &H05CD) Then
+            DatosHabitacion = TablaConexionesHabitaciones_05CD(PunteroTablaConexionesHabitacionesIX - &H05CD) 'obtiene los datos de la habitación
+        Else
+            DatosHabitacion = 0
+        End If
         If (DatosHabitacion And OrientacionSalidaC) <> 0 Then Exit Function 'si no se puede salir de la habitación por la orientación que se le pasa, sale
         '48a0
         If ModFunciones.LeerBitArray(TablaConexionesHabitaciones_05CD, PunteroTablaConexionesHabitacionesIX - &H05CD, MascaraBusquedaHabitacion_48A4) Then
@@ -6819,7 +6767,7 @@ H2BA6:
         'lee en bc un valor relacionado con el desplazamiento de la puerta en el buffer de alturas
         'si el objeto no es visible, sale. En otro caso, devuelve en ix un puntero a la entrada de la tabla de alturas de la posición correspondiente
         If Not LeerDesplazamientoPuerta_0E2C(PunteroBufferAlturasIX, PunteroDatosIY, DeltaBuffer) Then Exit Sub
-        'marca la altura de esta posición del buffer de alturas
+        'marca la altura de esta posición del buffer de altura
         EscribirByteBufferAlturas(PunteroBufferAlturasIX, AlturaPuertaA)
         'marca la altura de la siguiente posición del buffer de alturas
         EscribirByteBufferAlturas(PunteroBufferAlturasIX + DeltaBuffer, AlturaPuertaA)
@@ -7027,10 +6975,10 @@ H2BA6:
         RellenarBufferAlturas_2D22(PersonajeIY)
         PosicionXGuillermo = TablaCaracteristicasPersonajes_3036(2) 'obtiene la posición x de guillermo
         PosicionXPersonaje = TablaCaracteristicasPersonajes_3036(PersonajeIY + 2 - &H3036) 'obtiene la posición x del personaje
+        PosicionYPersonaje = TablaCaracteristicasPersonajes_3036(PersonajeIY + 3 - &H3036) 'obtiene la posición y del personaje
         '0bcf
         If EsDistanciaPequeña_0C75(PosicionXGuillermo, PosicionXPersonaje, MinimaXB) Then
             PosicionYGuillermo = TablaCaracteristicasPersonajes_3036(3) 'obtiene la posición y de guillermo
-            PosicionYPersonaje = TablaCaracteristicasPersonajes_3036(PersonajeIY + 3 - &H3036) 'obtiene la posición y del personaje
             '0BDB
             If EsDistanciaPequeña_0C75(PosicionYGuillermo, PosicionYPersonaje, MinimaYC) Then
                 '0BE1
@@ -7087,14 +7035,14 @@ H2BA6:
                 '0C2A
                 'si el personaje que estaba cerca está en lamisma habitación que guillermo, empieza a dibujar en guillermo
                 'apunta a una dirección que contiene un puntero a los datos de posición guillermo
-                PunteroDatosPersonajesHL = &H2BBA
+                PunteroDatosPersonajesHL = &H2BB0
                 NumeroPersonajes = NumeroPersonajes + 1 'comprueba 6 personajes
             End If
         End If
         '0C2E
         For Contador = 0 To NumeroPersonajes - 1
             'de = dirección de los datos de posición del personaje a comprobar
-            PunteroDatosPersonajeDE = Leer16(TablaDatosPersonajes_2BAE, PunteroDatosPersonajesHL - &H2BAE)
+            PunteroDatosPersonajeDE = Leer16(TablaPunterosPersonajes_2BAE, PunteroDatosPersonajesHL - &H2BAE)
             If PunteroDatosPersonajeDE <> PersonajeIY Then 'si no coincide con la del personaje
                 '0C3E
                 'aquí llega si el personaje que se le ha pasado a la rutina no es el que se está comprobando
@@ -7102,12 +7050,12 @@ H2BA6:
                 RellenarBufferAlturasPersonaje_28EF(PunteroDatosPersonajeDE, &H10)
             End If
             '0c48
-            PunteroDatosPersonajeDE = PunteroDatosPersonajeDE + 8
+            PunteroDatosPersonajesHL = PunteroDatosPersonajesHL + 10 'avanza al siguiente personaje
         Next
         '0C4F
         PunteroDatosPuertaIY = &H2FE4 'iy apunta a los datos de las puertas
         Do
-            If LeerBitArray(TablaDatosPuertas_2FE4, PunteroDatosPuertaIY - &H2FE4, 6) Then
+            If LeerBitArray(TablaDatosPuertas_2FE4, PunteroDatosPuertaIY + 1 - &H2FE4, 6) Then
                 'si la puerta está abierta, marca su posición en el buffer de alturas
                 '0x0f = altura en el buffer de alturas de una puerta cerrada
                 EscribirAlturaPuertaBufferAlturas_0E19(&H0F, PunteroDatosPuertaIY)
@@ -7715,7 +7663,7 @@ H2BA6:
                 Case = &HFD 'si hay que ir a por el libro
                     PersonajeDestinoHL = &H3008
                 Case = &HFC 'si hay que ir a por el pergamino
-                    PersonajeDestinoHL = &H3036
+                    PersonajeDestinoHL = &H3017
                 Case Else 'aquí llega si en ix-1 no encontró 0xff, 0xfe, 0xfd ni 0xfc
                     '075D
                     'copia 3 bytes al buffer que se usa en los algoritmos de posición
@@ -7752,7 +7700,7 @@ H2BA6:
             If ResultadoBusqueda_2DB6 <> &HFD Then Exit Sub
             '0788
             'si ha llegado al sitio, lo indica
-            TablaVariablesLogica_3C85(PersonajeObjetoIX - 3 - &H3C85) = LeerBytePersonajeObjeto(PersonajeObjetoIX)
+            TablaVariablesLogica_3C85(PersonajeObjetoIX - 3 - &H3C85) = LeerBytePersonajeObjeto(PersonajeObjetoIX - 1)
         Else
             '0872
             'aquí llega si tiene un movimiento pensado
@@ -8045,7 +7993,7 @@ H2BA6:
         'lee datos de movimiento de adso y guarda ese valor que luego usará como si fuera un valor aleatorio
         TablaVariablesLogica_3C85(ValorAleatorio_3C9D - &H3C85) = BufferComandosMonjes_A200(&HA2C0 - &HA200)
         'obtiene la máscara de las puertas que puede atravesar el personaje
-        PuertasAbriblesPersonajeA = PuertasAbribles_3CA6 And MascaraPuertasC
+        PuertasAbriblesPersonajeA = TablaVariablesLogica_3C85(PuertasAbribles_3CA6 - &H3C85) And MascaraPuertasC
         '3EB1
         'apunta a la tabla con las habitaciones que comunican las puertas
         PunteroAccesoHabitacionesIX = &H3C67
@@ -8089,24 +8037,6 @@ H2BA6:
             '3EDE
         Next 'repite hasta acabar las 6 entradas 
     End Sub
-
-    Public Sub ProcesarLogicaAdso_5DA1()
-        '### pendiente
-        TablaVariablesLogica_3C85(DondeVaAdso_3d13 - &H3C85) = &HFF 'sigue a guillermo
-
-        'TablaVariablesLogica_3C85(DondeVaAdso_3d13 - &H3C85) = &H1 'va al refectorio. 
-        'TablaVariablesLogica_3C85(DondeVaAdso_3d13 - &H3C85) = &H0 'va a la iglesia
-
-        'cambio de posición predefinida 0
-        'TablaVariablesLogica_3C85(&H3D14 - &H3C85) = &H88
-        'TablaVariablesLogica_3C85(&H3D15 - &H3C85) = &H88
-        'TablaVariablesLogica_3C85(&H3D16 - &H3C85) = &H02
-
-    End Sub
-
-
-
-
 
     Public Function LeerComandoPersonaje_2C10(ByVal PersonajeIY As Integer) As Byte
         'lee un bit de datos de los comandos del personaje y lo mete en el CF
@@ -8400,14 +8330,14 @@ H2BA6:
                     '08CF
                     'aquí llega si no tenía un movimiento pensado
                     'si tiene el control pulsado, adso se queda quieto
-                    If TeclaPulsadaNivel_3482(&H2F) And Depuracion.PararAdsoCTRL Then Exit Sub
+                    If TeclaPulsadaNivel_3482(&H17) And Depuracion.PararAdsoCTRL Then Exit Sub
                     '08D8
                     'indica que de momento no ha encontrado una ruta hasta guillermo
                     ResultadoBusqueda_2DB6 = 0
                     '08E3
                     'si la posición no es una de las del centro de la pantalla que se muestra, CF=1
                     'en otro caso, devuelve en ix un puntero a la entrada de la tabla de alturas de la posición correspondiente
-                    If DeterminarPosicionCentral_0CBE(PersonajeIY, PunteroBufferAlturasIX) Then
+                    If DeterminarPosicionCentral_0CBE(PersonajeIY, PunteroBufferAlturasIX) And Not (Depuracion.CamaraManual And (TablaVariablesLogica_3C85(PersonajeSeguidoPorCamara_3C8F - &H3C85) = 1)) Then
                         '08E6
                         'adso está en la pantalla que se muestra
                         If TeclaPulsadaNivel_3482(0) Then 'si se pulsa cursor arriba
@@ -8519,6 +8449,7 @@ H2BA6:
                         '097f
                         'aquí llega si adso no está en zona de la pantalla que se muestra
                         'va a por Guillermo, que no está en la misma zona de pantalla que se muestra (iy a por ix)
+                        'si la cámara apunta a adso mientras sigue a guillermo, pero guillermo no está en en la misma habitación, también pasa por aquí
                         If Not BuscarCaminoGeneral_098A(PersonajeIY, &H3038) Then Exit Sub
                         'si encontró un camino, vuelve a ejecutar el movimiento de adso
                         flipe = flipe + 1
@@ -8590,7 +8521,7 @@ H2BA6:
         Dim MalaquiasTieneLamparaA As Boolean
         Dim TiempoUsoLamparaHL As Integer
         'lee si malaquías tiene la 
-        If LeerBitArray(TablaObjetosPersonajes_2DEC, &H2DFA - &H2DEC, 7) Then MalaquiasTieneLamparaA = True
+        If LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosMalaquias_2DFA - &H2DEC, 7) Then MalaquiasTieneLamparaA = True
         'obtiene el tiempo de uso de la lámpara
         TiempoUsoLamparaHL = Leer16(TablaVariablesLogica_3C85, TiempoUsoLampara_3C87 - &H3C85)
         '3FFF
@@ -8599,14 +8530,14 @@ H2BA6:
         '4002
         'indica que se ha usado la lámpara
         TablaVariablesLogica_3C85(LamparaEnCocina_3C91 - &H3C85) = 0
-        'ponea a 0 el contador de uso de la lámpara
+        'pone a a 0 el contador de uso de la lámpara
         Escribir16(TablaVariablesLogica_3C85, TiempoUsoLampara_3C87 - &H3C85, 0)
         'indica que no se está usando la lámpara
         TablaVariablesLogica_3C85(LamparaEncendida_3C8B - &H3C85) = 0
         'indica que adso no tiene la lámpara
         ClearBitArray(TablaObjetosPersonajes_2DEC, &H2DF3 - &H2DEC, 7)
         'indica que malaquías no tiene la lámpara
-        ClearBitArray(TablaObjetosPersonajes_2DEC, &H2DFA - &H2DEC, 7)
+        ClearBitArray(TablaObjetosPersonajes_2DEC, ObjetosMalaquias_2DFA - &H2DEC, 7)
         'copia en 0x3030 -> 00 00 00 00 00 (limpia los datos de posición de la lámpara)
         CopiarDatosPersonajeObjeto_4145(&H3030, {0, 0, 0, 0, 0})
     End Sub
@@ -8684,7 +8615,7 @@ H2BA6:
         'coloca la posición (116, 164)
         PunteroCaracteresPantalla_2D97 = &HA41D
         If TablaVariablesLogica_3C85(ContadorRespuestaSN_3C99 - &H3C85) And &H01 Then
-            ImprimirFrase_4FEE({&H20, &H20, &H20})
+            ImprimirFrase_4FEE({&H20, &H20, &H20}) '3 espacios
         Else
             ImprimirFrase_4FEE({&H53, &H3A, &H4E})
         End If
@@ -8696,7 +8627,7 @@ H2BA6:
         Dim PunteroNotasHL As Integer
         Dim PunteroFrasesHL As Integer
         Dim NotaOctavaA As Byte
-        Dim Contador As Byte
+        Dim Contador As Integer
         Dim Valor As Byte
         EscribirFraseMarcador_5026 = False
         'si se está reproduciendo alguna frase, sale
@@ -8800,7 +8731,8 @@ H2BA6:
         AlturaPlantaPersonajeB = LeerAlturaBasePlanta_2473(AlturaPersonajeA)
         'si los personajes no están en la misma planta, sale
         If AlturaPlantaGuillermoB <> AlturaPlantaPersonajeB Then
-            CompararDistanciaGuillermo_3E61 = AlturaPlantaPersonajeB
+            CompararDistanciaGuillermo_3E61 = &HFF 'AlturaPlantaPersonajeB
+            'parche para que 
             Exit Function
         End If
         '3E71
@@ -8865,13 +8797,23 @@ H2BA6:
                 DibujarCaracterPergamino_6781()
             Case = "ImprimirRetornoCarroPergamino_67DE"
                 ImprimirRetornoCarroPergamino_67DE()
-            Case = "BuclePrincipal_25B7"
-                BuclePrincipal_25B7()
-                CalcularFPS()
             Case = "PasarPaginaPergamino_67F0"
                 PasarPaginaPergamino_67F0()
             Case = "PasarPaginaPergamino_6697"
                 PasarPaginaPergamino_6697()
+            Case = "InicializarPartida_2509"
+                InicializarPartida_2509()
+            Case = "InicializarPartida_2509_b"
+                InicializarPartida_2509_b
+            Case = "DibujarPantalla_4EB2"
+                DibujarPantalla_4EB2()
+            Case = "MostrarResultadoJuego_42E7_b"
+                MostrarResultadoJuego_42E7_b()
+            Case = "BuclePrincipal_25B7"
+                BuclePrincipal_25B7()
+                CalcularFPS()
+            Case = "BuclePrincipal_25B7_PantallaDibujada"
+                BuclePrincipal_25B7_PantallaDibujada()
         End Select
         ModPantalla.Refrescar()
         TmTick.Enabled = True
@@ -8912,7 +8854,7 @@ H2BA6:
         Dim ContadorB As Byte
         Dim ContadorC As Byte
         Dim Pixels As Byte
-        Dim ValorAnteriorPunteroCaracteresPantalla_2D97 As Byte
+        Dim ValorAnteriorPunteroCaracteresPantalla_2D97 As Integer
         'hl apunta a la parte de pantalla de las frases (104, 164)
         PunteroPantallaHL = &HE65A
         For ContadorB = 0 To 7 'b = 8 lineas
@@ -8961,7 +8903,7 @@ H2BA6:
         '		BC -> 0x04 (0xfe) -> ,   
         Contador_2D9A = Contador_2D9A + 1
         'si no es 45 sale
-        'If Contador_2D9A < &H45 Then Exit Sub
+        If Contador_2D9A < &H4 Then Exit Sub
         '3B5F
         Contador_2D9A = 0 'mantiene entre 0 y 44
         'si no está mostrando una frase, sale
@@ -9099,7 +9041,4628 @@ H2BA6:
         InicializarJuego_249A()
     End Sub
 
+    Public Sub ProcesarLogicaAdso_5DA1()
+        'TablaVariablesLogica_3C85(DondeVaAdso_3d13 - &H3C85) = &HFF 'sigue a guillermo
+        'TablaVariablesLogica_3C85(DondeVaAdso_3d13 - &H3C85) = &H1 'va al refectorio. 
+        'TablaVariablesLogica_3C85(DondeVaAdso_3D13 - &H3C85) = &H0 'va a la iglesia
+        'Exit Sub
+        'cambio de posición predefinida 0
+        'TablaVariablesLogica_3C85(&H3D14 - &H3C85) = &H88
+        'TablaVariablesLogica_3C85(&H3D15 - &H3C85) = &H88
+        'TablaVariablesLogica_3C85(&H3D16 - &H3C85) = &H02
+
+        'inicio de la lógica de adso
+        'si guillermo tiene el pergamino
+        If LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 4) Then
+            '5da9
+            'lo indica
+            TablaVariablesLogica_3C85(EstadoPergamino_3C90 - &H3C85) = 0
+        End If
+        '5dac
+        'si se está acabando la noche, informa de ello
+        If TablaVariablesLogica_3C85(NocheAcabandose_3C8C - &H3C85) = 1 Then
+            '5DB2
+            'pone en el marcador la frase
+            'PRONTO AMANECERA, MAESTRO
+            EscribirFraseMarcador_5026(&H27)
+        End If
+        '5DB6
+        'si ha cambiado el estado de la lámpara a 1
+        If TablaVariablesLogica_3C85(EstadoLampara_3C8D - &H3C85) = 1 Then
+            '5DBC
+            'indica que se procesado el cambio de estado de la lámpara
+            TablaVariablesLogica_3C85(EstadoLampara_3C8D - &H3C85) = 0
+            'escribe en el marcador la frase
+            'LA LAMPARA SE AGOTA
+            EscribirFraseMarcador_501B(&H28)
+        End If
+        '5DC3
+        'si ha cambiado el estado de la lámpara a 2
+        If TablaVariablesLogica_3C85(EstadoLampara_3C8D - &H3C85) = 2 Then
+            '5DC9
+            'indica que se procesado el cambio de estado de la lámpara
+            TablaVariablesLogica_3C85(EstadoLampara_3C8D - &H3C85) = 0
+            'inicia el contador del tiempo que pueden ir a oscuras
+            TablaVariablesLogica_3C85(ContadorTiempoOscuras_3C8E - &H3C85) = &H32
+            'indica que la lámpara ya no se está usando?
+            TablaVariablesLogica_3C85(LamparaEncendida_3C8B - &H3C85) = 0
+            'oculta el área de juego
+            PintarAreaJuego_1A7D(&HFF)
+            'le quita la lámpara a adso y reinicia los contadores?
+            InicializarLampara_3FF7()
+            EscribirFraseMarcador_501B(&H2A)
+        End If
+        '5DDC
+        'si guillermo no ha muerto
+        If TablaVariablesLogica_3C85(GuillermoMuerto_3C97 - &H3C85) = 0 Then
+            '5DE2
+            'si se ha activado el contador del tiempo a oscuras
+            If TablaVariablesLogica_3C85(ContadorTiempoOscuras_3C8E - &H3C85) >= 1 Then
+                '5DE8
+                'altura en el escenario de guillermo < 0x18, es decir, si ha salido de la la biblioteca
+                If TablaCaracteristicasPersonajes_3036(&H303A - &H3036) < &H18 Then
+                    '5DEF
+                    'pone el contador a 0
+                    TablaVariablesLogica_3C85(ContadorTiempoOscuras_3C8E - &H3C85) = 0
+                    Exit Sub
+                End If
+                '5DF3
+                'aquí llega si sigue en la biblioteca
+                'decrementa el contador del tiempo que pueden ir a oscuras
+                TablaVariablesLogica_3C85(ContadorTiempoOscuras_3C8E - &H3C85) = TablaVariablesLogica_3C85(ContadorTiempoOscuras_3C8E - &H3C85) - 1
+                'si llega a 1
+                If TablaVariablesLogica_3C85(ContadorTiempoOscuras_3C8E - &H3C85) = 1 Then
+                    '5DFE
+                    'indica que guillermo ha muerto
+                    TablaVariablesLogica_3C85(GuillermoMuerto_3C97 - &H3C85) = 1
+                    'escribe en el marcador la frase
+                    'JAMAS CONSEGUIREMOS SALIR DE AQUI
+                    EscribirFraseMarcador_501B(&H2B)
+                    Exit Sub
+                End If
+                '5E06
+                'aquí llega si está activo el contador del tiempo que pueden ir a oscuras, pero aún no se ha terminado
+            Else
+                '5E08
+                'aquí llega si no se ha activado el contador del tiempo a oscuras
+                'si la altura de adso >= 0x18 (si adso acaba de entrar en la biblioteca)
+                If TablaCaracteristicasPersonajes_3036(&H3049 - &H3036) >= &H18 Then
+                    '5E0F
+                    'indica que adso siga a guillermo
+                    TablaVariablesLogica_3C85(DondeVaAdso_3D13 - &H3C85) = &HFF
+                    'si adso no tiene la lámpara
+                    If Not LeerBitArray(TablaObjetosPersonajes_2DEC, &H2DF3 - &H2DEC, 7) Then
+                        '5E1A
+                        'escribe en el marcador la frase
+                        'DEBEMOS ENCONTRAR UNA LAMPARA, MAESTRO
+                        EscribirFraseMarcador_501B(&H13)
+                        'activa el contador del tiempo que pueden a oscuras
+                        TablaVariablesLogica_3C85(ContadorTiempoOscuras_3C8E - &H3C85) = &H64
+                        Exit Sub
+                    End If
+                    '5E22
+                    'aqui se llega si adso tiene la lámpara y acaba de entrar a la biblioteca
+                    'enciende la lámpara
+                    TablaVariablesLogica_3C85(LamparaEncendida_3C8B - &H3C85) = 1
+                    Exit Sub
+                End If
+                '5E26
+                'aquí llega si adso no está en la biblioteca
+                'indica que la lámpara no se está usando
+                TablaVariablesLogica_3C85(LamparaEncendida_3C8B - &H3C85) = 0
+                'anula el contador del tiempo que pueden ir a oscuras
+                TablaVariablesLogica_3C85(ContadorTiempoOscuras_3C8E - &H3C85) = 0
+            End If
+        End If
+        '5E2C
+        'si está en sexta
+        If MomentoDia_2D81 = 3 Then
+            '5E32
+            'va al refectorio
+            TablaVariablesLogica_3C85(DondeVaAdso_3D13 - &H3C85) = &H1
+            'indica que falta algún monje en misa/refectorio
+            TablaVariablesLogica_3C85(MonjesListos_3C96 - &H3C85) = 7
+            'cambia la frase a mostrar por DEBEMOS IR AL REFECTORIO, MAESTRO
+            NumeroFrase_3F0E = &H0C
+            'termina de procesar la lógica de adso
+            ProcesarLogicaAdso_5EE5()
+            Exit Sub
+        End If
+        '5E3E
+        'si es prima o vísperas
+        If MomentoDia_2D81 = 5 Or MomentoDia_2D81 = 1 Then
+            '5E48
+            'va a la iglesia
+            TablaVariablesLogica_3C85(DondeVaAdso_3D13 - &H3C85) = &H0
+            'indica que falta algún monje en misa/refectorio
+            TablaVariablesLogica_3C85(MonjesListos_3C96 - &H3C85) = 1
+            'cambia la frase a mostrar por DEBEMOS IR A LA IGLESIA, MAESTRO
+            NumeroFrase_3F0E = &H0B
+            ProcesarLogicaAdso_5EE5()
+            Exit Sub
+        End If
+        '5E54
+        'aquí llega si no es prima ni vísperas ni sexta
+        'si está en completas
+        If MomentoDia_2D81 = 6 Then
+            '5E5A
+            'cambia el estado de adso
+            TablaVariablesLogica_3C85(EstadoAdso_3D12 - &H3C85) = 6
+            'ld   b,$D7  ???
+            'se dirige a la celda
+            TablaVariablesLogica_3C85(DondeVaAdso_3D13 - &H3C85) = 2
+            Exit Sub
+        End If
+        '5E61
+        'aquí llega si no es prima ni vísperas ni sexta ni completas
+        'si es de noche
+        If MomentoDia_2D81 = 0 Then
+            '5E68
+            'si el estado es 4 (estaba en la celda esperando contestacion)
+            If TablaVariablesLogica_3C85(EstadoAdso_3D12 - &H3C85) = 4 Then
+                '5E6E
+                'si se muestra la pantalla número 0x37 (la de fuera de nuestra celda)
+                If NumeroPantallaActual_2DBD = &H37 Then
+                    '5E74
+                    'se pasa al siguiente día
+                    TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 2
+                End If
+                '5E77
+                'si no se está reproduciendo una voz
+                If ReproduciendoFrase_2DA1 = False Then
+                    '5E7D
+                    'si el contador para contestar es >= 100
+                    If TablaVariablesLogica_3C85(ContadorRespuestaSN_3C99 - &H3C85) >= &H64 Then
+                        '5E83
+                        'si tardamos en contestar, pasa al siguiente día
+                        TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 2
+                        Exit Sub
+                    End If
+                    '5E87
+                    'incrementa el contador
+                    TablaVariablesLogica_3C85(ContadorRespuestaSN_3C99 - &H3C85) = TablaVariablesLogica_3C85(ContadorRespuestaSN_3C99 - &H3C85) + 1
+                    'imprime S:N o borra S:N dependiendo del bit 1 de 0x3c99
+                    EscribirBorrar_S_N_5065()
+                    'dependiendo del bit 1, lee el estado del teclado
+                    If LeerBitArray(TablaVariablesLogica_3C85, ContadorRespuestaSN_3C99 - &H3C85, 0) Then
+                        '5E97
+                        'comprueba si se ha pulsado la S
+                        If TeclaPulsadaNivel_3482(&H3C) Then
+                            '5EAA
+                            'se avanza al siguiente día
+                            TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 2
+                            Exit Sub
+                        End If
+                        '5E9E
+                        'comprueba si se ha pulsado la N
+                        If TeclaPulsadaNivel_3482(&H2E) Then
+                            '5EA6
+                            TablaVariablesLogica_3C85(EstadoAdso_3D12 - &H3C85) = 5
+                        End If
+                        Exit Sub
+                    End If
+                End If
+                '5EAD
+                Exit Sub
+            End If
+            '5EAE
+            'aqui llega si es de noche y 0x3d12 no era 4
+            'sigue a guillermo
+            TablaVariablesLogica_3C85(DondeVaAdso_3D13 - &H3C85) = &HFF
+            'si el estado es 5 (no dormimos)
+            If TablaVariablesLogica_3C85(EstadoAdso_3D12 - &H3C85) = 5 Then
+                '5EB8
+                'si estamos en la pantalla 0x3e
+                If NumeroPantallaActual_2DBD = &H3E Then
+                    '5EBF
+                    Exit Sub
+                End If
+                '5EC0
+                'aquí llega si no estamos en nuestra celda
+                'si salimos de nuestra celda, cambia al estado 6
+                TablaVariablesLogica_3C85(EstadoAdso_3D12 - &H3C85) = 6
+            End If
+            '5EC3
+            If TablaVariablesLogica_3C85(EstadoAdso_3D12 - &H3C85) = 6 Then
+                '5EC9
+                'compara la distancia entre guillermo y adso (si está muy cerca devuelve 0, en otro caso != 0)
+                If CompararDistanciaGuillermo_3E61(&H3045) = 0 Then
+                    '5ECE
+                    'si estamos en la pantalla 0x3e (nuestra celda)
+                    If NumeroPantallaActual_2DBD = &H3E Then
+                        '5ED5
+                        'inicia el contador del tiempo de respuesta de guillermo a la pregunta de dormir
+                        TablaVariablesLogica_3C85(ContadorRespuestaSN_3C99 - &H3C85) = 0
+                        'cambia el estado de adso
+                        TablaVariablesLogica_3C85(EstadoAdso_3D12 - &H3C85) = 4
+                        'pone en el marcador la frase
+                        '¿DORMIMOS?, MAESTRO
+                        EscribirFraseMarcador_5026(&H12)
+                    End If
+                End If
+                '5EDF
+                Exit Sub
+            End If
+        End If
+        '5EE0
+        'sigue a guillermo
+        TablaVariablesLogica_3C85(DondeVaAdso_3D13 - &H3C85) = &HFF
+    End Sub
+
+    Public Sub ProcesarLogicaAdso_5EE5()
+        'parte final de la lógica de adso
+        If TablaVariablesLogica_3C85(EstadoAdso_3D12 - &H3C85) = TablaVariablesLogica_3C85(MonjesListos_3C96 - &H3C85) Then
+            'si son iguales, sale
+            Exit Sub
+        End If
+        '5EEC
+        If CompararDistanciaGuillermo_3E61(&H3045) = 0 Then 'si está cerca de guillermo
+            '5EF1
+            'pone en el marcador una frase (la frase se cambia dependiendo del estado)
+            EscribirFraseMarcador_5026(NumeroFrase_3F0E)
+        End If
+        '5EF4
+        TablaVariablesLogica_3C85(EstadoAdso_3D12 - &H3C85) = TablaVariablesLogica_3C85(MonjesListos_3C96 - &H3C85)
+    End Sub
+
+    Public Sub ComprobarDestinoAvanzarEstado_3E98(ByVal PunteroVariablesLogicaIX As Integer)
+        'si ha llegado al sitio al que quería llegar, avanza el estado
+        'obtiene a donde va. lo compara con donde ha llegado
+        If TablaVariablesLogica_3C85(PunteroVariablesLogicaIX - 1 - &H3C85) <> TablaVariablesLogica_3C85(PunteroVariablesLogicaIX - 3 - &H3C85) Then
+            Exit Sub 'si no ha llegado donde quería ir, sale
+        End If
+        'en otro caso avanza el estado
+        TablaVariablesLogica_3C85(PunteroVariablesLogicaIX - 2 - &H3C85) = TablaVariablesLogica_3C85(PunteroVariablesLogicaIX - 2 - &H3C85) + 1
+    End Sub
+
+    Public Sub MatarMalaquias_4386()
+        'si está muriendo, avanza la altura de malaquías
+        '438F
+        'indica que malaquías está ascendiendo mientras se está muriendo
+        MalaquiasAscendiendo_4384 = True
+        'incrementa la altura de malaquías
+        TablaCaracteristicasPersonajes_3036(&H3058 - &H3036) = TablaCaracteristicasPersonajes_3036(&H3058 - &H3036) + 1
+        'si es < 20, sale
+        If TablaCaracteristicasPersonajes_3036(&H3058 - &H3036) < &H20 Then Exit Sub
+        '439E
+        'aquí llega cuando malaquías ha desaparecido de la pantalla
+        'pone a 0 la posición x de malaquías
+        TablaCaracteristicasPersonajes_3036(&H3056 - &H3036) = 0
+        'indica que malaquías ha muerto
+        TablaVariablesLogica_3C85(MalaquiasMuriendose_3CA2 - &H3C85) = 2
+        'indica que malaquías ha llegado a la iglesia
+        TablaVariablesLogica_3C85(DondeEstaMalaquias_3CA8 - &H3C85) = 0
+    End Sub
+
+    Public Sub DejarLlavePasadizo_4022()
+        'deja la llave del pasadizo en la mesa de malaquías
+        'obtiene los objetos de malaquías
+        'si no tiene la llave del pasadizo de detrás de la cocina, sale
+        If Not LeerBitArray(TablaObjetosPersonajes_2DEC, &H2DFD - &H2DEC, 1) Then Exit Sub
+        '4028
+        'le quita la llave del pasadizo de detrás de la cocina
+        ClearBitArray(TablaObjetosPersonajes_2DEC, &H2DFD - &H2DEC, 1)
+        'copia en 0x3026 -> 00 00 35 35 13 (pone la llave3 en la mesa)
+        CopiarDatosPersonajeObjeto_4145(&H3026, {0, 0, &H35, &H35, &H13})
+    End Sub
+
+    Public Sub ActualizarMomentoDia_5527()
+        'comprueba si hay que pasar al siguiente momento del día
+        'comprueba si ha cambiado el estado del enter
+        If TeclaPulsadaFlanco_3472(6) And Depuracion.SaltarMomentoDiaEnter Then
+            'si se pulsó enter, avanza la etapa del día
+            ActualizarMomentoDia_553E()
+            Exit Sub
+        End If
+        '5531
+        'si el contador para que pase el momento del día es 0, sale
+        If TiempoRestanteMomentoDia_2D86 = 0 Then Exit Sub
+        '5537
+        'decrementa el contador del momento del día y si llega a 0, actualiza el momento del día
+        TiempoRestanteMomentoDia_2D86 = TiempoRestanteMomentoDia_2D86 - 1
+        If TiempoRestanteMomentoDia_2D86 > 0 Then Exit Sub
+        ActualizarMomentoDia_553E()
+    End Sub
+
+    Function ComprobarEstadoLampara_41FD() As Byte
+        'comprueba si se está agotando la lámpara
+        Dim EstadoLamparaC As Byte
+        Dim TiempoUsoLamparaHL As Integer
+        'lee el estado de la lámpara
+        EstadoLamparaC = TablaVariablesLogica_3C85(EstadoLampara_3C8D - &H3C85)
+        ComprobarEstadoLampara_41FD = EstadoLamparaC
+        'si adso no tiene la lámpara, sale
+        If Not LeerBitArray(TablaObjetosPersonajes_2DEC, &H2DF3 - &H2DEC, 7) Then Exit Function
+        '4207
+        'si no ha entrado al laberinto/la lampara no se está usando, sale
+        If TablaVariablesLogica_3C85(LamparaEncendida_3C8B - &H3C85) = 0 Then Exit Function
+        '420C
+        'si la pantalla está iluminada, sale
+        If Not HabitacionOscura_156C Then Exit Function
+        '4211
+        'incrementa el tiempo de uso de la lámpara
+        TiempoUsoLamparaHL = Leer16(TablaVariablesLogica_3C85, TiempoUsoLampara_3C87 - &H3C85)
+        TiempoUsoLamparaHL = TiempoUsoLamparaHL + 1
+        Escribir16(TablaVariablesLogica_3C85, TiempoUsoLampara_3C87 - &H3C85, TiempoUsoLamparaHL)
+        'si l no es 0, sale
+        If TiempoUsoLamparaHL Mod 256 <> 0 Then Exit Function
+        '421B
+        'si no ha procesado el cambiado de estado de la lámpara, sale
+        If EstadoLamparaC <> 0 Then Exit Function
+        '421E
+        'si el tiempo de uso de la lámpara ha llegado a 0x3xx, sale con c = 1 (se está agotando la lámpara)
+        If TiempoUsoLamparaHL >> 8 = 3 Then
+            ComprobarEstadoLampara_41FD = 1
+            Exit Function
+        End If
+        'si el tiempo de uso de la lámpara ha llegado a 0x6xx, sale con c = 2 (se ha agotado la lámpara)
+        If TiempoUsoLamparaHL >> 8 = 6 Then
+            ComprobarEstadoLampara_41FD = 2
+            Exit Function
+        End If
+    End Function
+
+    Public Function ComprobarAcabandoNoche_422B() As Byte
+        'comprueba si se está acabando la noche
+        ComprobarAcabandoNoche_422B = 0
+        'obtiene la cantidad de tiempo a esperar para que avance el momento del día
+        'si es 0, sale
+        If TiempoRestanteMomentoDia_2D86 = 0 Then Exit Function
+        '4233
+        'en otro caso, espera si la parte inferior del contador para que pase el momento del día no es 0, sale
+        If (TiempoRestanteMomentoDia_2D86 And &H000000FF) <> 0 Then Exit Function
+        '4236
+        'si no es de noche, sale
+        If MomentoDia_2D81 <> 0 Then Exit Function
+        '423B
+        'si la parte superior del contador es 2, sale con c = 1
+        If TiempoRestanteMomentoDia_2D86 >> 8 = 2 Then
+            ComprobarAcabandoNoche_422B = 1
+            Exit Function
+        End If
+        '4240
+        'en otro caso, si no es 0, sale con c = 0
+        If TiempoRestanteMomentoDia_2D86 <> 0 Then Exit Function
+        'si es 0, incrementa el momento del día y sale con c = 0
+        TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 1
+    End Function
+
+    Public Sub ActualizarVariablesTiempo_55B6()
+        'comprueba si hay que modificar las variables relacionadas con el tiempo (momento del día, combustible de la lámpara, etc)
+        Dim EstadoLamparaA As Byte
+        Dim AcabandoNocheA As Byte
+        'comprueba si hay que avanzar la etapa del día (si se ha pulsado enter también se cambia)
+        ActualizarMomentoDia_5527()
+        'comprueba si se está usando la lámpara, y si es así, si se está agotando
+        EstadoLamparaA = ComprobarEstadoLampara_41FD()
+        'actualiza el estado de la lámpara
+        TablaVariablesLogica_3C85(EstadoLampara_3C8D - &H3C85) = EstadoLamparaA
+        'comprueba si se está acabando la noche
+        AcabandoNocheA = ComprobarAcabandoNoche_422B()
+        'actualiza la variable que indica si se está acabando la noche
+        TablaVariablesLogica_3C85(NocheAcabandose_3C8C - &H3C85) = AcabandoNocheA
+    End Sub
+
+    Public Sub AvanzarScrollMomentoDia_5499()
+        'si no se ha completado el scroll del cambio del momento del día, lo avanza un paso
+        Dim CaracterA As Byte
+        Dim PunteroPantallaHL As Integer
+        Dim Contador As Byte
+        Dim ContadorC As Byte
+        Dim Pixels As Byte
+        'comprueba si se ha completado el scroll del cambio del momento del día
+        If ScrollCambioMomentoDia_2DA5 = 0 Then Exit Sub
+        '549E
+        'en otro caso, queda una iteración menos
+        ScrollCambioMomentoDia_2DA5 = ScrollCambioMomentoDia_2DA5 - 1
+        If ScrollCambioMomentoDia_2DA5 < 7 Then
+            '54A8
+            'lee un caracter
+            CaracterA = TablaEtapasDia_4F7A(PunteroProximaHoraDia_2D82 - &H4F7A)
+            'actualiza el puntero a la próxima hora del día
+            PunteroProximaHoraDia_2D82 = PunteroProximaHoraDia_2D82 + 1
+        Else
+            CaracterA = &H20 'a = espacio en blanco
+        End If
+        '54B0
+        'hace el efecto de scroll del texto del día 8 pixels hacia la izquierda
+        'l = coordenada X (en bytes) + 32 pixels, h = coordenada Y (en pixels)
+        'graba la posición inicial para el scroll (84, 180)
+        PunteroCaracteresPantalla_2D97 = &HB40D
+        'apunta a pantalla (44, 180)
+        PunteroPantallaHL = &HE6EB
+        For Contador = 0 To 7 '8 líneas
+            '54BC
+            'hace el scroll 8 pixels a la izquierda
+            For ContadorC = 0 To 11 '12 bytes
+                Pixels = PantallaCGA(PunteroPantallaHL + ContadorC - &HC000)
+                PantallaCGA(PunteroPantallaHL - 2 + ContadorC - &HC000) = Pixels
+                PantallaCGA2PC(PunteroPantallaHL - 2 + ContadorC - &HC000, Pixels)
+            Next
+            '54C7
+            PunteroPantallaHL = &HC000 + DireccionSiguienteLinea_3A4D_68F2(PunteroPantallaHL - &HC000)
+        Next 'completa las 8 líneas
+        'imprime un carácter
+        ImprimirCaracter_3B19(CaracterA, &H0F)
+    End Sub
+
+    Public Sub LeerPosicionObjetoDejar_534F(ByVal PunteroPersonajeObjetoIX As Integer, ByRef PosicionObjetoBC As Integer, ByRef AlturaObjetoA As Byte)
+        'obtiene la posición donde dejará el objeto y la altura a la que está el personaje que lo deja
+        'modifica una rutina con los datos de posición del personaje y su orientación
+        'devuelve  en bc la posición del personaje + 2*desplazamiento en según orientación
+        Dim PunteroPersonajeDE As Integer
+        Dim PosicionX As Byte
+        Dim PosicionY As Byte
+        Dim Orientacion As Byte
+        Dim IncrementoX As Integer
+        Dim IncrementoY As Integer
+        'On Error Resume Next
+        'lee la dirección de los datos de posición del personaje
+        PunteroPersonajeDE = Leer16(TablaObjetosPersonajes_2DEC, PunteroPersonajeObjetoIX + 1 - &H2DEC) - 2
+        'lee la orientación del personaje
+        Orientacion = TablaCaracteristicasPersonajes_3036(PunteroPersonajeDE + 1 - &H3036)
+        'hl apunta a la tabla de desplazamiento a sumar si sigue avanzando en esa orientación
+        'hl = hl + 8*a
+        IncrementoX = Leer8Signo(TablaAvancePersonaje4Tiles_284D, &H2853 + 8 * Orientacion - &H284D)
+        'lee la posición x del personaje
+        PosicionX = TablaCaracteristicasPersonajes_3036(PunteroPersonajeDE + 2 - &H3036)
+        'le suma 2 veces el valor leido de la tabla y modifica una comparación
+        PosicionXPersonajeCoger_516E = CByte(CInt(PosicionX) + 2 * IncrementoX)
+        '5364
+        'lee la posición y del personaje
+        PosicionY = TablaCaracteristicasPersonajes_3036(PunteroPersonajeDE + 3 - &H3036)
+        IncrementoY = Leer8Signo(TablaAvancePersonaje4Tiles_284D, &H2853 + 1 + 8 * Orientacion - &H284D)
+        'le suma 2 veces el valor leido de la tabla
+        PosicionYPersonajeCoger_5173 = CByte(CInt(PosicionY) + 2 * IncrementoY)
+        '536D
+        'modifica una resta
+        AlturaPersonajeCoger_5167 = TablaCaracteristicasPersonajes_3036(PunteroPersonajeDE + 4 - &H3036)
+        PosicionObjetoBC = CInt(PosicionYPersonajeCoger_5173) << 8 Or PosicionXPersonajeCoger_516E
+        AlturaObjetoA = AlturaPersonajeCoger_5167
+    End Sub
+
+    Public Sub DibujarObjeto_0D13(ByVal SpriteIX As Integer, ByVal ObjetoIY As Integer)
+        'salta a la rutina de redibujado de objetos para redibujar solo el objeto que se deja
+        'llega con ix = sprite del objeto que se deja
+        'llega con iy = datos del objeto que se deja
+        'hace que solo procese un objeto de la lista
+        '0DBB=rutina a la que saltar para procesar los objetos del juego
+        'llama a la rutina para que se redibuje el objeto
+        ProcesarObjetos_0D3B(&H0DBB, SpriteIX, ObjetoIY, True)
+    End Sub
+
+    Public Sub DejarObjeto_5277(ByVal PunteroPersonajeObjetoIX As Integer)
+        'deja algún objeto y marca el sprite del objeto para dibujar
+        Dim ObjetosA As Byte
+        Dim ObjetoC As Byte
+        Dim PosicionObjetoBC As Integer
+        Dim PosicionObjetoX As Byte
+        Dim PosicionObjetoY As Byte
+        Dim AlturaObjetoA As Byte
+        Dim AlturaRelativa_52C1 As Byte
+        Dim PunteroBufferAlturasIX As Integer
+        Dim AlturaA As Byte
+        Dim AlturaBaseObjetoB As Byte
+        Dim PunteroPersonajeHL As Integer
+        Dim OrientacionA As Byte
+        Dim Contador As Byte
+        Dim MascaraHL As Integer
+        Dim MascaraA As Byte
+        Dim PunteroSpritesIX As Integer
+        Dim PunteroPosicionObjetosIY As Integer
+        'lee los objetos que tenemos
+        ObjetosA = TablaObjetosPersonajes_2DEC(PunteroPersonajeObjetoIX + 3 - &H2DEC)
+        For ObjetoC = 1 To 8 '8 objetos
+            'si tiene el objeto que se está comprobando, salta
+            If LeerBitByte(ObjetosA, 7) Then Exit For
+            If ObjetoC = 8 Then Exit Sub
+            ObjetosA = ObjetosA << 1
+        Next 'comprueba para todos los objetos
+        '5284
+        'aquí llega cuando se pulsó espacio y tenía algún objeto (c = número de objeto)
+        'decrementa el contador
+        If TablaObjetosPersonajes_2DEC(PunteroPersonajeObjetoIX + 6 - &H2DEC) <> 0 Then
+            'si no era 0, sale
+            DecByteArray(TablaObjetosPersonajes_2DEC, PunteroPersonajeObjetoIX + 6 - &H2DEC)
+            Exit Sub
+        End If
+        '5294
+        'obtiene la posición donde dejará el objeto y la altura a la que está el personaje
+        LeerPosicionObjetoDejar_534F(PunteroPersonajeObjetoIX, PosicionObjetoBC, AlturaObjetoA)
+        'altura relativa del objeto
+        AlturaBaseObjetoB = LeerAlturaBasePlanta_2473(AlturaObjetoA)
+        AlturaRelativa_52C1 = AlturaObjetoA - AlturaBaseObjetoB
+        Integer2Nibbles(PosicionObjetoBC, PosicionObjetoY, PosicionObjetoX)
+        '52A7
+        'si el objeto no se deja en la misma planta, salta
+        '52A9
+        'ajusta la posición pasada en hl a las 20x20 posiciones centrales que se muestran. Si la posición está fuera, CF=1
+        'si hay acarreo, la posición no está dentro del rectángulo visible, por lo que salta
+        If AlturaBasePlantaActual_2DBA = AlturaBaseObjetoB And DeterminarPosicionCentral_279B(PosicionObjetoX, PosicionObjetoY) Then
+            '52AE
+            '0cd4
+            PunteroBufferAlturasIX = PosicionObjetoY * 24 + PosicionObjetoX + PunteroBufferAlturas_2D8A
+            '52B1
+            'obtiene la entrada correspondiente del buffer de alturas
+            AlturaA = LeerByteBufferAlturas(PunteroBufferAlturasIX)
+            'si hay algún personaje en esa posición, sale
+            If (AlturaA And &HF0) <> 0 Then Exit Sub
+            '52B9
+            'si se deja en una posición con una altura >= 0x0d, sale
+            If AlturaA >= &H0D Then Exit Sub
+            '52C0
+            'si la altura de la posición donde se deja - altura del personaje que deja el objeto >= 0x05, sale
+            If (AlturaA - AlturaRelativa_52C1) >= 5 Then Exit Sub
+            '52C6
+            AlturaA = AlturaA and &H0F
+            'la compara con la de sus vecinos y si no es igual, sale
+            If AlturaA <> LeerByteBufferAlturas(PunteroBufferAlturasIX - 1) Then Exit Sub
+            If AlturaA <> LeerByteBufferAlturas(PunteroBufferAlturasIX - &H18) Then Exit Sub
+            If AlturaA <> LeerByteBufferAlturas(PunteroBufferAlturasIX - &H19) Then Exit Sub
+            'a = altura total de la posición en la que se deja el objeto
+            AlturaA = AlturaA + AlturaBasePlantaActual_2DBA
+        Else
+            '52E5
+            'aquí llega si el objeto no se deja en la misma planta que la de la pantalla en la que se está o no se deja en la misma habitación
+            'obtiene la dirección de la posición del personaje
+            PunteroPersonajeHL = Leer16(TablaObjetosPersonajes_2DEC, PunteroPersonajeObjetoIX + 1 - &H2DEC)
+            'de = posición global del personaje
+            PosicionObjetoBC = Leer16(TablaCaracteristicasPersonajes_3036, PunteroPersonajeHL - &H3036)
+            'a = altura global del personaje
+            AlturaA = TablaCaracteristicasPersonajes_3036(PunteroPersonajeHL + 2 - &H3036)
+        End If
+        '52F3
+        'aquí también llega si el objeto está en la misma habitación que se muestra en pantalla
+        'obtiene la dirección de la posición del personaje
+        PunteroPersonajeHL = Leer16(TablaObjetosPersonajes_2DEC, PunteroPersonajeObjetoIX + 1 - &H2DEC)
+        PunteroPersonajeHL = PunteroPersonajeHL - 1
+        If Depuracion.BugDejarObjetoPresente Then
+            '52FC
+            'guarda la altura del objeto en h
+            PunteroPersonajeHL = (PunteroPersonajeHL And &H000000FF) Or (CInt(AlturaA) << 8)
+            '¡fallo del juego! quiere obtener la orientación del personaje pero ha sobreescrito h
+            OrientacionA = LeerByteTablaCualquiera(PunteroPersonajeHL)
+        Else
+            OrientacionA = TablaCaracteristicasPersonajes_3036(PunteroPersonajeHL - &H3036)
+        End If
+        '52FE
+        OrientacionA = OrientacionA Xor &H02
+        'inicia el contador para coger/dejar objetos
+        TablaObjetosPersonajes_2DEC(PunteroPersonajeObjetoIX + 6 - &H2DEC) = &H10
+        '5307
+        'empieza a comprobar si tiene el objeto indicado por el bit 7
+        MascaraHL = &H8000
+        For Contador = 1 To ObjetoC - 1
+            MascaraHL = MascaraHL >> 1
+        Next
+        '5313
+        MascaraA = CByte(MascaraHL And &H000000FF)
+        'el bit del objeto que se deja está a 0 y el resto de bits a 1
+        MascaraA = MascaraA Xor &HFF
+        'combina los objetos que tenía para eliminar el que deja
+        TablaObjetosPersonajes_2DEC(PunteroPersonajeObjetoIX - &H2DEC) = MascaraA And TablaObjetosPersonajes_2DEC(PunteroPersonajeObjetoIX - &H2DEC)
+        '531B
+        MascaraA = CByte((MascaraHL And &H0000FF00) >> 8)
+        'el bit del objeto que se deja está a 0 y el resto de bits a 1
+        MascaraA = MascaraA Xor &HFF
+        'combina los objetos que tenía para eliminar el que deja
+        TablaObjetosPersonajes_2DEC(PunteroPersonajeObjetoIX + 3 - &H2DEC) = MascaraA And TablaObjetosPersonajes_2DEC(PunteroPersonajeObjetoIX + 3 - &H2DEC)
+        '5323
+        'apunta a los sprites de los objetos
+        PunteroSpritesIX = &H2F1B
+        'apunta a los datos de posición de los objetos
+        PunteroPosicionObjetosIY = &H3008
+        For Contador = 1 To ObjetoC - 1
+            PunteroSpritesIX = PunteroSpritesIX + &H14 'avanza el siguiente sprite
+            PunteroPosicionObjetosIY = PunteroPosicionObjetosIY + 5 'avanza al siguiente dato de posición
+        Next
+        '533B
+        'indica que no se tiene el objeto
+        ClearBitArray(TablaPosicionObjetos_3008, PunteroPosicionObjetosIY - &H3008, 7)
+        'guarda la altura de destino del objeto
+        TablaPosicionObjetos_3008(PunteroPosicionObjetosIY + 4 - &H3008) = AlturaA
+        'guarda la orientación del objeto
+        TablaPosicionObjetos_3008(PunteroPosicionObjetosIY + 1 - &H3008) = OrientacionA
+        'guarda la posición global de destino del objeto
+        Integer2Nibbles(PosicionObjetoBC, PosicionObjetoY, PosicionObjetoX)
+        TablaPosicionObjetos_3008(PunteroPosicionObjetosIY + 2 - &H3008) = PosicionObjetoX
+        TablaPosicionObjetos_3008(PunteroPosicionObjetosIY + 3 - &H3008) = PosicionObjetoY
+        '534C
+        'salta a la rutina de redibujado de objetos para redibujar solo el objeto que se deja
+        DibujarObjeto_0D13(PunteroSpritesIX, PunteroPosicionObjetosIY)
+    End Sub
+
+    Public Function ComprobarColocacionGuillermo_43C4(ByVal PosicionReferenciaDE As Integer) As Byte
+        'comprueba que guillermo esté en una posición determinada (de la planta baja) indicada por de, con la orientación = 1
+        'devuelve en c 0, si no está en la habitación de la posición, 2 si está en la habitación de la posición y 1 si está en la posición indicada y con la orientación correcta
+        Dim AlturaGuillermoA As Byte
+        Dim PosicionGuillermoX As Byte
+        Dim PosicionGuillermoY As Byte
+        Dim ValorA As Byte
+        Dim PosicionReferenciaD As Byte
+        Dim PosicionReferenciaE As Byte
+        'c = 0, no está en su sitio
+        ComprobarColocacionGuillermo_43C4 = 0
+        'obtiene la altura de guillermo
+        AlturaGuillermoA = TablaCaracteristicasPersonajes_3036(&H303A - &H3036)
+        'si  está en la planta baja (altura < 0x0b)
+        If AlturaGuillermoA < &H0B Then
+            '43CD
+            Integer2Nibbles(PosicionReferenciaDE, PosicionReferenciaD, PosicionReferenciaE)
+            'lee la posición en x
+            PosicionGuillermoX = TablaCaracteristicasPersonajes_3036(&H3038 - &H3036)
+            'lee la posición en y
+            PosicionGuillermoY = TablaCaracteristicasPersonajes_3036(&H3039 - &H3036)
+            ValorA = (PosicionGuillermoX Xor PosicionReferenciaE) Or (PosicionGuillermoY Xor PosicionReferenciaD)
+            '43D7
+            'si la posición está en la misma habitación (a < 0x10)
+            If ValorA < &H10 Then
+                '43DB
+                'c = 0x02, en la habitación pero no en la posición correcta
+                ComprobarColocacionGuillermo_43C4 = 2
+                '43DD
+                'si Guillermo está en la misma habitación que la posición de referencia
+                If ValorA = 0 Then
+                    '43E0
+                    'si la orientación del personaje es 1
+                    If TablaCaracteristicasPersonajes_3036(&H3037 - &H3036) = 1 Then
+                        'Guillermo está en la posición indicada con la orientación = 1
+                        ComprobarColocacionGuillermo_43C4 = 1
+                    End If
+                End If
+            End If
+        End If
+        '43E8
+        'graba el resultado
+        TablaVariablesLogica_3C85(GuillermoBienColocado_3C9B - &H3C85) = ComprobarColocacionGuillermo_43C4
+    End Function
+
+    Public Sub ComprobarPresenciaBerengarioAdsoSeverinoMalaquias_6498()
+        'rellena 3c96 con el destino combinado de Berengario/Bernardo, Adso, Severino y Malaquías
+        'llamado el día 1, 2 y 4
+        TablaVariablesLogica_3C85(MonjesListos_3C96 - &H3C85) =
+            TablaVariablesLogica_3C85(DondeEsta_Berengario_3CE7 - &H3C85) Or
+            TablaVariablesLogica_3C85(DondeEstaAdso_3D11 - &H3C85) Or
+            TablaVariablesLogica_3C85(DondeEstaSeverino_3CFF - &H3C85) Or
+            TablaVariablesLogica_3C85(DondeEstaMalaquias_3CA8 - &H3C85)
+    End Sub
+
+    Public Sub ComprobarPresenciaAdsoSeverinoMalaquias_64A2()
+        'rellena 3c96 con el destino combinado de Adso, Severino y Malaquías
+        'llamado el día 3
+        TablaVariablesLogica_3C85(MonjesListos_3C96 - &H3C85) =
+            TablaVariablesLogica_3C85(DondeEstaAdso_3D11 - &H3C85) Or
+            TablaVariablesLogica_3C85(DondeEstaSeverino_3CFF - &H3C85) Or
+            TablaVariablesLogica_3C85(DondeEstaMalaquias_3CA8 - &H3C85)
+    End Sub
+
+    Public Sub ComprobarPresenciaAdso_64BC()
+        'rellena 3c96 con el destino de Adso
+        'llamado el día 6
+        TablaVariablesLogica_3C85(MonjesListos_3C96 - &H3C85) = TablaVariablesLogica_3C85(DondeEstaAdso_3D11 - &H3C85)
+    End Sub
+
+    Public Sub QuitarPergamino_40B9()
+        'el abad deja el pergamino, si lo tiene
+        'si el abad no tiene el pergamino, sale
+        If Not LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosAbad_2E04 - &H2DEC, 4) Then Exit Sub
+        '40BF
+        'modifica la máscara de objetos para no coger el pergamino
+        TablaObjetosPersonajes_2DEC(MascaraObjetosAbad_2E06 - &H2DEC) = 0
+        'apunta a la tabla de datos de los objetos del abad
+        'deja el pergamino
+        DejarObjeto_5277(&H2E01)
+        'pone a 0 el contador que se incrementa si no pulsamos los cursores
+        TablaVariablesLogica_3C85(ContadorReposo_3C93 - &H3C85) = 0
+    End Sub
+
+    Public Sub ComprobarColocacionGuillermoMisa_43AC()
+        'comprueba que guillermo esté en la posición correcta de misa
+        If ComprobarColocacionGuillermo_43C4(&H4B84) <> 0 Then Exit Sub
+        'posición imposible
+        ComprobarColocacionGuillermo_43C4(&H3080)
+    End Sub
+
+    Public Sub PresenciarMuerteMalaquias_64AA()
+        'si malaquías está muriéndose
+        If TablaVariablesLogica_3C85(MalaquiasMuriendose_3CA2 - &H3C85) >= 1 Then
+            '64B0
+            'frase = MALAQUIAS HA MUERTO
+            NumeroFrase_3F0E = &H20
+            'indica que ya están todos en su sitio
+            TablaVariablesLogica_3C85(MonjesListos_3C96 - &H3C85) = 0
+            Exit Sub
+        End If
+        '64B8
+        'indica que aún no están todos en su sitio
+        TablaVariablesLogica_3C85(MonjesListos_3C96 - &H3C85) = 1
+    End Sub
+
+    Public Sub ComprobarPresenciaPersonajesMisa_6487(ByVal DiaC As Byte)
+        'comprueba que han llegado a misa de vísperas los personajes necesarios según el día
+        '###depuración
+        'ComprobarPresenciaAdso_64BC()
+        'Exit Sub
+        Select Case DiaC
+            Case = 1
+                ComprobarPresenciaBerengarioAdsoSeverinoMalaquias_6498()
+            Case = 2
+                ComprobarPresenciaBerengarioAdsoSeverinoMalaquias_6498()
+            Case = 3
+                ComprobarPresenciaAdsoSeverinoMalaquias_64A2()
+            Case = 4
+                ComprobarPresenciaBerengarioAdsoSeverinoMalaquias_6498()
+            Case = 5
+                PresenciarMuerteMalaquias_64AA()
+            Case = 6
+                ComprobarPresenciaAdso_64BC()
+        End Select
+    End Sub
+
+    Public Sub EsperarColocacionPersonajes_6520()
+        'espera a que el abad, el resto de monjes y guillermo estén en su sitio y si es así avanza el momento del día
+        'si el abad ha llegado a donde iba
+        If TablaVariablesLogica_3C85(DondeEstaAbad_3CC6 - &H3C85) = TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) Then
+            '6526
+            'si los monjes están listos para empezar la misa
+            If TablaVariablesLogica_3C85(MonjesListos_3C96 - &H3C85) = 0 Then
+                '652C
+                'si guillermo por lo menos ha llegado a la habitación
+                If TablaVariablesLogica_3C85(GuillermoBienColocado_3C9B - &H3C85) >= 1 Then
+                    '6532
+                    'si se ha superado el contador de puntualidad
+                    If TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) >= &H32 Then
+                        '6538
+                        'reinicia el contador
+                        TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = 0
+                        'pone en el marcador la frase
+                        'LLEGAIS TARDE, FRAY GUILLERMO
+                        EscribirFraseMarcador_5026(6)
+                        'decrementa la vida de guillermo en 2 unidades
+                        DecrementarObsequium_55D3(2)
+                        Exit Sub
+                    Else
+                        '6544
+                        'si no se está reproduciendo una voz
+                        If ReproduciendoFrase_2DA1 = False Then
+                            '654A
+                            'si guillermo no está en su sitio
+                            If TablaVariablesLogica_3C85(GuillermoBienColocado_3C9B - &H3C85) = 2 Then
+                                '6550
+                                'incrementa el contador
+                                TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) + 1
+                                'si el contador pasa el límite
+                                If TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) >= &H1E Then
+                                    '655B
+                                    'pone el contador a 0
+                                    TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = 0
+                                    'pone en el marcador la frase
+                                    'OCUPAD VUESTRO SITIO, FRAY GUILLERMO
+                                    EscribirFraseMarcador_5026(&H2D)
+                                    'decrementa la vida de guillermo en 2 unidades
+                                    DecrementarObsequium_55D3(2)
+                                    Exit Sub
+                                End If
+                                '6565
+                                Exit Sub
+                            Else
+                                '6566
+                                'pone en el marcador la frase que había guardado
+                                '3F0B
+                                EscribirFraseMarcador_5026(NumeroFrase_3F0E)
+                                'indica que hay que avanzar el momento del día
+                                TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 1
+                            End If
+                        End If
+                        '656C
+                        'si hay que avanzar el momento del día y guillermo no está en su sitio
+                        If TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 1 And TablaVariablesLogica_3C85(GuillermoBienColocado_3C9B - &H3C85) = 2 Then
+                            '6576
+                            'reinicia el contador
+                            TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = 0
+                            'indica que no hay que avanzar el momento del día
+                            TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 0
+                            'pone en el marcador la frase
+                            'OCUPAD VUESTRO SITIO, FRAY GUILLERMO
+                            EscribirFraseMarcador_5026(&H2D)
+                            'decrementa la vida de guillermo en 2 unidades
+                            DecrementarObsequium_55D3(2)
+                        End If
+                        '6583
+                        Exit Sub
+                    End If
+                Else
+                    '6584
+                    'aquí se llega cuando guillermo todavía no ha llegado a la iglesia
+                    'si el contador supera el límite tolerable
+                    If TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) >= &HC8 Then
+                        '658B
+                        'cambia al estado de echarle
+                        TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0B
+                        'avanza el momento del día
+                        TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 1
+                        Exit Sub
+                    Else
+                        '6592
+                        'incrementa el contador
+                        TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) + 1
+                        Exit Sub
+                    End If
+                End If
+            Else
+                '6597
+                Exit Sub
+            End If
+        Else
+            '6599
+            TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = 0
+            Exit Sub
+        End If
+    End Sub
+
+    Public Sub ComprobarColocacionPersonajes_64C0(ByVal DiaC As Byte)
+        'llamado si está en misa (prima) y se le pasa en c el día que es
+
+        '###depuración
+        'ComprobarPresenciaAdso_64BC()
+        'Exit Sub
+
+        Select Case DiaC
+            Case = 2
+                'frase = HERMANOS, VENACIO HA SIDO ASESINADO
+                NumeroFrase_3F0E = &H15
+                ComprobarPresenciaBerengarioAdsoSeverinoMalaquias_6498()
+            Case = 3
+                'frase = HERMANOS, BERENGARIO HA DESAPARECIDO. TEMO QUE SE HAYA COMETIDO OTRO CRIMEN
+                NumeroFrase_3F0E = &H18
+                ComprobarPresenciaAdsoSeverinoMalaquias_64A2()
+            Case = 4
+                'frase = HERMANOS, HAN ENCONTRADO A BERENGARIO ASESINADO
+                NumeroFrase_3F0E = &H1A
+                ComprobarPresenciaAdsoSeverinoMalaquias_64A2()
+            Case = 5
+                ComprobarPresenciaBerengarioAdsoSeverinoMalaquias_6498()
+            Case = 6
+                ComprobarPresenciaAdso_64BC()
+            Case = 7
+                'frase = OREMOS
+                ComprobarPresenciaAdso_64BC()
+        End Select
+    End Sub
+
+    Public Sub ComprobarColocacionGuillermoRefectorio_43B9()
+        'comprueba que guillermo esté en la posición correcta del refectorio
+        If ComprobarColocacionGuillermo_43C4(&H3938) <> 0 Then Exit Sub
+        'posición imposible
+        ComprobarColocacionGuillermo_43C4(&H3020)
+    End Sub
+
+    Public Sub ComprobarPresenciaPersonajesRefectorio_64EA(ByVal DiaC As Byte)
+        'llamado si está en el refectorio y se le pasa en c el día que es
 
 
+        '###depuración
+        If TablaVariablesLogica_3C85(DondeEstaAdso_3D11 - &H3C85) = 1 Then
+            'indica que todos los monjes están listos
+            TablaVariablesLogica_3C85(MonjesListos_3C96 - &H3C85) = 0
+        End If
+        Exit Sub
+
+
+
+        If DiaC = 2 Then
+            '64FA
+            'comprueba que estén Berengario, Adso y Severino
+            If TablaVariablesLogica_3C85(DondeEsta_Berengario_3CE7 - &H3C85) = 1 And
+                    TablaVariablesLogica_3C85(DondeEstaAdso_3D11 - &H3C85) = 1 And
+                    TablaVariablesLogica_3C85(DondeEstaSeverino_3CFF - &H3C85) = 1 Then
+                'indica que todos los monjes están listos
+                TablaVariablesLogica_3C85(MonjesListos_3C96 - &H3C85) = 0
+            End If
+        ElseIf DiaC = 3 Or DiaC = 4 Then
+            '650C
+            'comprueba que estén Adso y Severino
+            If TablaVariablesLogica_3C85(DondeEstaAdso_3D11 - &H3C85) = 1 And
+                    TablaVariablesLogica_3C85(DondeEstaSeverino_3CFF - &H3C85) = 1 Then
+                'indica que todos los monjes están listos
+                TablaVariablesLogica_3C85(MonjesListos_3C96 - &H3C85) = 0
+            End If
+        ElseIf DiaC = 5 Or DiaC = 6 Then
+            'si adso ha llegado al comedor
+            If TablaVariablesLogica_3C85(DondeEstaAdso_3D11 - &H3C85) = 1 Then
+                'indica que todos los monjes están listos
+                TablaVariablesLogica_3C85(MonjesListos_3C96 - &H3C85) = 0
+            End If
+        End If
+    End Sub
+
+    Public Sub EcharBronca_Guillermo_646C()
+        'le echa una bronca a guillermo
+        'si no tiene el bit 7 puesto
+        If Not LeerBitArray(TablaVariablesLogica_3C85, EstadoAbad_3CC7 - &H3C85, 7) Then
+            '6474
+            'decrementa la vida de guillermo en 2 unidades
+            DecrementarObsequium_55D3(2)
+            'descarta los movimientos pensados e indica que hay que pensar un nuevo movimiento
+            DescartarMovimientosPensados_08BE(&H3063)
+            'marca el estado de bronca
+            SetBitArray(TablaVariablesLogica_3C85, EstadoAbad_3CC7 - &H3C85, 7)
+            'escribe en el marcador la frase
+            'OS ORDENO QUE VENGAIS
+            EscribirFraseMarcador_501B(8)
+            '3E5B
+            'indica que el personaje no quiere buscar ninguna ruta
+            TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+        End If
+    End Sub
+
+    Public Sub DefinirEstadoAbad_63CF()
+        'acciones dependiendo del estado del abad
+        'si está en el estado 0x10
+        If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H10 Then
+            '63D5
+            '63E2
+            'si malaquías o berengario/bernardo van a buscar al abad
+            If TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = &HFE Or TablaVariablesLogica_3C85(DondeVaMalaquias_3CAA - &H3C85) = &HFE Then
+                '63EE
+                'si el abad ha llegado a donde quería ir
+                If TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = TablaVariablesLogica_3C85(DondeEstaAbad_3CC6 - &H3C85) Then
+                    '63F4
+                    '3E5B
+                    'indica que el personaje no quiere buscar ninguna ruta
+                    TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                    Exit Sub
+                Else
+                    '63F7
+                    'se va a su celda
+                    TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 2
+                    'si bernardo tiene el pergamino
+                    If LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosBerengario_2E0B - &H2DEC, 4) Then
+                        '6402
+                        'va a la entrada de la abadía
+                        TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 3
+                        Exit Sub
+                    Else
+                        '6405
+                        Exit Sub
+                    End If
+                End If
+            Else
+                '6406
+                'si el abad tiene el pergamino
+                If LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosAbad_2E04 - &H2DEC, 4) Then
+                    '640E
+                    'va a su celda
+                    TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 2
+                End If
+                '6411
+                'si el abad ha llegado donde quería ir
+                If TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = TablaVariablesLogica_3C85(DondeEstaAbad_3CC6 - &H3C85) Then
+                    '6417
+                    'se mueve aleatoriamente
+                    TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = (TablaVariablesLogica_3C85(ValorAleatorio_3C9D - &H3C85) And 3) + 2
+                    Exit Sub
+                Else
+                    '641F
+                    Exit Sub
+                End If
+            End If
+        Else
+            '63D8
+            'si es tercia
+            If MomentoDia_2D81 = 2 Then
+                '63DE
+                '6420
+                'si está en el estado 0x0e
+                If TablaVariablesLogica_3C85(&H3CC7 - &H3C85) = &H0E Then
+                    '6426
+                    'pone en el marcador la frase
+                    'VENID AQUI, FRAY GUILLERMO
+                    EscribirFraseMarcador_5026(&H14)
+                    'pasa al estado 0x11
+                    TablaVariablesLogica_3C85(&H3CC7 - &H3C85) = &H11
+                End If
+                '642d
+                'si está en el estado 0x11
+                If TablaVariablesLogica_3C85(&H3CC7 - &H3C85) = &H11 Then
+                    '6433
+                    'si no está reproduciendo una frase
+                    If Not ReproduciendoFrase_2DA1 Then
+                        '6439
+                        'pasa al estado 0x12
+                        TablaVariablesLogica_3C85(&H3CC7 - &H3C85) = &H12
+                        'inicia el contador
+                        TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = 0
+                    End If
+                End If
+                '643F
+                'si está en el estado 0x12
+                If TablaVariablesLogica_3C85(&H3CC7 - &H3C85) = &H12 Then
+                    '6445
+                    'pasa al estado 0x0f
+                    TablaVariablesLogica_3C85(&H3CC7 - &H3C85) = &H0F
+                    'va al altar de la iglesia
+                    TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 0
+                    'pone en el marcador la frase correspondiente
+                    '3F0B
+                    EscribirFraseMarcador_5026(NumeroFrase_3F0E)
+                    Exit Sub
+                Else
+                    '644F
+                    'si está en el estado 0x0f
+                    If TablaVariablesLogica_3C85(&H3CC7 - &H3C85) = &H0F Then
+                        '6455
+                        'si no está reproduciendo una voz
+                        If Not ReproduciendoFrase_2DA1 Then
+                            '645B
+                            'pasa al estado 0x10
+                            TablaVariablesLogica_3C85(&H3CC7 - &H3C85) = &H10
+                            Exit Sub
+                        Else
+                            '645F
+                            'compara la distancia entre guillermo y el abad (si está muy cerca devuelve 0, en otro caso != 0)
+                            'si guillermo está cerca, sale
+                            If CompararDistanciaGuillermo_3E61(&H3063) = 0 Then Exit Sub
+                            '6465
+                            'pasa al estado 0x12
+                            TablaVariablesLogica_3C85(&H3CC7 - &H3C85) = &H12
+                            'le echa una bronca a guillermo
+                            EcharBronca_Guillermo_646C()
+                            Exit Sub
+                        End If
+                    Else
+                        '646B
+                        Exit Sub
+                    End If
+                End If
+            Else
+                '63E1
+                Exit Sub
+            End If
+        End If
+    End Sub
+
+    Public Sub ReproducirSonido_1007()
+        '###pendiente
+
+    End Sub
+
+
+    Public Sub ReproducirSonido_102A()
+        '###pendiente
+
+    End Sub
+
+    Public Sub ReproducirSonidoAbrir_101B()
+        '###pendiente
+
+    End Sub
+
+    Public Sub ReproducirSonidoCerrar_1016()
+        '###pendiente
+
+    End Sub
+
+    Public Sub ReproducirSonidoCampanas_100C()
+        '###pendiente
+
+    End Sub
+
+    Public Sub ReproducirSonidoCampanillas_1011()
+        '###pendiente
+
+    End Sub
+
+    Public Sub ReproducirSonidoCogerDejar_1025()
+        '###pendiente
+
+    End Sub
+
+    Public Sub ReproducirSonidoCogerDejar_102F()
+        '###pendiente
+
+    End Sub
+
+    Public Sub ReproducirSonido_5088()
+        '###pendiente
+
+    End Sub
+
+    Public Sub ReproducirSonidoCanal1_0FFD()
+        '###pendiente
+
+    End Sub
+
+
+    Public Sub EjecutarComportamientoAbad_071E()
+        Dim PersonajeIY As Integer
+        Dim PunteroDatosAbadIX As Integer
+        'iy apunta a las características del abad
+        PersonajeIY = &H3063
+        'apunta a las variables de movimiento del abad
+        PunteroDatosAbadIX = &H3CC9
+        'indica que el personaje inicialmente si quiere moverse
+        TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 0
+        'ejecuta la lógica del abad
+        ProcesarLogicaAbad_5FCB(PersonajeIY, PunteroDatosAbadIX)
+        'modifica la tabla de 0x05cd con información de la tabla de las puertas y entre que habitaciones están
+        ActualizarTablaPuertas_3EA4(&H3F)
+        'apunta a la tabla para mover al abad
+        'comprueba si el personaje puede moverse a donde quiere y actualiza su sprite y el buffer de alturas
+        ActualizarDatosPersonaje_291D(&H2BCC)
+        'apunta a las variables de movimiento del abad
+        GenerarMovimiento_073C(PersonajeIY, &H3CC9)
+    End Sub
+
+
+    Public Sub ProcesarLogicaAbad_5FCB(ByVal PersonajeIY As Integer, ByVal PunteroDatosAbadIX As Integer)
+
+        '(si la posición de guillermo es < 0x60) y (es el día 1 o es prima)
+        If (TablaCaracteristicasPersonajes_3036(&H3038 - &H3036) < &H60) And (NumeroDia_2D80 = 1 Or MomentoDia_2D81 = 1) Then
+            '5FD7
+            'cambia el estado del abad para que eche a guillermo de la abadía
+            TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0B
+        End If
+        '5fdc
+        'si guillermo sube a la biblioteca cuando no es por la noche
+        If MomentoDia_2D81 >= 1 And TablaCaracteristicasPersonajes_3036(&H303A - &H3036) >= &H16 Then
+            '5FE6
+            'indica que el abad va a la puerta del pasillo que va a la biblioteca
+            TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 9
+            'cambia el estado del abad para que eche a guillermo de la abadía
+            TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0B
+            Exit Sub
+        Else
+            '5FED
+            'si el abad está en el estado de expulsar a guillermo de la abadia
+            If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0B Then
+                '5FF3
+                'indica que el abad persigue a guillermo
+                TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = &HFF
+                'comprueba si el abad está cerca de guillermo
+                If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                    '5FFC
+                    'si Guillermo está muerto, sale
+                    If TablaVariablesLogica_3C85(GuillermoMuerto_3C97 - &H3C85) = 1 Then Exit Sub
+                    '6003
+                    'aquí llega si guillermo está cerca del abad cuando lo va a echar, pero aún está vivo
+                    If Not ReproduciendoFrase_2DA1 Then
+                        '6009
+                        'pone en el marcador la frase
+                        'NO HABEIS RESPETADO MIS ORDENES. ABANDONAD PARA SIEMPRE ESTA ABADIA
+                        EscribirFraseMarcador_5026(&H0E)
+                        'mata a guillermo
+                        TablaVariablesLogica_3C85(GuillermoMuerto_3C97 - &H3C85) = 1
+                        Exit Sub
+                    End If
+                    '6010
+                    Exit Sub
+                Else
+                    '6010
+                    Exit Sub
+                End If
+            Else
+                '6011
+                'c = 0 si la pantalla que se está mostrando actualmente es la celda del abad y la cámara sigue a guillermo
+                If (NumeroPantallaActual_2DBD = &H0D) And TablaVariablesLogica_3C85(PersonajeSeguidoPorCamaraReposo_3C92 - &H3C85) = 0 Then
+                    '6019
+                    'comprueba si el abad está cerca de guillermo
+                    If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                        '601E
+                        'si está cerca de guillermo
+                        'pone en el marcador la frase HABEIS ENTRADO EN MI CELDA
+                        EscribirFraseMarcador_5026(&H29)
+                        'va a por guillermo
+                        TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = &HFF
+                        'pone al abad en estado de expulsar a guillermo de la abadia
+                        TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0B
+                        Exit Sub
+                    Else
+                        '602A
+                        'va a su celda
+                        TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 2
+                        Exit Sub
+                    End If
+                Else
+                    '602E
+                    'si ha llegado a su celda y tiene el pergamino
+                    If (TablaVariablesLogica_3C85(DondeEstaAbad_3CC6 - &H3C85) = TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85)) And TablaVariablesLogica_3C85(DondeEstaAbad_3CC6 - &H3C85) = 2 And LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosAbad_2E04 - &H2DEC, 4) Then
+                        '603E
+                        'indica que guillermo no tiene el pergamino
+                        TablaVariablesLogica_3C85(EstadoPergamino_3C90 - &H3C85) = 1
+                        'deja el pergamino
+                        QuitarPergamino_40B9()
+                        'si está en el estado 0x15 y no tiene el pergamino
+                        If (TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H15) And Not LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosAbad_2E04 - &H2DEC, 4) Then
+                            '604E
+                            'indica que hay que avanzar el momento del día
+                            TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 1
+                            'pasa al estado 0x10
+                            TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H10
+                        End If
+                    End If
+                    '6054
+                    'si está en el estado 0x15
+                    If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H15 Then
+                        '605A
+                        'se va a su celda
+                        TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 2
+                        Exit Sub
+                    Else
+                        '605E
+                        'si el abad tiene puesto el bit 7 de su estado
+                        If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) >= &H80 Then
+                            '6065
+                            'si no está reproduciendo una frase
+                            If Not ReproduciendoFrase_2DA1 Then
+                                '606B
+                                'quita el bit 7 de su estado
+                                ClearBitArray(TablaVariablesLogica_3C85, EstadoAbad_3CC7 - &H3C85, 7)
+                            Else
+                                '6072
+                                'va a por guillermo
+                                TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = &HFF
+                                Exit Sub
+                            End If
+                        End If
+                        '6077
+                        'si está en vísperas
+                        If MomentoDia_2D81 = 5 Then
+                            '607D
+                            'pasa al estado 5
+                            TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 5
+                            'comprueba que guillermo esté en la posición correcta de misa (si vale 0 está en otra habitación, si vale 2 está en la habitación, pero mal situado, y si vale 1 está bien situado)
+                            ComprobarColocacionGuillermoMisa_43AC()
+                            'va al altar
+                            TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 0
+                            'frase = OREMOS
+                            NumeroFrase_3F0E = &H17
+                            'salta a una rutina para comprobar que personajes deben haber llegado
+                            ComprobarPresenciaPersonajesMisa_6487(NumeroDia_2D80)
+                            'espera a que el abad, el resto de monjes y guillermo estén en su sitio y si es así avanza el momento del día
+                            EsperarColocacionPersonajes_6520()
+                            Exit Sub
+                        Else
+                            '6094
+                            'si está en prima
+                            If MomentoDia_2D81 = 1 Then
+                                '609A
+                                'pasa al estado 0x0e
+                                TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0E
+                                'comprueba que guillermo esté en la posición correcta de misa (si vale 0 está en otra habitación, si vale 2 está en la habitación, pero mal situado, y si vale 1 está bien situado)
+                                ComprobarColocacionGuillermoMisa_43AC()
+                                'va a misa
+                                TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 0
+                                'frase = OREMOS
+                                NumeroFrase_3F0E = &H17
+                                'comprueba si los monjes han llegado a su sitio
+                                ComprobarColocacionPersonajes_64C0(NumeroDia_2D80)
+                                'espera a que el abad, el resto de monjes y guillermo estén en su sitio y si es así avanza el momento del día
+                                EsperarColocacionPersonajes_6520()
+                                Exit Sub
+                            Else
+                                '60B1
+                                'si es sexta
+                                If MomentoDia_2D81 = 3 Then
+                                    '60B7
+                                    'va al refectorio
+                                    TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 1
+                                    'comprueba si guillermo está en la posición adecuada del receptorio (si vale 0 está en otra habitación, si vale 2 está en la habitación, pero mal situado, y si vale 1 está bien situado)
+                                    ComprobarColocacionGuillermoRefectorio_43B9()
+                                    'pasa al estado 0x10
+                                    TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H10
+                                    'frase = PODEIS COMER, HERMANOS
+                                    NumeroFrase_3F0E = &H19
+                                    'indica que la comprobacion es negativa inicialmente
+                                    TablaVariablesLogica_3C85(MonjesListos_3C96 - &H3C85) = 1
+                                    'salta a una rutina para comprobar si han llegado los monjes dependiendo de c (día)
+                                    ComprobarPresenciaPersonajesRefectorio_64EA(NumeroDia_2D80)
+                                    'espera a que el abad, el resto de monjes y guillermo estén en su sitio y si es así avanza el momento del día
+                                    EsperarColocacionPersonajes_6520()
+                                    Exit Sub
+                                Else
+                                    '60D1
+                                    'si es completas y está en estado 5
+                                    If MomentoDia_2D81 = 6 And TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 5 Then
+                                        '60DB
+                                        'pasa al estado 6
+                                        TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 6
+                                        'si se muestra la pantalla de misa
+                                        If NumeroPantallaActual_2DBD = &H22 Then
+                                            '60E4
+                                            'pone en el marcador la frase PODEIS IR A VUESTRAS CELDAS
+                                            EscribirFraseMarcador_5026(&H0D)
+                                        End If
+                                        '60E8
+                                        Exit Sub
+                                    Else
+                                        '60E9
+                                        'si berengario le ha avisado de que guillermo ha cogido el pergamino
+                                        If TablaVariablesLogica_3C85(BerengarioChivato_3C94 - &H3C85) = 1 Then
+                                            '60EF
+                                            'va a por guillermo
+                                            TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = &HFF
+                                            'a = 0x10 (pergamino)
+                                            'si el abad tiene el pergamino
+                                            If LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosAbad_2E04 - &H2DEC, 4) Then
+                                                '60FE
+                                                'estado = 0x15
+                                                TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H15
+                                                'indica que ha llegado a donde estaba guillermo
+                                                TablaVariablesLogica_3C85(DondeEstaAbad_3CC6 - &H3C85) = &HFF
+                                                'limpia el aviso de berengario
+                                                TablaVariablesLogica_3C85(BerengarioChivato_3C94 - &H3C85) = 0
+                                                Exit Sub
+                                            Else
+                                                '6109
+                                                'compara la distancia entre guillermo y el abad (si está muy cerca devuelve 0, en otro caso != 0)
+                                                If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                                                    '610E
+                                                    'si está cerca de guillermo
+                                                    'si el contador ha pasado el límite
+                                                    If TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) >= &HC8 Then
+                                                        '6115
+                                                        'decrementa la vida de guillermo en 2 unidades
+                                                        '55CE
+                                                        DecrementarObsequium_55D3(2)
+                                                        'pone en el marcador la frase 
+                                                        'DADME EL MANUSCRITO, FRAY GUILLERMO
+                                                        EscribirFraseMarcador_5026(5)
+                                                        'reinicia el contador
+                                                        TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = 0
+                                                    End If
+                                                    '611F
+                                                    TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) + 1
+                                                    Exit Sub
+                                                Else
+                                                    '6126
+                                                    'pone el contador al máximo
+                                                    TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = &HC9
+                                                    Exit Sub
+                                                End If
+                                            End If
+                                        Else
+                                            '612B
+                                            'si es completas
+                                            If MomentoDia_2D81 = 6 Then
+                                                '6132
+                                                'si está en estado 0x06
+                                                If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 6 Then
+                                                    '6138
+                                                    'si no se está mostrando una frase
+                                                    If Not ReproduciendoFrase_2DA1 Then
+                                                        '613E
+                                                        'limpia el contador
+                                                        TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = 0
+                                                        'se va a la posición para que entremos a nuestra celda
+                                                        TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 5
+                                                        'si ha llegado al sitio al que quería llegar, avanza el estado
+                                                        ComprobarDestinoAvanzarEstado_3E98(PunteroDatosAbadIX)
+                                                    End If
+                                                    '6147
+                                                    Exit Sub
+                                                Else
+                                                    '6148
+                                                    'si está en estado 0x07
+                                                    If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 7 Then
+                                                        '614E
+                                                        'si guillermo está en su celda
+                                                        If NumeroPantallaActual_2DBD = &H3E Then
+                                                            '6155
+                                                            'pasa al estado 0x09
+                                                            TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 9
+                                                            Exit Sub
+                                                        Else
+                                                            '6159
+                                                            'compara la distancia entre guillermo y el abad (si está muy cerca devuelve 0, en otro caso != 0)
+                                                            If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                                                                '615E
+                                                                'si está cerca
+                                                                'pasa al estado 0x08
+                                                                TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 8
+                                                                'pone en el marcador la frase
+                                                                'ENTRAD EN VUESTRA CELDA, FRAY GUILLERMO
+                                                                EscribirFraseMarcador_5026(&H10)
+                                                                Exit Sub
+                                                            Else
+                                                                '6166
+                                                                'avanza el contador
+                                                                TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) + 1
+                                                                'si el contador pasa el límite tolerable
+                                                                If TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) >= &H32 Then
+                                                                    '6171
+                                                                    'pasa al estado 0x08
+                                                                    TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 8
+                                                                End If
+                                                                '6174
+                                                                Exit Sub
+                                                            End If
+                                                        End If
+                                                    Else
+                                                        '6175
+                                                        'si está en el estado 0x08
+                                                        If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 8 Then
+                                                            '617B
+                                                            'si guillermo ha entrado en su celda
+                                                            If NumeroPantallaActual_2DBD = &H3E Then
+                                                                '6182
+                                                                'pasa al estado 0x09
+                                                                TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 9
+                                                                Exit Sub
+                                                            Else
+                                                                '6186
+                                                                'incrementa el contador
+                                                                TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) + 1
+                                                                'si ha pasado el límite, lo mantiene
+                                                                If TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) >= &H32 Then
+                                                                    '6191
+                                                                    TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = &H32
+                                                                End If
+                                                                '6194
+                                                                'compara la distancia entre guillermo y el abad (si está muy cerca devuelve 0, en otro caso != 0)
+                                                                If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                                                                    '6199
+                                                                    'si el contador está al límite
+                                                                    If TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = &H32 Then
+                                                                        '619F
+                                                                        'decrementa la vida de guillermo en 2 unidades
+                                                                        '55CE
+                                                                        DecrementarObsequium_55D3(2)
+                                                                        'pone en el marcador la frase
+                                                                        'ENTRAD EN VUESTRA CELDA, FRAY GUILLERMO
+                                                                        EscribirFraseMarcador_5026(&H10)
+                                                                        'reinicia el contador
+                                                                        TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = 0
+                                                                    End If
+                                                                    '61A9
+                                                                    Exit Sub
+                                                                Else
+                                                                    '61AA
+                                                                    'va a por guillermo
+                                                                    TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = &HFF
+                                                                    Exit Sub
+                                                                End If
+                                                            End If
+                                                        Else
+                                                            '61AF
+                                                            'si está en el estado 0x09
+                                                            If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 9 Then
+                                                                '61B5
+                                                                'si la pantalla que se está mostrando es la de la celda de guillermo
+                                                                If NumeroPantallaActual_2DBD = &H3E Then
+                                                                    '61BC
+                                                                    'se mueve hacia la puerta
+                                                                    TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 6
+                                                                    'si ha llegado al sitio al que quería llegar, avanza el estado
+                                                                    ComprobarDestinoAvanzarEstado_3E98(PunteroDatosAbadIX)
+                                                                    Exit Sub
+                                                                Else
+                                                                    '61C4
+                                                                    'descarta los movimientos pensados e indica que hay que pensar un nuevo movimiento
+                                                                    DescartarMovimientosPensados_08BE(PersonajeIY)
+                                                                    'cambia de estado
+                                                                    TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 8
+                                                                    'va a por guillermo
+                                                                    TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = &HFF
+                                                                    Exit Sub
+                                                                End If
+                                                            Else
+                                                                '61CF
+                                                                'si está en el estado 0x0a
+                                                                If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0A Then
+                                                                    '61D5
+                                                                    'indica que hay que avanzar el momento del día
+                                                                    TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 1
+                                                                    'modifica la máscara de puertas que pueden abrirse para que no pueda abrirse la puerta de al lado del a celda de guillermo
+                                                                    TablaVariablesLogica_3C85(PuertasAbribles_3CA6 - &H3C85) = TablaVariablesLogica_3C85(PuertasAbribles_3CA6 - &H3C85) And &HF7
+                                                                End If
+                                                                '61DE
+                                                                Exit Sub
+                                                            End If
+                                                        End If
+                                                    End If
+                                                End If
+                                            Else
+                                                '61DF
+                                                'si es de noche
+                                                If MomentoDia_2D81 = 0 Then
+                                                    '61E6
+                                                    'va a su celda
+                                                    TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 2
+                                                    'si está en estado 0x0a y ha llegado a su celda
+                                                    If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0A And TablaVariablesLogica_3C85(DondeEstaAbad_3CC6 - &H3C85) = 2 Then
+                                                        '61F3
+                                                        'pone el contador a 0
+                                                        TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = 0
+                                                        'pasa a estado 0x0c
+                                                        TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0C
+                                                    End If
+                                                    '61F9
+                                                    'si está en estado 0x0c
+                                                    If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0C Then
+                                                        '61FF
+                                                        'si guillermo no está en el ala izquierda de la abadía
+                                                        If TablaCaracteristicasPersonajes_3036(&H3038 - &H3036) >= &H60 Then
+                                                            '6205
+                                                            'incrementa el contador
+                                                            TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) + 1
+                                                            'si el contador ha superado el límite, o es el quinto día y tenemos la llave de la habitación del abad
+                                                            If (TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) >= &HFA) Or (NumeroDia_2D80 = 5 And LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 3)) Then
+                                                                '621B
+                                                                'cambia al estado 0x0d
+                                                                TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0D
+                                                            End If
+                                                        End If
+                                                        '621e
+                                                        Exit Sub
+                                                    Else
+                                                        '621F
+                                                        'si está en el estado 0x0d
+                                                        If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0D Then
+                                                            '6225
+                                                            'si guillermo está en el ala izquierda de la abadía o en su celda
+                                                            If TablaCaracteristicasPersonajes_3036(&H3038 - &H3036) < &H60 Or NumeroPantallaActual_2DBD = &H3E Then
+                                                                '6230
+                                                                'cambia al estado 0x0c
+                                                                TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0C
+                                                                TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = &H32
+                                                                Exit Sub
+                                                            Else
+                                                                '6237
+                                                                'compara la distancia entre guillermo y el abad (si está muy cerca, devuelve 0, en otro caso devuelve algo != 0)
+                                                                If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                                                                    '623C
+                                                                    'cambia al estado para echarlo de la abadía
+                                                                    TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0B
+                                                                End If
+                                                                '623F
+                                                                'va a por guillermo
+                                                                TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = &HFF
+                                                                Exit Sub
+                                                            End If
+                                                        Else
+                                                            '6244
+                                                            Exit Sub
+                                                        End If
+                                                    End If
+                                                Else
+                                                    '6245
+                                                    'si es el primer día
+                                                    If NumeroDia_2D80 = 1 Then
+                                                        '624C
+                                                        'si es nona
+                                                        If MomentoDia_2D81 = 4 Then
+                                                            '6253
+                                                            'si está en el estado 0x04
+                                                            If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 4 Then
+                                                                '6259
+                                                                'va a su celda
+                                                                TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 2
+                                                                'si ha llegado a su celda
+                                                                If TablaVariablesLogica_3C85(DondeEstaAbad_3CC6 - &H3C85) = 2 Then
+                                                                    '6262
+                                                                    'indica que hay que avanzar el momento del día
+                                                                    TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 1
+                                                                End If
+                                                                '6265
+                                                                Exit Sub
+                                                            Else
+                                                                '6266
+                                                                'si está en el estado 0x00
+                                                                If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 0 Then
+                                                                    '626C
+                                                                    'compara la distancia entre guillermo y el abad (si está muy cerca devuelve 0, en otro caso != 0)
+                                                                    If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                                                                        '6271
+                                                                        'pone en el marcador la frase
+                                                                        'BIENVENIDO A ESTA ABADIA, HERMANO. OS RUEGO QUE ME SIGAIS. HA SUCEDIDO ALGO TERRIBLE
+                                                                        EscribirFraseMarcador_5026(1)
+                                                                        'cambia al estado 0x01
+                                                                        TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 1
+                                                                        'va a por guillermo
+                                                                        TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = &HFF
+                                                                        Exit Sub
+                                                                    Else
+                                                                        '627F
+                                                                        'va a la entrada de la abadía
+                                                                        TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 3
+                                                                        Exit Sub
+                                                                    End If
+                                                                Else
+                                                                    '6283
+                                                                    'compara la distancia entre guillermo y el abad (si está muy cerca devuelve 0, en otro caso != 0)
+                                                                    If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                                                                        '6289
+                                                                        'si está en el estado 0x01
+                                                                        If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 1 Then
+                                                                            '628F
+                                                                            'si va a la primera parada y no se está reproduciendo ninguna frase
+                                                                            If (TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 4) And Not ReproduciendoFrase_2DA1 Then
+                                                                                '6297
+                                                                                'cambia al estado 0x02
+                                                                                TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 2
+                                                                            Else
+                                                                                '629C
+                                                                                'si no se está reproduciendo una frase
+                                                                                If Not ReproduciendoFrase_2DA1 Then
+                                                                                    '62A2
+                                                                                    'va a la primera parada durante el discurso de bienvenida
+                                                                                    TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 4
+                                                                                    'pone en el marcador la frase
+                                                                                    'TEMO QUE UNO DE LOS MONJES HA COMETIDO UN CRIMEN. OS RUEGO QUE LO ENCONTREIS ANTES DE QUE LLEGUE BERNARDO GUI, PUES	NO DESEO QUE SE MANCHE EL NOMBRE DE ESTA ABADIA
+                                                                                    EscribirFraseMarcador_5026(2)
+                                                                                End If
+                                                                            End If
+                                                                        End If
+                                                                        '62A9
+                                                                        'si está en el estado 0x02
+                                                                        If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 2 Then
+                                                                            '62AF
+                                                                            'va a la primera parada durante el discurso de bienvenida
+                                                                            TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 4
+                                                                            'si ha llegado a la primera parada y no está reproduciendo una frase
+                                                                            If (TablaVariablesLogica_3C85(DondeEstaAbad_3CC6 - &H3C85) = 4) And Not ReproduciendoFrase_2DA1 Then
+                                                                                '62BA
+                                                                                'pasa al estado 0x03
+                                                                                TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 3
+                                                                            End If
+                                                                        End If
+                                                                        '62BD
+                                                                        'si está en el estado 0x03
+                                                                        If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 3 Then
+                                                                            '62C3
+                                                                            'si va hacia nuestra celda y no está reproduciendo una voz
+                                                                            If (TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 5) And Not ReproduciendoFrase_2DA1 Then
+                                                                                '62CB
+                                                                                'cambia al estado 0x1f
+                                                                                TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H1F
+                                                                            Else
+                                                                                '62D0
+                                                                                'si no está reproduciendo una voz
+                                                                                If Not ReproduciendoFrase_2DA1 Then
+                                                                                    '62D6
+                                                                                    'va a la entrada de nuestra celda
+                                                                                    TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 5
+                                                                                    'pone en el marcador la frase
+                                                                                    'DEBEIS RESPETAR MIS ORDENES Y LAS DE LA ABADIA. ASISTIR A LOS OFICIOS Y A LA COMIDA. DE NOCHE DEBEIS ESTAR EN VUESTRA CELDA
+                                                                                    EscribirFraseMarcador_5026(3)
+                                                                                End If
+                                                                            End If
+                                                                        End If
+                                                                        '62DD
+                                                                        'si está en el estado 0x1f
+                                                                        If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H1F Then
+                                                                            '62E3
+                                                                            'va a la entrada de nuestra celda
+                                                                            TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 5
+                                                                            'si ha llegado a la entrada de nuestra celda y no está reproduciendo una voz
+                                                                            If (TablaVariablesLogica_3C85(DondeEstaAbad_3CC6 - &H3C85) = 5) And Not ReproduciendoFrase_2DA1 Then
+                                                                                '62EE
+                                                                                'pasa al estado 0x04
+                                                                                TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = 4
+                                                                                'pone en el marcador la frase
+                                                                                'ESTA ES VUESTRA CELDA, DEBO IRME
+                                                                                EscribirFraseMarcador_5026(7)
+                                                                            End If
+                                                                        End If
+                                                                        '62F5
+                                                                        Exit Sub
+                                                                    Else
+                                                                        '62F6
+                                                                        'le echa una bronca a guillermo
+                                                                        EcharBronca_Guillermo_646C()
+                                                                        Exit Sub
+                                                                    End If
+                                                                End If
+                                                            End If
+                                                        Else
+                                                            '62F9
+                                                            Exit Sub
+                                                        End If
+                                                    Else
+                                                        '62FA
+                                                        'si es el segundo día
+                                                        If NumeroDia_2D80 = 2 Then
+                                                            '6300
+                                                            'frase = DEBEIS SABER QUE LA BIBLIOTECA ES UN LUGAR SECRETO. SOLO MALAQUIAS PUEDE ENTRAR. PODEIS IROS
+                                                            NumeroFrase_3F0E = &H16
+                                                            DefinirEstadoAbad_63CF()
+                                                            Exit Sub
+                                                        Else
+                                                            '6306
+                                                            'si es el tercer día
+                                                            If NumeroDia_2D80 = 3 Then
+                                                                '630C
+                                                                'si está en el estado 0x10 y el momento del día es tercia
+                                                                If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H10 And MomentoDia_2D81 = 2 Then
+                                                                    '6316
+                                                                    'compara la distancia entre guillermo y el abad (si está muy cerca devuelve 0, en otro caso != 0)
+                                                                    If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                                                                        '631B
+                                                                        'va a la pantalla en la que presenta a jorge
+                                                                        TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = &H07
+                                                                        Exit Sub
+                                                                    Else
+                                                                        '631F
+                                                                        'si el estado de jorge >= 0x1e (ya ha presentado a guillermo ante jorge)
+                                                                        If TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) >= &H1E Then
+                                                                            '6325
+                                                                            'cambia de estado
+                                                                            TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) - 1
+                                                                        End If
+                                                                        '632A
+                                                                        'no hay que avanzar el momento del día
+                                                                        TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 0
+                                                                        EcharBronca_Guillermo_646C()
+                                                                        Exit Sub
+                                                                    End If
+                                                                Else
+                                                                    '6330
+                                                                    'frase = QUIERO QUE CONOZCAIS AL HOMBRE MAS VIEJO Y SABIO DE LA ABADIA
+                                                                    NumeroFrase_3F0E = &H30
+                                                                    DefinirEstadoAbad_63CF()
+                                                                    Exit Sub
+                                                                End If
+                                                            Else
+                                                                '6336
+                                                                'si es el cuarto día
+                                                                If NumeroDia_2D80 = 4 Then
+                                                                    '633C
+                                                                    'frase = HA LLEGADO BERNARDO, DEBEIS ABANDONAR LA INVESTIGACION
+                                                                    NumeroFrase_3F0E = &H11
+                                                                    DefinirEstadoAbad_63CF()
+                                                                    Exit Sub
+                                                                Else
+                                                                    '6342
+                                                                    'si es el quinto día
+                                                                    If NumeroDia_2D80 = 5 Then
+                                                                        '6348
+                                                                        'si es nona
+                                                                        If MomentoDia_2D81 = 4 Then
+                                                                            '634E
+                                                                            'si ha llegado a la puerta de la celda de severino
+                                                                            If TablaVariablesLogica_3C85(DondeEstaAbad_3CC6 - &H3C85) = 8 Then
+                                                                                '6354
+                                                                                'si no se ha iniciado el contador
+                                                                                If TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = 0 Then
+                                                                                    '635A
+                                                                                    'pone un sonido
+                                                                                    ReproducirSonido_102A()
+                                                                                End If
+                                                                                '635D
+                                                                                'incrementa el contador
+                                                                                TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) + 1
+                                                                                'si el contador es < 0x1e, sale
+                                                                                If TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) < &H1E Then Exit Sub
+                                                                                'cambia al estado 0x10
+                                                                                TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H10
+                                                                                'pone en el marcador la frase
+                                                                                'DIOS SANTO... HAN ASESINADO A SEVERINO Y LE HAN ENCERRADO
+                                                                                EscribirFraseMarcador_5026(&H1C)
+                                                                                'avanza el momento del día
+                                                                                TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 1
+                                                                                Exit Sub
+                                                                            Else
+                                                                                '6374
+                                                                                'si el abad va a la celda de severino o está en el estado 0x13
+                                                                                If (TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 8) Or (TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H13) Then
+                                                                                    '637E
+                                                                                    'no permite avanzar el momento del día
+                                                                                    TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 0
+                                                                                    'si está en el estado 0x13
+                                                                                    If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H13 Then
+                                                                                        '6387
+                                                                                        'compara la distancia entre guillermo y el abad (si está muy cerca devuelve 0, en otro caso != 0)
+                                                                                        If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                                                                                            '638C
+                                                                                            'va a la puerta de la celda de severino
+                                                                                            TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 8
+                                                                                            Exit Sub
+                                                                                        Else
+                                                                                            '6390
+                                                                                            'le echa una bronca a guillermo
+                                                                                            EcharBronca_Guillermo_646C()
+                                                                                            Exit Sub
+                                                                                        End If
+                                                                                    Else
+                                                                                        '6393
+                                                                                        'si no se está reproduciendo una voz
+                                                                                        If Not ReproduciendoFrase_2DA1 Then
+                                                                                            '6399
+                                                                                            'pasa al estado 0x13
+                                                                                            TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H13
+                                                                                        End If
+                                                                                        '639C
+                                                                                        Exit Sub
+                                                                                    End If
+                                                                                Else
+                                                                                    '639F
+                                                                                    'escribe en el marcador la frase
+                                                                                    'VENID, FRAY GUILLERMO, DEBEMOS ENCONTRAR A SEVERINO
+                                                                                    EscribirFraseMarcador_501B(&H1B)
+                                                                                    'va a la puerta de la celda de severino
+                                                                                    TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) = 8
+                                                                                    Exit Sub
+                                                                                End If
+                                                                            End If
+                                                                        Else
+                                                                            '63A7
+                                                                            'frase = BERNARDO ABANDONARA HOY LA ABADIA
+                                                                            NumeroFrase_3F0E = &H1D
+                                                                            DefinirEstadoAbad_63CF()
+                                                                            Exit Sub
+                                                                        End If
+                                                                    Else
+                                                                        '63AD
+                                                                        'si es el sexto día
+                                                                        If NumeroDia_2D80 = 6 Then
+                                                                            '63B3
+                                                                            'frase = MAÑANA ABANDONAREIS LA ABADIA
+                                                                            NumeroFrase_3F0E = &H1E
+                                                                            DefinirEstadoAbad_63CF()
+                                                                            Exit Sub
+                                                                        Else
+                                                                            '63B9
+                                                                            'si es el séptimo día
+                                                                            If NumeroDia_2D80 = 7 Then
+                                                                                '63BF
+                                                                                'frase = DEBEIS ABANDONAR YA LA ABADIA
+                                                                                NumeroFrase_3F0E = &H25
+                                                                                'si es tercia
+                                                                                If MomentoDia_2D81 = 2 Then
+                                                                                    '63C8
+                                                                                    'indica que guillermo ha muerto
+                                                                                    TablaVariablesLogica_3C85(GuillermoMuerto_3C97 - &H3C85) = 1
+                                                                                End If
+                                                                                '63CB
+                                                                                DefinirEstadoAbad_63CF()
+                                                                                Exit Sub
+                                                                            Else
+                                                                                '63CE
+                                                                                Exit Sub
+                                                                            End If
+                                                                        End If
+                                                                    End If
+                                                                End If
+                                                            End If
+                                                        End If
+                                                    End If
+                                                End If
+                                            End If
+                                        End If
+                                    End If
+                                End If
+                            End If
+                        End If
+                    End If
+                End If
+            End If
+        End If
+    End Sub
+
+
+    Public Function LeerPosicionPersonajeAbrirPuerta_0F7C(ByRef PermisoPuertaHL As Integer) As Integer
+        'devuelve en ab lo que hay en [[hl]] e incrementa hl
+        '[HL] es un puntero a un personaje
+        'ab = [hl]
+        Dim PersonajeAB As Integer
+        PersonajeAB = Leer16(TablaPermisosPuertas_2DD9, PermisoPuertaHL - &H2DD9)
+        PermisoPuertaHL = PermisoPuertaHL + 2
+        LeerPosicionPersonajeAbrirPuerta_0F7C = Leer16(TablaCaracteristicasPersonajes_3036, PersonajeAB - &H3036)
+    End Function
+
+    Public Function ComprobarPermisosPuerta_0F6C(ByVal PosicionPuertaDE As Integer, ByVal PuertasAbriblesA As Byte, ByVal PuertaC As Byte, ByVal PermisoPuertaHL As Integer) As Boolean
+        'comprueba si el personaje se acerca a una puerta que no puede abrir
+        'si es así, comprueba si hay alguien cerca que la pueda abrir.
+        'si no es así, la cierra
+        'devuelve true si no hay permiso para abrir
+        Dim PersonajePermisoAB As Integer 'personaje con permiso para abrir la puerta
+        Dim PersonajeX As Byte 'coordenadas del personaje que puede abrir la puerta
+        Dim PersonajeY As Byte
+        Dim PuertaX As Byte 'coordenadas de la puerta
+        Dim PuertaY As Byte
+        ComprobarPermisosPuerta_0F6C = False
+        If Depuracion.PuertasAbiertas Then Exit Function
+        'combina las puertas a las que pueden entrar
+        PuertasAbriblesA = PuertasAbriblesA Or TablaPermisosPuertas_2DD9(PermisoPuertaHL - &H2DD9)
+        PermisoPuertaHL = PermisoPuertaHL + 1
+        'si tienen permisos para abrir la puerta, sale
+        If (PuertasAbriblesA And PuertaC) <> 0 Then Exit Function
+        '0F70
+        PersonajePermisoAB = LeerPosicionPersonajeAbrirPuerta_0F7C(PermisoPuertaHL)
+        Integer2Nibbles(PosicionPuertaDE, PuertaY, PuertaX)
+        Integer2Nibbles(PersonajePermisoAB, PersonajeY, PersonajeX)
+        'compara la coordenada x del personaje con la coordenada x de la puerta. si no está cerca sale
+        If Z80Sub(PersonajeX, PuertaX) >= 6 Then Exit Function
+        '0F77
+        'repite con la y
+        If Z80Sub(PersonajeY, PuertaY) >= 6 Then Exit Function
+        ComprobarPermisosPuerta_0F6C = True
+    End Function
+
+    Public Sub AbrirPuerta_0F22(ByVal PuertaIY As Integer, ByVal CambiarOrientacion As Boolean, ByVal EstadoAnteriorBC As Integer)
+        'coloca en el buffer de alturas el valor que hace falta para poder atravesar la puerta
+        Dim PunteroBufferAlturasBC As Integer
+        Dim PunteroBufferAlturasIX As Integer
+        Dim AlturaPuertaA As Byte
+        If CambiarOrientacion Then
+            'cambia la orientación de la puerta
+            TablaDatosPuertas_2FE4(PuertaIY - &H2FE4) = Z80Add(TablaDatosPuertas_2FE4(PuertaIY - &H2FE4), 2)
+        End If
+        '0F28
+        'lee en bc el desplazamiento de la puerta para el buffer de alturas, y si la puerta es visible
+        LeerDesplazamientoPuerta_0E2C(PunteroBufferAlturasIX, PuertaIY, PunteroBufferAlturasBC)
+        'devuelve en ix un puntero a la entrada de la tabla de alturas de la posición correspondiente
+        PunteroBufferAlturasIX = PunteroBufferAlturasIX + 2 * PunteroBufferAlturasBC
+        'lee si hay algún personaje en la posición en la que se abre la puerta
+        'si no es así, sale
+        If (LeerByteBufferAlturas(PunteroBufferAlturasIX) And &HF0) = 0 Then Exit Sub
+        '0F36
+        'si hay algún personaje, restaura la configuración de la puerta
+        Escribir16(TablaDatosPuertas_2FE4, PuertaIY - &H2FE4, EstadoAnteriorBC)
+        'modifica una instrucción para que no haya que redibujar el sprite
+        RedibujarPuerta_0DFF = False
+        'obtiene la altura a la que está situada la puerta
+        AlturaPuertaA = TablaDatosPuertas_2FE4(PuertaIY + 4 - &H2FE4)
+        'modifica el buffer de alturas con la altura de la puerta
+        EscribirAlturaPuertaBufferAlturas_0E19(AlturaPuertaA, PuertaIY)
+    End Sub
+
+
+    Public Sub AbrirCerrarPuerta_0EAD(ByVal PuertaIY As Integer)
+        'comprueba si hay que abrir o cerrar una puerta
+        Dim PuertaC As Byte
+        Dim PuertasAbriblesA As Byte
+        Dim PosicionPuertaDE As Integer
+        Dim PuertaX As Byte
+        Dim PuertaY As Byte
+        Dim PermisoPuertaHL As Integer
+        Dim PersonajePermisoAB As Integer
+        Dim PersonajeX As Byte
+        Dim PersonajeY As Byte
+        Dim EstadoPuertaBC As Integer
+        Dim AlturaPuertaA As Byte
+        Dim CambiarOrientacion As Boolean
+        'iy apunta a los datos de la puerta
+        PuertaC = TablaDatosPuertas_2FE4(PuertaIY + 1 - &H2FE4)
+        'si la puerta se queda fija, sale
+        If LeerBitByte(PuertaC, 7) Then Exit Sub
+        'obtiene las coordenadas x e y de la puerta
+        PosicionPuertaDE = Leer16(TablaDatosPuertas_2FE4, PuertaIY + 2 - &H2FE4)
+        Integer2Nibbles(PosicionPuertaDE, PuertaY, PuertaX)
+        PuertaX = PuertaX - 2
+        PuertaY = PuertaY - 2
+        PosicionPuertaDE = (CInt(PuertaY) << 8) Or PuertaX
+        '0EBD
+        'obtiene que puerta es
+        PuertaC = PuertaC And &H1F
+        'puertas que se pueden abrir
+        PuertasAbriblesA = TablaVariablesLogica_3C85(PuertasAbribles_3CA6 - &H3C85)
+        'añade a la máscara la puerta del pasadizo detrás de la cocina
+        PuertasAbriblesA = PuertasAbriblesA Or &H10
+        'combina la máscara con la puerta actual
+        PuertaC = PuertaC And PuertasAbriblesA
+        '0EC8
+        'lee las puertas a las que puede entrar adso
+        PuertasAbriblesA = TablaPermisosPuertas_2DD9(&H2DDC - &H2DD9)
+        'apunta a las puertas a las que puede entrar guillermo
+        PermisoPuertaHL = &H2DD9
+        '0ED1
+        'comprueba si guillermo está cerca de una puerta que no tiene permisos para abrir
+        If Not ComprobarPermisosPuerta_0F6C(PosicionPuertaDE, PuertasAbriblesA, PuertaC, PermisoPuertaHL) Then
+            '0ED3
+            'Guillermo tiene permiso para abrir
+            'lee las puertas a las que puede entrar guillermo
+            PuertasAbriblesA = TablaPermisosPuertas_2DD9(&H2DD9 - &H2DD9)
+            'apunta a las puertas a las que puede entrar adso
+            PermisoPuertaHL = &H2DDC
+            'comprueba si adso está cerca de una puerta que no tiene permisos para abrir
+            If Not ComprobarPermisosPuerta_0F6C(PosicionPuertaDE, PuertasAbriblesA, PuertaC, PermisoPuertaHL) Then
+                '0EDE
+                'Adso tiene permiso para abrir
+                'apunta a los permisos del primer personaje
+                PermisoPuertaHL = &H2DD9
+                PuertaX = PuertaX + 1
+                PuertaY = PuertaY + 1
+                PosicionPuertaDE = (CInt(PuertaY) << 8) Or PuertaX
+                '0EE3
+                Do
+                    PuertasAbriblesA = TablaPermisosPuertas_2DD9(PermisoPuertaHL - &H2DD9)
+                    PermisoPuertaHL = PermisoPuertaHL + 1
+                    'si se han procesado todas las entradas, salta a ver si hay que cerrar la puerta
+                    If PuertasAbriblesA = &HFF Then Exit Do
+                    If Depuracion.PuertasAbiertas Then PuertasAbriblesA = &HFF
+                    '0EE9
+                    'si este personaje no tiene permisos para abrir esta puerta
+                    If (PuertasAbriblesA And PuertaC) = 0 Then
+                        '0EEC
+                        'avanza a las permisos de las puertas del siguiente personaje
+                        PermisoPuertaHL = PermisoPuertaHL + 2
+                    Else
+                        '0EF0
+                        'aquí llega si alguien tiene permisos para abrir una puerta
+                        'devuelve la posición del personaje que puede abrir la puerta
+                        PersonajePermisoAB = LeerPosicionPersonajeAbrirPuerta_0F7C(PermisoPuertaHL)
+                        Integer2Nibbles(PersonajePermisoAB, PersonajeY, PersonajeX)
+                        'compara la coordenada x del personaje con la coordenada x de la puerta. si no está cerca sale
+                        'si está cerca en X
+                        If Z80Sub(PersonajeX, PuertaX) < 4 Then
+                            '0EF8
+                            'si está cerca en Y
+                            If Z80Sub(PersonajeY, PuertaY) < 4 Then
+                                '0EFE
+                                'abrir puerta
+                                'si la puerta está abierta, sale
+                                If LeerBitArray(TablaDatosPuertas_2FE4, PuertaIY + 1 - &H2FE4, 6) Then Exit Sub
+                                '0F03
+                                'guarda la orientación y el estado de la puerta por si hay que restaurarlo luego
+                                EstadoPuertaBC = Leer16(TablaDatosPuertas_2FE4, PuertaIY - &H2FE4)
+                                'marca la puerta como abierta
+                                SetBitArray(TablaDatosPuertas_2FE4, PuertaIY + 1 - &H2FE4, 6)
+                                'modifica una instrucción para que haya que redibujar un sprite
+                                RedibujarPuerta_0DFF = True
+                                'obtiene la altura a la que está situada la puerta
+                                AlturaPuertaA = TablaDatosPuertas_2FE4(PuertaIY + 4 - &H2FE4)
+                                'modifica el buffer de alturas ya que cuando se abre la puerta se debe poder pasar
+                                EscribirAlturaPuertaBufferAlturas_0E19(AlturaPuertaA, PuertaIY)
+                                '0F19
+                                'cambia la orientación de la puerta
+                                TablaDatosPuertas_2FE4(PuertaIY - &H2FE4) = Z80Dec(TablaDatosPuertas_2FE4(PuertaIY - &H2FE4))
+                                '0F1C
+                                CambiarOrientacion = Not LeerBitArray(TablaDatosPuertas_2FE4, PuertaIY + 1 - &H2FE4, 5)
+                                AbrirPuerta_0F22(PuertaIY, CambiarOrientacion, EstadoPuertaBC)
+                                Exit Sub
+                            End If
+                        End If
+                    End If
+                Loop
+            End If
+        End If
+        '0F46
+        'aqui llega para comprobar si hay que cerrar la puerta puerta
+        'si la puerta está cerrada, sale
+        If Not LeerBitArray(TablaDatosPuertas_2FE4, PuertaIY + 1 - &H2FE4, 6) Then Exit Sub
+        '0F4B
+        'guarda la orientación y el estado de la puerta por si hay que restaurarlo luego
+        EstadoPuertaBC = Leer16(TablaDatosPuertas_2FE4, PuertaIY - &H2FE4)
+        'modifica una instrucción para que se redibuje el sprite
+        RedibujarPuerta_0DFF = True
+        'obtiene la altura a la que está situada la puerta
+        AlturaPuertaA = TablaDatosPuertas_2FE4(PuertaIY + 4 - &H2FE4)
+        'modifica el buffer de alturas las posiciones ocupadas por la puerta para que deje pasar
+        EscribirAlturaPuertaBufferAlturas_0E19(AlturaPuertaA, PuertaIY)
+        '0F5D
+        'indica que la puerta está cerrada
+        ClearBitArray(TablaDatosPuertas_2FE4, PuertaIY + 1 - &H2FE4, 6)
+        'cambia la orientación de la puerta
+        TablaDatosPuertas_2FE4(PuertaIY - &H2FE4) = Z80Dec(TablaDatosPuertas_2FE4(PuertaIY - &H2FE4))
+        '0F64
+        'si el bit 5 está puesto, modifica la orientación
+        CambiarOrientacion = LeerBitArray(TablaDatosPuertas_2FE4, PuertaIY + 1 - &H2FE4, 5)
+        'salta para redibujar el sprite
+        AbrirPuerta_0F22(PuertaIY, CambiarOrientacion, EstadoPuertaBC)
+    End Sub
+
+    Public Sub AbrirCerrarPuertas_0D67()
+        'comprueba si hay que abrir o cerrar alguna puerta y actualiza los sprites 
+        'de las puertas en consecuencia
+        Dim SpriteIX As Integer
+        Dim PuertaIY As Integer
+        Dim PosicionX As Byte
+        Dim PosicionY As Byte
+        Dim PosicionZ As Byte
+        Dim PosicionYp As Byte
+        Dim PuertaA As Byte
+        'apunta a los sprites de las puertas
+        SpriteIX = &H2E8F
+        'apunta a los datos de las puertas
+        PuertaIY = &H2FE4
+        'indica que la puerta no requiere los gráficos flipeados
+        PuertaRequiereFlip_2DAF = False
+        'si ha llegado a la última entrada, sale
+        '0D73
+        Do
+            'If PuertaIY = &H2FF3 Then Stop
+            If TablaDatosPuertas_2FE4(PuertaIY - &H2FE4) = &HFF Then Exit Sub
+            '0D79
+            'comprueba si hay que abrir o cerrar alguna puerta y actualiza los sprites en consecuencia
+            'inicialmente no hay que redibujar el sprite
+            RedibujarPuerta_0DFF = False
+            'comprueba si hay que abrir o cerrar esta puerta
+            AbrirCerrarPuerta_0EAD(PuertaIY)
+            'devuelve la posición del objeto en coordenadas de pantalla. Si no es visible devuelve el CF = 1
+            If ObtenerCoordenadasObjeto_0E4C(SpriteIX, PuertaIY, PosicionX, PosicionY, PosicionZ, PosicionYp) Then
+                '0D89
+                'si la puerta es visible, dibuja el sprite (si ha cambiado el estado de la puerta) y marca las posiciones que ocupa la puerta para no poder avanzar a través de ella
+                ProcesarPuertaVisible_0DD2(SpriteIX, PuertaIY, PosicionX, PosicionY, PosicionYp)
+            End If
+            '0D8C
+            'lee si se va a redibujar la pantalla
+            If Not CambioPantalla_2DB8 Then
+                '0D94
+                'aquí llega si no se va a redibujar la pantalla
+                PuertaA = TablaSprites_2E17(SpriteIX - &H2E17)
+                'si la puerta  es visible
+                If PuertaA <> &HFE Then
+                    '0D9B
+                    'si la puerta se redibuja
+                    If LeerBitByte(PuertaA, 7) Then
+                        '0D9F
+                        'si la puerta se redibuja, pone un sonido dependiendo de su estado
+                        If LeerBitByte(PuertaA, 6) Then
+                            '0DA6
+                            'si el bit 6 era 1, pone el sonido de abrir la puerta
+                            ReproducirSonidoAbrir_101B()
+                        Else
+                            '0DAA
+                            'si el bit 6 era 0, pone el sonido de cerrar la puerta
+                            ReproducirSonidoCerrar_1016()
+                        End If
+                    End If
+                End If
+            End If
+            '0DAF
+            'avanza a la siguiente puerta
+            PuertaIY = PuertaIY + 5
+            'avanza al siguiente sprite
+            SpriteIX = SpriteIX + &H14
+        Loop
+    End Sub
+
+    Public Sub FlipearGraficosPuertas_0E66()
+        'comprueba si tiene que flipear los gráficos de las puertas
+        'lee el estado de flipx que espera la puerta
+        'lee si las puertas están flipeadas o no
+        'si están en el estado que se necesita, sale
+        If (PuertaRequiereFlip_2DAF Xor PuertasFlipeadas_2D78) = False Then Exit Sub
+        '0E6F
+        'en otro caso, flipea los gráficos
+        PuertasFlipeadas_2D78 = Not PuertasFlipeadas_2D78
+        'flipea los gráficos de la puerta
+        GirarGraficosRespectoX_3552(TablaGraficosObjetos_A300, &HAA49 - &HA300, 6, &H28)
+        'GirarGraficosRespectoX_3552(ByRef Tabla() As Byte, ByVal PunteroTablaHL As Integer, ByVal AnchoC As Byte, ByVal NGraficosB As Byte)
+    End Sub
+
+    Public Sub Dibujar2Lineas_3FE6(ByVal PixelsA As Byte, ByVal PosicionYH As Byte, ByVal PosicionXL As Byte)
+        'pasa hl a coordenadas de pantalla y graba a en esa línea y en la siguiente
+        Dim PunteroPantallaHL As Integer
+        'dado hl (coordenadas Y,X), calcula el desplazamiento correspondiente en pantalla
+        PunteroPantallaHL = ObtenerDesplazamientoPantalla_3C42(PosicionXL, PosicionYH)
+        'graba a
+        PantallaCGA(PunteroPantallaHL - &HC000) = PixelsA
+        PantallaCGA2PC(PunteroPantallaHL - &HC000, PixelsA)
+        'pasa a la siguiente línea de pantalla
+        PunteroPantallaHL = &HC000 + DireccionSiguienteLinea_3A4D_68F2(PunteroPantallaHL - &HC000)
+        'graba a
+        PantallaCGA(PunteroPantallaHL - &HC000) = PixelsA
+        PantallaCGA2PC(PunteroPantallaHL - &HC000, PixelsA)
+    End Sub
+
+    Public Sub DibujarEspiral_3F7F(ByVal MascaraE As Byte)
+        'dibuja la espiral del color indicado por e
+
+        Dim PosicionYH As Byte
+        Dim PosicionXL As Byte
+        Dim Ancho_3F67 As Byte
+        Dim Alto_3F68 As Byte
+        Dim Ancho_3F69 As Byte
+        Dim Alto_3F6A As Byte
+        Dim ContadorGlobalB As Byte
+        Dim ContadorTiraB As Byte
+        Dim PixelsA As Byte
+        'posición inicial (00, 00)
+        PosicionYH = 0
+        PosicionXL = 0
+        Ancho_3F67 = &H3F 'ancho de izquierda a derecha
+        Alto_3F68 = &H4F 'alto de arriba a abajo
+        Ancho_3F69 = &H3F 'ancho de derecha a izquierda
+        Alto_3F6A = &H4E 'alto de abajo a arriba
+        '3F96
+        ContadorGlobalB = &H20 '32 veces
+        PixelsA = 0
+        ContadorTiraB = Ancho_3F67
+        Do
+            '3FA6
+            'dibuja una tira (de color a) de b*8 pixels de ancho y 2 de alto (de izquierda a derecha)
+            Ancho_3F67 = Ancho_3F67 - 1
+            '3FA9
+            Do
+                'pasa hl a coordenadas de pantalla y graba a en esa línea y en la siguiente
+                Dibujar2Lineas_3FE6(PixelsA, PosicionYH, PosicionXL)
+                PosicionXL = PosicionXL + 1 'pasa al siguiente byte en X
+                ContadorTiraB = ContadorTiraB - 1
+            Loop While ContadorTiraB <> 0 'repite hasta que b = 0
+            '3FAF
+            'dibuja una tira (de color a) de 8 pixels de ancho y [ix+0x01]*2 de alto (de arriba a abajo)
+            ContadorTiraB = Alto_3F68
+            Alto_3F68 = Alto_3F68 - 2
+            '3FB8
+            Do
+                'pasa hl a coordenadas de pantalla y graba a en esa línea y en la siguiente
+                Dibujar2Lineas_3FE6(PixelsA, PosicionYH, PosicionXL)
+                PosicionYH = PosicionYH + 2 'pasa a las 2 líneas siguientes en Y
+                ContadorTiraB = ContadorTiraB - 1
+            Loop While ContadorTiraB <> 0 'repite hasta que b = 0
+            '3FBF
+            'dibuja una tira (de color a) de [ix+0x02]*8 pixels de ancho y 2 de alto (de derecha a izquierda)
+            ContadorTiraB = Ancho_3F69
+            Ancho_3F69 = Z80Sub(Ancho_3F69, 2)
+            '3FC8
+            Do
+                'pasa hl a coordenadas de pantalla y graba a en esa línea y en la siguiente
+                Dibujar2Lineas_3FE6(PixelsA, PosicionYH, PosicionXL)
+                PosicionXL = PosicionXL - 1 'retrocede en X
+                ContadorTiraB = ContadorTiraB - 1
+            Loop While ContadorTiraB <> 0 'repite hasta que b = 0
+            '3FCE
+            'dibuja una tira (de color a) de 8 pixels de ancho y [ix+0x03]*2 de alto (de abajo a arriba)
+            ContadorTiraB = Alto_3F6A
+            Alto_3F6A = Alto_3F6A - 2
+            '3FD7
+            Do
+                'pasa hl a coordenadas de pantalla y graba a en esa línea y en la siguiente
+                Dibujar2Lineas_3FE6(PixelsA, PosicionYH, PosicionXL)
+                PosicionYH = PosicionYH - 2
+                ContadorTiraB = ContadorTiraB - 1
+            Loop While ContadorTiraB <> 0 'repite hasta que b = 0
+            '3FDE
+            'cambia el color de las tiras
+            PixelsA = PixelsA Xor MascaraE
+            ModPantalla.Refrescar()
+            ContadorGlobalB = ContadorGlobalB - 1
+
+            If ContadorGlobalB = 0 Then
+                '3FE2
+                'pasa hl a coordenadas de pantalla y graba a en esa línea y en la siguiente
+                Dibujar2Lineas_3FE6(PixelsA, PosicionYH, PosicionXL)
+                Exit Sub
+            Else
+                '3F9F
+                ContadorTiraB = Ancho_3F67
+                Ancho_3F67 = Ancho_3F67 - 1
+            End If
+        Loop
+    End Sub
+
+    Public Sub DibujarEspiral_3F6B()
+        'rutina encargada de dibujar y de borrar la espiral
+        DibujarEspiral_3F7F(&HFF) 'dibuja la espiral
+        DibujarEspiral_3F7F(0) 'borra la espiral
+        PosicionXPersonajeActual_2D75 = 0 'indica un cambio de pantalla
+    End Sub
+
+    Public Sub ColocarLampara_4100()
+        'si la lámpara estaba desaparecida, aparece en la cocina
+        'si no ha desaparecido la lámpara, sale
+        If TablaVariablesLogica_3C85(LamparaEnCocina_3C91 - &H3C85) <> 0 Then Exit Sub
+        '4105
+        'indicar que la lámpara no está desaparecida
+        TablaVariablesLogica_3C85(LamparaEnCocina_3C91 - &H3C85) = Z80Inc(TablaVariablesLogica_3C85(LamparaEnCocina_3C91 - &H3C85))
+        'pone la lámpara en la cocina
+        CopiarDatosPersonajeObjeto_4145(&H3030, {0, 0, &H5A, &H2A, &H04})
+    End Sub
+
+    Public Sub QuitarGafas_4037()
+        'desaparecen las lentes
+        Dim MascaraLentes As Byte
+        MascaraLentes = &HDF
+        'quita las gafas de los objetos de Guillermo
+        TablaObjetosPersonajes_2DEC(ObjetosGuillermo_2DEF - &H2DEC) = MascaraLentes And TablaObjetosPersonajes_2DEC(ObjetosGuillermo_2DEF - &H2DEC)
+        'le quita las gafas a berengario
+        TablaObjetosPersonajes_2DEC(ObjetosBerengario_2E0B - &H2DEC) = MascaraLentes And TablaObjetosPersonajes_2DEC(ObjetosBerengario_2E0B - &H2DEC)
+        'dibuja los objetos que tenemos en el marcador
+        DibujarObjetosMarcador_51D4()
+        'copia en 0x3012 -> 00 00 00 00 00 (desaparecen las gafas)
+        CopiarDatosPersonajeObjeto_4145(&H3012, {0, 0, 0, 0, 0})
+    End Sub
+
+    Public Sub DarLibroJorge_40F1()
+        'le da el libro a jorge
+        SetBitArray(TablaObjetosPersonajes_2DEC, ObjetosJorge_2E13 - &H2DEC, 7)
+        'deja el libro fuera de la abadía
+        CopiarDatosPersonajeObjeto_4145(&H3008, {&H80, 0, &H0F, &H2E, 0})
+    End Sub
+
+    Public Sub CambiarCaraBerengario_4078()
+        'cambia la cara de berengario por la de jorge y lo coloca al final del corredor de las celdas
+        Dim ComandosBerengarioHL As Integer
+        Dim CaraBerengarioHL As Integer
+        Dim CaraJorgeDE As Integer
+        'lee la dirección de los datos que guían a berengario
+        ComandosBerengarioHL = Leer16(TablaCaracteristicasPersonajes_3036, &H307E - &H3036)
+        'escribe el valor para que piense un nuevo movimiento
+        BufferComandosMonjes_A200(ComandosBerengarioHL - &HA200) = &H10
+        'para el contador y el índice de los datos que guían al personaje
+        TablaCaracteristicasPersonajes_3036(&H307C - &H3036) = 0
+        TablaCaracteristicasPersonajes_3036(&H308C - &H3036) = 0
+        'puntero a los datos gráficos de la cara de berengario
+        CaraBerengarioHL = &H309B
+        'puntero a los datos gráficos de la cara de jorge
+        CaraJorgeDE = &HB2F7
+        'modifica la cara apuntada por hl con la que se le pasa en de. Además llama a 0x4145 con lo que hay a continuación
+        RotarGraficosCambiarCaraCambiarPosicion_40A2(CaraBerengarioHL, CaraJorgeDE, &H3073, {0, &HC8, &H24, 0, 0})
+    End Sub
+
+    Public Sub CambiarCaraBerengario_4058()
+        'aparece bernardo en la entrada de la iglesia
+        Dim CaraBerengarioHL As Integer
+        Dim CaraBernardoDE As Integer
+        'puntero a los datos gráficos de la cara de berengario
+        CaraBerengarioHL = &H309B
+        'puntero a los datos gráficos de la cara de bernardo gui
+        CaraBernardoDE = &HB293
+        'modifica la cara apuntada por hl con la que se le pasa en de. Además llama a 0x4145 con lo que hay a continuación
+        RotarGraficosCambiarCaraCambiarPosicion_40A2(CaraBerengarioHL, CaraBernardoDE, &H3073, {0, &H88, &H88, 2, 0})
+    End Sub
+
+    Public Sub CambiarCaraSeverino_4068()
+        'se cambia la cara de severino por la de jorge y aparece en la habitación del espejo
+        Dim CaraSeverinoHL As Integer
+        Dim CaraJorgeDE As Integer
+        'puntero a los datos gráficos de la cara de berengario
+        CaraSeverinoHL = &H309D
+        'puntero a los datos gráficos de la cara de bernardo gui
+        CaraJorgeDE = &HB2F7
+        'modifica la cara apuntada por hl con la que se le pasa en de. Además llama a 0x4145 con lo que hay a continuación
+        RotarGraficosCambiarCaraCambiarPosicion_40A2(CaraSeverinoHL, CaraJorgeDE, &H3082, {&H03, &H12, &H65, &H18, 0})
+    End Sub
+
+    Public Sub AbrirPuertasAlaIzquierda_3585()
+        'abre las puertas del ala izquierda de la abadía
+        Escribir16(TablaDatosPuertas_2FE4, &H2FFD - &H2FE4, &HE002)
+        Escribir16(TablaDatosPuertas_2FE4, &H3002 - &H2FE4, &HC002)
+    End Sub
+
+
+    Public Sub ProcesarLogicaMomentoDia_5EF9()
+        'si ha cambiado el momento del día, ejecuta unas acciones dependiendo del momento del día
+        'si no ha cambiado el momento del día, sale
+        If MomentoDia_2D81 = TablaVariablesLogica_3C85(MomentoDiaUltimasAcciones_3C95 - &H3C85) Then Exit Sub
+
+        '5F02
+        'pone en 0x3c95 el momento del día
+        TablaVariablesLogica_3C85(MomentoDiaUltimasAcciones_3C95 - &H3C85) = MomentoDia_2D81
+        '[0x3c93] = dato siguiente = 0?
+        TablaVariablesLogica_3C85(ContadorReposo_3C93 - &H3C85) = 0
+        '5F09
+        Select Case MomentoDia_2D81
+            Case = 0 'noche
+                '5F1F
+                Select Case NumeroDia_2D80
+                    Case = 5 'si es el día 5
+                        '5F25
+                        'pone las gafas de guillermo en la habitación iluminada del laberinto
+                        CopiarDatosPersonajeObjeto_4145(&H3012, {0, 0, &H1B, &H23, &H18})
+                        'pone la llave de la habitación del abad en el altar
+                        CopiarDatosPersonajeObjeto_4145(&H301C, {0, 0, &H89, &H3E, &H08})
+                    Case = 6 'si es el día 6
+                        '5F31
+                        'pone la llave de la habitación de severino en la mesa de malaquías
+                        CopiarDatosPersonajeObjeto_4145(&H3021, {0, 0, &H35, &H35, &H13})
+                        'se cambia la cara de severino por la de jorge y aparece en la habitación del espejo
+                        CambiarCaraSeverino_4068()
+                        'indica que jorge está activo
+                        TablaVariablesLogica_3C85(JorgeActivo_3CA3 - &H3C85) = 0
+                End Select
+                Exit Sub
+            Case = 1 'prima
+                '5F3B
+                'dibuja y borra la espiral
+                DibujarEspiral_3F6B()
+                'modifica la máscara de las puertas que pueden abrirse
+                TablaVariablesLogica_3C85(PuertasAbribles_3CA6 - &H3C85) = &HEF
+                'selecciona paleta 2
+                ModPantalla.SeleccionarPaleta(2)
+                'abre las puertas del ala izquierda de la abadía
+                AbrirPuertasAlaIzquierda_3585()
+                ReproducirSonidoCampanas_100C()
+                'si hemos llegado al tercer día
+                If NumeroDia_2D80 >= 3 Then
+                    '5F51
+                    'le quita la lámpara a adso y reinicia los contadores de la lámpara
+                    InicializarLampara_3FF7()
+                    'si la lámpara estaba desaparecida, aparece en la cocina
+                    ColocarLampara_4100()
+                End If
+                '5F57
+                Select Case NumeroDia_2D80
+                    Case = 2 'día 2
+                        '5F5D
+                        'desaparecen las lentes
+                        QuitarGafas_4037()
+                    Case = 3 'día 3
+                        '5F66
+                        'le da el libro a jorge
+                        DarLibroJorge_40F1()
+                        'cambia la cara de berengario por la de jorge y lo coloca al final del corredor de las celdas
+                        CambiarCaraBerengario_4078()
+                        'berengario/jorge no tiene ningún objeto
+                        TablaObjetosPersonajes_2DEC(ObjetosBerengario_2E0B - &H2DEC) = 0
+                        'el abad no tiene ningún objeto
+                        TablaObjetosPersonajes_2DEC(ObjetosAbad_2E04 - &H2DEC) = 0
+                        'si guillermo no tiene el pergamino
+                        If Not LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 4) Then
+                            '5F78
+                            'pone el pergamino en la habitación detrás del espejo
+                            CopiarDatosPersonajeObjeto_4145(&H3017, {0, 0, &H18, &H64, &H18})
+                            'indica que guillermo no tiene el pergamino
+                            TablaVariablesLogica_3C85(EstadoPergamino_3C90 - &H3C85) = 1
+                        End If
+                    Case = 5 'día 5
+                        '5F7E
+                        'si no tenemos la llave de la habitación del abad, ésta desaparece
+                        If Not LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 3) Then
+                            '5F88
+                            'desaparece la llave de la habitación del abad
+                            CopiarDatosPersonajeObjeto_4145(&H301C, {0, 0, 0, 0, 0})
+                        End If
+                End Select
+                Exit Sub
+            Case = 2 'tercia
+                '5F8C
+                'dibuja y borra la espiral
+                DibujarEspiral_3F6B()
+                'pone en el canal 1 el sonido de las campanas
+                ReproducirSonidoCampanillas_1011()
+            Case = 3 'sexta
+                '5F93
+                ReproducirSonidoCampanas_100C()
+                If NumeroDia_2D80 = 4 Then 'si es el cuarto día
+                    '5F9C
+                    'aparece bernardo en la entrada de la iglesia
+                    CambiarCaraBerengario_4058()
+                    'activa a bernardo
+                    TablaVariablesLogica_3C85(JorgeOBernardoActivo_3CA1 - &H3C85) = 0
+                    'bernardo sólo puede coger el pergamino
+                    TablaObjetosPersonajes_2DEC(MascaraObjetosBerengarioBernardo_2E0D - &H2DEC) = &H10
+                End If
+            Case = 4 'nona
+                '5FA6
+                'dibuja y borra la espiral
+                DibujarEspiral_3F6B()
+                If NumeroDia_2D80 = 3 Then 'si es el tercer día
+                    '5FAF
+                    'jorge pasa a estar inactivo
+                    TablaVariablesLogica_3C85(JorgeOBernardoActivo_3CA1 - &H3C85) = 1
+                    'desaparece jorge
+                    TablaCaracteristicasPersonajes_3036(&H3074 - &H3036) = 0
+                End If
+                '5FB5
+                'pone en el canal 1 el sonido de las campanillas
+                ReproducirSonidoCampanillas_1011()
+            Case = 5 'vísperas
+                '5FB9
+                ReproducirSonidoCampanas_100C()
+            Case = 6 'completas
+                '5FBD
+                'dibuja y borra la espiral
+                DibujarEspiral_3F6B()
+                'fija la paleta 3
+                ModPantalla.SeleccionarPaleta(3)
+                'bloquea las puertas del ala izquierda de la abadía
+                TablaVariablesLogica_3C85(PuertasAbribles_3CA6 - &H3C85) = &HDF
+                'pone en el canal 1 el sonido de las campanillas
+                ReproducirSonidoCampanillas_1011()
+        End Select
+
+    End Sub
+
+    Public Sub EjecutarAccionesMomentoDia_3EEA()
+        'trata de ejecutar unas acciones dependiendo del momento del día
+        'copia el estado de la reproducción de frases/voces
+        Static Contador As Integer
+        Dim nose As Integer
+        Contador = Contador + 1
+        nose = Contador
+        ReproduciendoFrase_2DA1 = ReproduciendoFrase_2DA2
+        '        If Contador < 12 Then
+        '       ReproduciendoFrase_2DA1 = False
+        '      'TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 1
+        '     Else
+        '    Stop
+        '   End If
+
+        'hl apunta a los datos del personaje que se muestra en pantalla
+        'si está en medio de una animación, sale
+        If LeerBitArray(TablaCaracteristicasPersonajes_3036, PunteroDatosPersonajeActual_2D88 - &H3036, 0) Then Exit Sub
+        '3EF6
+        'lee si hay que avanzar el momento del día
+        If TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 0 Then
+            '3EFA
+            'si no hay que avanzar el momento del día, trata de ejecutar las acciones programadas según el momento del día
+            ProcesarLogicaMomentoDia_5EF9()
+        Else
+            '3EFD
+            'hay que avancar el momento del día, sólo si no se está reproduciendo ninguna voz
+            If ReproduciendoFrase_2DA1 Then Exit Sub
+            '3F02
+            'indica que ya no hay que avanzar el momento del día
+            TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 0
+            'avanza el momento del día
+            ActualizarMomentoDia_553E()
+            'si ha cambiado el momento del día, ejecuta unas acciones dependiendo del momento del día
+            ProcesarLogicaMomentoDia_5EF9()
+        End If
+    End Sub
+
+    Public Sub EjecutarComportamientoPersonajes_2664()
+        If Depuracion.PersonajesAdso Then EjecutarComportamientoAdso_087B()
+        If Depuracion.PersonajesAbad Then EjecutarComportamientoAbad_071E()
+        If Depuracion.PersonajesMalaquias Then EjecutarComportamientoMalaquias_06FD()
+        If Depuracion.PersonajesBerengario Then EjecutarComportamientoBerengarioBernardoEncapuchadoJorge_0830()
+        If Depuracion.PersonajesSeverino Then EjecutarComportamientoSeverinoJorge_0851()
+    End Sub
+
+    Public Sub EjecutarComportamientoMalaquias_06FD()
+        Dim PersonajeIY As Integer
+        Dim PunteroDatosMalaquiasIX As Integer
+        'apunta a las características de malaquías
+        PersonajeIY = &H3054
+        'apunta a las variables de movimiento de malaquías
+        PunteroDatosMalaquiasIX = &H3CAB
+        'indica que el personaje inicialmente si quiere moverse
+        TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 0
+        'ejecuta la lógica de malaquías (puede cambiar 0x3c9c)
+        ProcesarLogicaMalaquias_575E(PersonajeIY, PunteroDatosMalaquiasIX)
+        'modifica la tabla de 0x05cd con información de la tabla de las puertas y entre que habitaciones están
+        ActualizarTablaPuertas_3EA4(&H3F)
+        'apunta a la tabla de datos para mover a malaquías
+        'comprueba si el personaje puede moverse a donde quiere y actualiza su sprite y el buffer de alturas
+        ActualizarDatosPersonaje_291D(&H2BC2)
+        'apunta a las variables de movimiento del abad
+        GenerarMovimiento_073C(PersonajeIY, &H3CAB)
+    End Sub
+
+    Public Sub EjecutarComportamientoBerengarioBernardoEncapuchadoJorge_0830()
+        Dim PersonajeIY As Integer
+        Dim PunterosBerengarioHL As Integer 'puntero a TablaPunterosPersonajes_2BAE
+        Dim DatosLogicaBerengarioIX As Integer 'puntero a TablaVariablesLogica_3C85
+        'apunta a los datos de posición de berengario
+        PersonajeIY = &H3072
+        'apunta a las variables de movimiento de berengario
+        DatosLogicaBerengarioIX = &H3CEA
+        'indica que el personaje inicialmente si quiere moverse
+        TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 0
+        'ejecuta la lógica de berengario
+        ProcesarLogicaBerengarioBernardoEncapuchadoJorge_593F(PersonajeIY, DatosLogicaBerengarioIX)
+        'modifica la tabla de 0x05cd con información de la tabla de las puertas y entre que habitaciones están
+        ActualizarTablaPuertas_3EA4(&H3F)
+        'apunta a la tabla de berengario
+        'comprueba si el personaje puede moverse a donde quiere y actualiza su sprite y el buffer de alturas
+        PunterosBerengarioHL = &H2BD6
+        ActualizarDatosPersonaje_291D(PunterosBerengarioHL)
+        'apunta a las variables de movimiento de berengario
+        GenerarMovimiento_073C(PersonajeIY, DatosLogicaBerengarioIX)
+    End Sub
+
+
+    Public Sub EjecutarComportamientoSeverinoJorge_0851()
+        Dim PersonajeIY As Integer
+        Dim PunterosSeverinoHL As Integer 'puntero a TablaPunterosPersonajes_2BAE
+        Dim DatosLogicaSeverinoIX As Integer 'puntero a TablaVariablesLogica_3C85
+        'apunta a los datos de posición de severino
+        PersonajeIY = &H3081
+        'apunta a las variables de estado de severino
+        DatosLogicaSeverinoIX = &H3D02
+        'indica que el personaje inicialmente si quiere moverse
+        TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 0
+        'ejecuta los cambios de estado de severino/jorge
+        ProcesarLogicaSeverinoJorge_5BC6(PersonajeIY, DatosLogicaSeverinoIX)
+        'modifica la tabla de 0x05cd con información de la tabla de las puertas y entre que habitaciones están
+        ActualizarTablaPuertas_3EA4(&H3F)
+        'apunta a la tabla de severino
+        'comprueba si el personaje puede moverse a donde quiere y actualiza su sprite y el buffer de alturas
+        PunterosSeverinoHL = &H2BE0
+        ActualizarDatosPersonaje_291D(PunterosSeverinoHL)
+        'apunta a las variables de movimiento de berengario
+        GenerarMovimiento_073C(PersonajeIY, DatosLogicaSeverinoIX)
+    End Sub
+
+
+    Public Sub ProcesarLogicaMalaquias_575E(ByVal PersonajeIY As Integer, ByVal PunteroDatosMalaquiasIX As Integer)
+        'lógica de malaquías
+        'si malaquías ha muerto
+        If TablaVariablesLogica_3C85(MalaquiasMuriendose_3CA2 - &H3C85) = 2 Then
+            '5764
+            '3E5B
+            'indica que el personaje no quiere buscar ninguna ruta
+            TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+            Exit Sub
+        End If
+        '5767
+        'si está muriendo, avanza la altura de malaquías
+        If TablaVariablesLogica_3C85(MalaquiasMuriendose_3CA2 - &H3C85) = 1 Then
+            '576C
+            MatarMalaquias_4386()
+            '3E5B
+            'indica que el personaje no quiere buscar ninguna ruta
+            TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+            Exit Sub
+        End If
+        '5773
+        'si el abad está en el estado de echar a guillermo de la abadía
+        If TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0B Then
+            '5779
+            '3E5B
+            'indica que el personaje no quiere buscar ninguna ruta
+            TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+            Exit Sub
+        End If
+        '577C
+        'si es de noche o completas
+        If (MomentoDia_2D81 = 0) Or (MomentoDia_2D81 = 6) Then
+            '5786
+            'va a su celda
+            TablaVariablesLogica_3C85(DondeVaMalaquias_3CAA - &H3C85) = 7
+            'pasa al estado 8
+            TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = 8
+            Exit Sub
+        End If
+        '578D
+        'si es vísperas
+        If MomentoDia_2D81 = 5 Then
+            '5794
+            'si está en el estado 0x0c
+            If TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = &H0C Then
+                '579A
+                'va a buscar al abad
+                TablaVariablesLogica_3C85(DondeVaMalaquias_3CAA - &H3C85) = &HFE
+                'si ha llegado a la posición del abad
+                If TablaVariablesLogica_3C85(DondeEstaMalaquias_3CA8 - &H3C85) = &HFE Then
+                    '57A5
+                    'cambia el estado del abad para que eche a guillermo
+                    TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0B
+                    'cambia al estado 6
+                    TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = 6
+                End If
+                '57AB
+                Exit Sub
+            End If
+            '57AC
+            'si está en el estado 0
+            If TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = 0 Then
+                '57B2
+                'modifica la máscara de los objetos que puede coger malaquías (puede coger la llave del pasadizo)
+                TablaObjetosPersonajes_2DEC(MascaraObjetosMalaquias_2DFF - &H2DEC) = 2
+                'va a la mesa del scriptorium a coger la llave
+                TablaVariablesLogica_3C85(DondeVaMalaquias_3CAA - &H3C85) = 6
+                'si ha llegado a la mesa del scriptorium donde está la llave
+                If TablaVariablesLogica_3C85(DondeEstaMalaquias_3CA8 - &H3C85) = 6 Then
+                    '57BE
+                    'pasa al estado 2
+                    TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = 2
+                Else
+                    '57C3
+                    Exit Sub
+                End If
+            End If
+            '57C4
+            'si su estado es < 4
+            If TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) < 4 Then
+                '57CA
+                'si la altura de guillermo es >= 0x0c
+                If TablaCaracteristicasPersonajes_3036(&H303A - &H3036) >= &H0C Then
+                    '57D0
+                    'va a por guillermo
+                    TablaVariablesLogica_3C85(DondeVaMalaquias_3CAA - &H3C85) = &HFF
+                    '57DA
+                    'si está en el estado 2
+                    If TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = 2 Then
+                        '57E0
+                        'compara la distancia entre guillermo y malaquías (si está muy cerca devuelve 0, en otro caso != 0)
+                        If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                            '57E5
+                            'escribe en el marcador la frase
+                            'DEBEIS ABANDONAR EDIFICIO, HERMANO
+                            EscribirFraseMarcador_501B(9)
+                            'pasa al estado 3
+                            TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = 3
+                            'inicia el contador del tiempo que permite a guillermo estar en el scriptorium
+                            TablaVariablesLogica_3C85(ContadorGuillermoDesobedeciendo_3C9E - &H3C85) = 0
+                            Exit Sub
+                        End If
+                    Else
+                        '57F0
+                        'si está en el estado 3
+                        If TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = 3 Then
+                            '57F6
+                            'incrementa el contador
+                            TablaVariablesLogica_3C85(ContadorGuillermoDesobedeciendo_3C9E - &H3C85) = TablaVariablesLogica_3C85(ContadorGuillermoDesobedeciendo_3C9E - &H3C85) + 1
+                            'si el contador llega al límite tolerable
+                            If TablaVariablesLogica_3C85(ContadorGuillermoDesobedeciendo_3C9E - &H3C85) >= &HFA Then
+                                '5802
+                                'escribe en el marcador la frase
+                                'ADVERTIRE AL ABAD
+                                EscribirFraseMarcador_501B(&H0A)
+                                'cambia al estado 0x0c
+                                TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = &H0C
+                            End If
+                            '5809
+                            Exit Sub
+                        End If
+                    End If
+                Else
+                    '57D6
+                    'pasa al estado 4
+                    TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = 4
+                    Exit Sub
+                End If
+            End If
+            '580A
+            'si está en el estado 4
+            If TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = 4 Then
+                '5810
+                'va a cerrar las puertas del ala izquierda de la abadía
+                TablaVariablesLogica_3C85(DondeVaMalaquias_3CAA - &H3C85) = 4
+                'si ha llegado a las puertas del ala izquierda de la abadía
+                If TablaVariablesLogica_3C85(DondeEstaMalaquias_3CA8 - &H3C85) = 4 Then
+                    '5819
+                    'si berengario o bernardo gui no han abandonado el ala izquierda de la abadía
+                    If (TablaCaracteristicasPersonajes_3036(&H3074 - &H3036) < &H62) And (TablaVariablesLogica_3C85(JorgeOBernardoActivo_3CA1 - &H3C85) = 0) Then
+                        '5821
+                        '3E5B
+                        'indica que el personaje no quiere buscar ninguna ruta
+                        TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                        Exit Sub
+                    Else
+                        '5824
+                        'pasa al estado 5
+                        TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = 5
+                        'indica que las puertas ya no permanecen fijas
+                        TablaDatosPuertas_2FE4(Puerta1_2FFE - &H2FE4) = TablaDatosPuertas_2FE4(Puerta1_2FFE - &H2FE4) And &H7F
+                        TablaDatosPuertas_2FE4(Puerta2_3003 - &H2FE4) = TablaDatosPuertas_2FE4(Puerta2_3003 - &H2FE4) And &H7F
+                    End If
+                End If
+                '5831
+                Exit Sub
+            Else
+                '5832
+                'si está en el estado 5
+                If TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = 5 Then
+                    '5838
+                    'se va a la mesa de la cocina de delante del pasadizo
+                    TablaVariablesLogica_3C85(DondeVaMalaquias_3CAA - &H3C85) = 5
+                    'bloquea las puertas del ala izquierda de la abadía
+                    TablaVariablesLogica_3C85(PuertasAbribles_3CA6 - &H3C85) = &HDF
+                    'si guillermo está en el ala izquierda de la abadía
+                    If TablaCaracteristicasPersonajes_3036(&H3038 - &H3036) < &H60 Then
+                        '5845
+                        'pasa al estado 0x0c para advertir al abad
+                        TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = &H0C
+                    End If
+                    '5848
+                    'si ha llegado al sitio al que quería llegar, avanza el estado
+                    ComprobarDestinoAvanzarEstado_3E98(PunteroDatosMalaquiasIX)
+                    Exit Sub
+                Else
+                    '584B
+                    'si está en el estado 6
+                    If TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = 6 Then
+                        '5851
+                        'va a la iglesia
+                        TablaVariablesLogica_3C85(DondeVaMalaquias_3CAA - &H3C85) = 0
+                        'si ha llegado al sitio al que quería llegar, avanza el estado
+                        ComprobarDestinoAvanzarEstado_3E98(PunteroDatosMalaquiasIX)
+                    End If
+                    '5857
+                    'si el estado de malaquías es el 0x0b
+                    If TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = &H0B Then
+                        '585D
+                        'si no se está reproduciendo una frase
+                        If Not ReproduciendoFrase_2DA1 Then
+                            '5863
+                            'indica que malaquías está muriendo
+                            TablaVariablesLogica_3C85(MalaquiasMuriendose_3CA2 - &H3C85) = 1
+                        End If
+                        '5866
+                        Exit Sub
+                    Else
+                        '5867
+                        'si está en el estado 7
+                        If TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = 7 Then
+                            '586D
+                            'si es el quinto día
+                            If NumeroDia_2D80 = 5 Then
+                                '5873
+                                'si está en la iglesia (la comparación con 0x23 no es necesaria?)
+                                If NumeroPantallaActual_2DBD = &H22 Or NumeroPantallaActual_2DBD = &H23 Then
+                                    '587D
+                                    'indica que no ha llegado a la iglesia todavía
+                                    TablaVariablesLogica_3C85(DondeEstaMalaquias_3CA8 - &H3C85) = 1
+                                    'pasa al estado 0x0b
+                                    TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = &H0B
+                                    'escribe en el marcador la frase
+                                    'ERA VERDAD, TENIA EL PODER DE MIL ESCORPIONES
+                                    EscribirFraseMarcador_501B(&H1F)
+                                End If
+                            End If
+                            '5887
+                            Exit Sub
+                        Else
+                            '5888
+                            Exit Sub
+                        End If
+                    End If
+                End If
+            End If
+        End If
+        '5889
+        'si es prima
+        If MomentoDia_2D81 = 1 Then
+            '588F
+            'cambia al estado 9
+            TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = 9
+            'va a misa
+            TablaVariablesLogica_3C85(DondeVaMalaquias_3CAA - &H3C85) = 0
+            Exit Sub
+        End If
+        '5896
+        'si malaquías ha llegado a su puesto en el scriptorium
+        If TablaVariablesLogica_3C85(DondeEstaMalaquias_3CA8 - &H3C85) = 2 Then
+            '589C
+            'cambia al estado 0
+            TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = 0
+            'modifica la máscara de los objetos que puede coger malaquías
+            TablaObjetosPersonajes_2DEC(MascaraObjetosMalaquias_2DFF - &H2DEC) = 0
+            'deja la llave del pasadizo en la mesa de malaquías
+            DejarLlavePasadizo_4022()
+        End If
+        '58A5
+        'si está en el estado 0
+        If TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = 0 Then
+            '58AC
+            'compara la distancia entre guillermo y malaquías (si está muy cerca devuelve 0, en otro caso != 0)
+            If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                '58B2
+                'si ha salido a cerrar el paso a guillermo
+                If TablaVariablesLogica_3C85(DondeVaMalaquias_3CAA - &H3C85) = 3 Then
+                    '58B8
+                    'si berengario no ha llegado a su puesto de trabajo
+                    If Not LeerBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 7) Then
+                        '58BF
+                        'si la posición y de guillermo < 0x38
+                        If TablaCaracteristicasPersonajes_3036(&H3039 - &H3036) < &H38 Then
+                            '58C5
+                            '???
+                            SetBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 7)
+                            'dice la frase
+                            'LO SIENTO, VENERABLE HERMANO, NO PODEIS SUBIR A LA BIBLIOTECA
+                            EscribirFraseMarcador_501B(&H33)
+                        End If
+                        '58CF
+                        Exit Sub
+                    End If
+                    '58D1
+                    If Not LeerBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 6) Then
+                        '58D8
+                        'si es el segundo día y no se está reproduciendo ninguna frase
+                        If (NumeroDia_2D80 = 2) And (Not ReproduciendoFrase_2DA1) Then
+                            '58E0
+                            SetBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 6)
+                            'dice la frase
+                            'SI LO DESEAIS, BERENGARIO OS MOSTRARA EL SCRIPTORIUM
+                            EscribirFraseMarcador_5026(&H34)
+                            Exit Sub
+                        End If
+                        '58EB
+                        Exit Sub
+                    End If
+                    '58ED
+                    If Not LeerBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 4) Then
+                        '58F3
+                        'compara la distancia entre guillermo y malaquías (si está muy cerca devuelve 0, en otro caso != 0)
+                        If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                            '58F8
+                            'si está muy cerca, sale
+                            Exit Sub
+                        End If
+                        '58F9
+                        'aquí llega si está lejos, pero esto no puede ser, ya que esto está dentro de un (si guillermo está cerca...) (???)
+                        SetBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 4)
+                    End If
+                    '58FE
+                    Exit Sub
+                End If
+                '58FF
+                'descarta los movimientos pensados e indica que hay que pensar un nuevo movimiento
+                DescartarMovimientosPensados_08BE(PersonajeIY)
+                'comprueba si está pulsado el cursor arriba
+                If Not TeclaPulsadaNivel_3482(0) Then
+                    '5908
+                    'indica que el personaje no quiere buscar ninguna ruta
+                    '3E5B
+                    'indica que el personaje no quiere buscar ninguna ruta
+                    TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                    Exit Sub
+                End If
+                '590B
+                'sale a cerrar el paso a guillermo
+                TablaVariablesLogica_3C85(DondeVaMalaquias_3CAA - &H3C85) = 3
+                Exit Sub
+            End If
+            '590F
+            'vuelve a su mesa
+            TablaVariablesLogica_3C85(DondeVaMalaquias_3CAA - &H3C85) = 2
+            Exit Sub
+        End If
+        '5913
+        'si es tercia
+        If MomentoDia_2D81 = 2 Then
+            '5919
+            'si está en el estado 0x09 en el quinto día
+            If (TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = 9) And (NumeroDia_2D80 = 5) Then
+                '5923
+                'va a la celda de severino
+                TablaVariablesLogica_3C85(DondeVaMalaquias_3CAA - &H3C85) = 8
+                'si malaquías y severino están en la celda de severino
+                If (TablaVariablesLogica_3C85(DondeEstaMalaquias_3CA8 - &H3C85) = 8) And (TablaVariablesLogica_3C85(DondeEstaSeverino_3CFF - &H3C85) = 2) Then
+                    '5930
+                    'mata a severino/activa a jorge
+                    TablaVariablesLogica_3C85(JorgeActivo_3CA3 - &H3C85) = 1
+                    'cambia al estado 0x0a
+                    TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = &H0A
+                End If
+                '5936
+                Exit Sub
+            End If
+            '5937
+            'cambia al estado 0x0a
+            TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) = &H0A
+            'va a su mesa de trabajo
+            TablaVariablesLogica_3C85(DondeVaMalaquias_3CAA - &H3C85) = 2
+            Exit Sub
+        End If
+        '593E
+    End Sub
+
+    Public Sub CambiarCaraBerengarioEncapuchado_4094()
+        'cambia la cara de berengario por la del encapuchado
+        Dim CaraBerengarioHL As Integer
+        Dim CaraEncapuchadoDE As Integer
+        'rota los gráficos de los monjes si fuera necesario
+        RotarGraficosMonjes_36C4()
+        'puntero a los datos gráficos de la cara de berengario
+        CaraBerengarioHL = &H309B
+        'puntero a los datos gráficos de la cara del encapuchado
+        CaraEncapuchadoDE = &HB35B
+        '409D
+        '[hl] = de
+        Escribir16(TablaPunterosCarasMonjes_3097, CaraBerengarioHL - &H3097, CaraEncapuchadoDE)
+    End Sub
+
+    Public Function ComprobarPergamino_43ED() As Boolean
+        'devuelve true si guillermo tiene el pergamino sin que el abad haya sido
+        'advertido, o  si el pergamino está en la planta 0
+        'devuelve false si el abad ha sido advertido de que guillermo tiene el 
+        'pergamino, o si el pergamino ha sido cogido por otro personaje
+        Dim AlturaPergaminoA As Byte
+        Dim AlturaPlantaPergaminoB As Byte
+        ComprobarPergamino_43ED = False
+        'si ha advertido al abad, sale
+        If LeerBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 0) Then Exit Function
+        'si guillermo tiene el pergamino, sale
+        If LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 4) Then
+            ComprobarPergamino_43ED = True
+            Exit Function
+        End If
+        'si el pergamino está cogido, sale
+        If LeerBitArray(TablaPosicionObjetos_3008, &H3017 - &H3008, 7) Then Exit Function
+        'obtiene la altura del pergamino
+        AlturaPergaminoA = TablaPosicionObjetos_3008(&H301B - &H3008)
+        'dependiendo de la altura, devuelve la altura base de la planta en b
+        AlturaPlantaPergaminoB = LeerAlturaBasePlanta_2473(AlturaPergaminoA)
+        If AlturaPlantaPergaminoB = 0 Then ComprobarPergamino_43ED = True
+    End Function
+
+    Public Sub ProcesarLogicaBerengarioBernardoEncapuchadoJorge_593F(ByVal PersonajeIY As Integer, ByVal DatosBerengarioIX As Integer)
+        'lógica de berengario/jorge/bernardo/encapuchado
+        'si jorge no está haciendo nada, sale
+        If TablaVariablesLogica_3C85(JorgeOBernardoActivo_3CA1 - &H3C85) = 1 Then
+            '5945
+            '3E5B
+            'indica que el personaje no quiere buscar ninguna ruta
+            TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+            Exit Sub
+        End If
+        '5948
+        'si es el tercer día
+        If NumeroDia_2D80 = 3 Then
+            '594E
+            'si es prima
+            If MomentoDia_2D81 = 1 Then
+                '5954
+                '3E5B
+                'indica que el personaje no quiere buscar ninguna ruta
+                TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                Exit Sub
+            End If
+            '5957
+            'si es tercia
+            If MomentoDia_2D81 = 2 Then
+                '595D
+                'si está en el estado 0x1e
+                If TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = &H1E Then
+                    '5963
+                    'si no está reproduciendo una voz
+                    If Not ReproduciendoFrase_2DA1 Then
+                        '5969
+                        'pasa al estado 0x1f
+                        TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = &H1F
+                    End If
+                    '596C
+                    '3E5B
+                    'indica que el personaje no quiere buscar ninguna ruta
+                    TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                    Exit Sub
+                End If
+                '596F
+                'si está en el estado 0x1f
+                If TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = &H1F Then
+                    '5975
+                    'compara la distancia entre guillermo y jorge (si está muy cerca devuelve 0, en otro caso != 0)
+                    If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                        '597A
+                        'pone en el marcador la frase
+                        'SED BIENVENIDO, VENERABLE HERMANO; Y ESCUCHAD LO QUE OS DIGO. LAS VIAS DEL ANTICRISTO SON LENTAS Y TORTUOSAS. LLEGA CUANDO MENOS LO ESPERAS. NO DESPERDICIEIS LOS ULTIMOS DIAS
+                        EscribirFraseMarcador_5026(&H32)
+                        'indica que hay que avanzar el momento del día
+                        TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 1
+                    End If
+                    '5981
+                    '3E5B
+                    'indica que el personaje no quiere buscar ninguna ruta
+                    TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                    Exit Sub
+                End If
+                '5984
+                'compara la distancia entre guillermo y jorge (si está muy cerca devuelve 0, en otro caso != 0)
+                If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                    '5989
+                    'escribe en el marcador la frase
+                    'VENERABLE JORGE, EL QUE ESTA ANTE VOS ES FRAY GUILLERMO, NUESTRO HUESPED
+                    EscribirFraseMarcador_501B(&H31)
+                    'pasa al estado 0x1e
+                    TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = &H1E
+                End If
+                '5990
+                '3E5B
+                'indica que el personaje no quiere buscar ninguna ruta
+                TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                Exit Sub
+            End If
+            '5993
+            'si es sexta
+            If MomentoDia_2D81 = 3 Then
+                '5999
+                'se va a la celda de los monjes
+                TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = 3
+                'pasa al estado 0
+                TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = 0
+                'si la posición x de jorge ??? esto no tiene mucho sentido, porque es una frase que dice adso!!!
+                If TablaCaracteristicasPersonajes_3036(&H3074 - &H3036) = &H60 Then
+                    '59A5
+                    'pone en el marcador la frase
+                    'PRONTO AMANECERA, MAESTRO
+                    EscribirFraseMarcador_5026(&H27)
+                End If
+                '59A9
+                'si ha llegado a su celda, lo indica
+                If TablaVariablesLogica_3C85(DondeEsta_Berengario_3CE7 - &H3C85) = 3 Then
+                    '59AF
+                    'indica que jorge no va a hacer nada más por ahora
+                    TablaVariablesLogica_3C85(JorgeOBernardoActivo_3CA1 - &H3C85) = 1
+                End If
+                '59B2
+                Exit Sub
+            End If
+        End If
+        '59B3
+        'aquí llega si no es el tercer día
+        'si es sexta
+        If MomentoDia_2D81 = 3 Then
+            '59B9
+            'va al refectorio
+            TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = 1
+            Exit Sub
+        End If
+        '59BD
+        'si es prima
+        If MomentoDia_2D81 = 1 Then
+            '59C3
+            'va a la iglesia
+            TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = 0
+            Exit Sub
+        End If
+        '59C7
+        'si es el quinto día
+        If NumeroDia_2D80 = 5 Then
+            '59CD
+            'si ha llegado a la salida de la abadía, lo indica
+            If TablaVariablesLogica_3C85(DondeEsta_Berengario_3CE7 - &H3C85) = 4 Then
+                '59D3
+                'indica que Bernardo no va a hacer nada más por ahora?
+                TablaVariablesLogica_3C85(JorgeOBernardoActivo_3CA1 - &H3C85) = 1
+                'posición x de berengario = 0
+                TablaCaracteristicasPersonajes_3036(&H3074 - &H3036) = 0
+            End If
+            '59D9
+            'se va de la abadía
+            TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = 4
+        End If
+        '59DC
+        'si es completas
+        If MomentoDia_2D81 = 6 Then
+            '59E2
+            'se va a la celda de los monjes
+            TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = 3
+            Exit Sub
+        End If
+        '59E6
+        'si es de noche
+        If MomentoDia_2D81 = 0 Then
+            '59ED
+            'si es el tercer día
+            If NumeroDia_2D80 = 3 Then
+                '59F4
+                'si está en el estado 6
+                If TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = 6 Then
+                    '59FA
+                    'modifica la máscara de los objetos que puede coger. sólo el libro
+                    TablaObjetosPersonajes_2DEC(MascaraObjetosBerengarioBernardo_2E0D - &H2DEC) = &H80
+                    'si está en su celda
+                    If TablaVariablesLogica_3C85(DondeEsta_Berengario_3CE7 - &H3C85) = 3 Then
+                        '5A04
+                        'indica que va hacia las escaleras al pie del scriptorium
+                        TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = 5
+                        Exit Sub
+                    End If
+                    '5A08
+                    'se dirige hacia el libro
+                    TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = &HFD
+                    'si tiene el libro
+                    If LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosBerengario_2E0B - &H2DEC, 7) Then
+                        '5A16
+                        'si ha llegado a la celda de severino
+                        If TablaVariablesLogica_3C85(DondeEsta_Berengario_3CE7 - &H3C85) = 6 Then
+                            '5A1C
+                            'indica que hay que avanzar el momento del día
+                            TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 1
+                        End If
+                        '5A1F
+                        'se dirige a la celda de severino
+                        TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = 6
+                    End If
+                    '5A22
+                    Exit Sub
+                End If
+                '5A23
+                'si está en su celda
+                If TablaVariablesLogica_3C85(DondeEsta_Berengario_3CE7 - &H3C85) = 3 Then
+                    '5A29
+                    'pasa al estado 6
+                    TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = 6
+                    'cambia la cara de berengario por la del encapuchado
+                    CambiarCaraBerengarioEncapuchado_4094()
+                    Exit Sub
+                End If
+            End If
+            '5A30
+            'se dirige a la celda de los monjes
+            TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = 3
+            Exit Sub
+        End If
+        '5A34
+        'si es visperas
+        If MomentoDia_2D81 = 5 Then
+            '5A3A
+            'si es el segundo día y malaquías no ha abandonado el scriptorium
+            If (NumeroDia_2D80 = 2) And (TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) < 4) Then
+                '5A44
+                '3E5B
+                'indica que el personaje no quiere buscar ninguna ruta
+                TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                Exit Sub
+            End If
+            '5A47
+            'pasa al estado 1
+            TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = 1
+            'va a la iglesia
+            TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = 0
+            Exit Sub
+        End If
+        '5A4E
+        'si es el primer o segundo día
+        If NumeroDia_2D80 < 3 Then
+            '5A55
+            'si está en el estado 4
+            If TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = 4 Then
+                '5A5B
+                'incrementa el tiempo que lleva guillermo con el pergamino
+                TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) + 1
+                'si guillermo no tiene mucho tiempo el pergamino y no ha cambiado de pantalla
+                If (TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) < &H41) And (NumeroPantallaActual_2DBD = &H40) Then
+                    '5A6B
+                    'si guillermo no tiene el pergamino
+                    If Not LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 4) Then
+                        '5A71
+                        'cambia el estado de berengario
+                        TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = 0
+                    End If
+                    '5A74
+                    Exit Sub
+                End If
+                '5A75
+                'cambia el estado de berengario
+                TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = 5
+                '437D
+                'deshabilita el contador para que avance el momento del día de forma automática
+                TiempoRestanteMomentoDia_2D86 = 0
+                Exit Sub
+            End If
+            '5A7C
+            'si está en el estado 5
+            If TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = 5 Then
+                '5A82
+                'va hacia la posición del abad
+                TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = &HFE
+                'si berengario ha llegado a la posición del abad
+                If TablaVariablesLogica_3C85(DondeEsta_Berengario_3CE7 - &H3C85) = &HFE Then
+                    '5A8D
+                    'pone el contador al valor máximo
+                    TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = &HC9
+                    'cambia el estado de berengario
+                    TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = 0
+                    'indica que guillermo ha cogido el pergamino
+                    TablaVariablesLogica_3C85(BerengarioChivato_3C94 - &H3C85) = 1
+                    'indica que el abad ha sido advisado de que guillermo ha cogido el pergamino
+                    SetBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 0)
+                End If
+                '5A9C
+                Exit Sub
+            End If
+            '5A9D
+            'si ha llegado a su mesa del scriptorium
+            If TablaVariablesLogica_3C85(DondeEsta_Berengario_3CE7 - &H3C85) = 2 Then
+                '5AA3
+                'comprueba el estado del pergamino
+                If ComprobarPergamino_43ED() Then
+                    '5AA8
+                    'guillermo ha codigo el pergamino
+                    'reinicia el contador
+                    TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = 0
+                    'pasa al estado 4
+                    TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = 4
+                    'compara la distancia entre guillermo y berengario(si está muy cerca devuelve 0, en otro caso != 0)
+                    If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                        '5AB3
+                        'si está cerca de guillermo
+                        'pone en el marcador la frase
+                        'DEJAD EL MANUSCRITO DE VENACIO O ADVERTIRE AL ABAD
+                        EscribirFraseMarcador_5026(4)
+                        Exit Sub
+                    End If
+                    '5AB9
+                    'pasa al estado 5
+                    TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = 5
+                    '437D
+                    'deshabilita el contador para que avance el momento del día de forma automática
+                    TiempoRestanteMomentoDia_2D86 = 0
+                    Exit Sub
+                End If
+            End If
+            '5AC0
+            'si malaquías le ha dicho que berengario le puede enseñar el scriptorium y la altura de guillermo >= 0x0d
+            If LeerBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 6) And (TablaCaracteristicasPersonajes_3036(&H303A - &H3036) >= &H0D) Then
+                '5ACE
+                'si no le había dicho lo de los mejores copistas de occidente
+                If Not LeerBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 4) Then
+                    '5AD4
+                    'berengario va a por guillermo
+                    TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = &HFF
+                    'compara la distancia entre guillermo y berengario (si está muy cerca devuelve 0, en otro caso != 0)
+                    If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                        '5ADD
+                        'si no se está reproduciendo una frase
+                        If Not ReproduciendoFrase_2DA1 Then
+                            '5AE3
+                            'indica que berengario ha llegado a donde está guillermo
+                            TablaVariablesLogica_3C85(DondeEsta_Berengario_3CE7 - &H3C85) = &HFF
+                            'descarta los movimientos pensados e indica que hay que pensar un nuevo movimiento
+                            DescartarMovimientosPensados_08BE(PersonajeIY)
+                            'indica que ya le ha dicho lo de los mejores copistas de occidente
+                            SetBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 4)
+                            'pone en el marcador la frase
+                            'AQUI TRABAJAN LOS MEJORES COPISTAS DE OCCIDENTE
+                            EscribirFraseMarcador_5026(&H35)
+                        End If
+                        '5AF3
+                        '3E5B
+                        'indica que el personaje no quiere buscar ninguna ruta
+                        TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                        Exit Sub
+                    End If
+                    '5AF6
+                    Exit Sub
+                End If
+                '5AF9
+                'si no le ha dicho lo de venacio
+                If Not LeerBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 3) Then
+                    '5AFF
+                    'va a su mesa del scriptorium
+                    TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = 2
+                    'compara la distancia entre guillermo y berengario (si está muy cerca devuelve 0, en otro caso != 0)
+                    If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                        '5B07
+                        'si está cerca de guillermo
+                        'si berengario ha llegado al scriptorium y no se estaba reproduciendo una frase
+                        If (TablaVariablesLogica_3C85(DondeEsta_Berengario_3CE7 - &H3C85) = 2) And Not ReproduciendoFrase_2DA1 Then
+                            '5B0F
+                            'indica que ya le ha enseñado donde trabaja venacio
+                            SetBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 3)
+                            'pone en el marcador la frase
+                            'AQUI TRABAJABA VENACIO
+                            EscribirFraseMarcador_5026(&H36)
+                        End If
+                        '5B18
+                        Exit Sub
+                    End If
+                    '5B19
+                    'si ha llegado a su puesto en el scriptorium y guillermo no le ha seguido
+                    If TablaVariablesLogica_3C85(DondeEsta_Berengario_3CE7 - &H3C85) = 2 Then
+                        '5B1F
+                        '??? esto es un bug del juego??? creo que debería ser 0x08 en vez de 0x80
+                        SetBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 7)
+                    End If
+                End If
+            End If
+            '5B25
+            'cambia el estado de berengario
+            TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = 0
+            'no se mueve de su puesto de trabajo
+            TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = 2
+            Exit Sub
+        End If
+        '5B2C
+        'si está en el estado 0x14
+        If TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = &H14 Then
+            '5B32
+            'si ha llegado al sitio donde quería ir
+            If TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = TablaVariablesLogica_3C85(DondeEsta_Berengario_3CE7 - &H3C85) Then
+                '5B38
+                'se mueve de forma aleatoria por la abadía
+                TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = TablaVariablesLogica_3C85(ValorAleatorio_3C9D - &H3C85) And &H03
+            End If
+            '5B3D
+            Exit Sub
+        End If
+        '5B3E
+        'si es el cuarto día
+        If NumeroDia_2D80 = 4 Then
+            '5B45
+            'si bernardo va a por el abad y el abad tiene el pergamino
+            If (TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = &HFE) And LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosAbad_2E04 - &H2DEC, 4) Then
+                '5B52
+                'cambia el estado de berengario
+                TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = &H14
+                'va al refectorio
+                TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = 1
+                'cambia el estado del abad
+                TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H15
+                Exit Sub
+            End If
+            '5B5C
+            'si bernardo tiene el pergamino
+            If LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosBerengario_2E0B - &H2DEC, 4) Then
+                '5B64
+                'va a por el abad
+                TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = &HFE
+                '437D
+                'deshabilita el contador para que avance el momento del día de forma automática
+                TiempoRestanteMomentoDia_2D86 = 0
+                'cambia la máscara de los objetos que puede coger bernardo
+                TablaObjetosPersonajes_2DEC(MascaraObjetosBerengarioBernardo_2E0D - &H2DEC) = 0
+                Exit Sub
+            End If
+            '5B6F
+            'si el pergamino está a buen recaudo o el abad va a echar a guillermo
+            If (TablaVariablesLogica_3C85(EstadoPergamino_3C90 - &H3C85) = 1) Or LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosAbad_2E04 - &H2DEC, 4) Or (TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0B) Then
+                '5B7F
+                'va a su puesto en el scriptorium
+                TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = 2
+                'cambia el estado de bernardo
+                TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = &H14
+                Exit Sub
+            End If
+            '5B86
+            'indica que el pergamino no se le ha quitado a guillermo
+            TablaVariablesLogica_3C85(EstadoPergamino_3C90 - &H3C85) = 0
+            'deshabilita el contador para que avance el momento del día de forma automática
+            '437D
+            'deshabilita el contador para que avance el momento del día de forma automática
+            TiempoRestanteMomentoDia_2D86 = 0
+            'si guillermo tiene el pergamino
+            If LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 4) Then
+                '5B94
+                'si está en el estado 7
+                If TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = 7 Then
+                    '5B9A
+                    'va a por guillermo
+                    TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = &HFF
+                    'compara la distancia entre guillermo y bernardo gui (si está muy cerca devuelve 0, en otro caso != 0)
+                    If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                        '5BA3
+                        'si está cerca de guillermo
+                        'si no está mostrando una frase
+                        If Not ReproduciendoFrase_2DA1 Then
+                            '5BA9
+                            'pone en el marcador la frase
+                            'DADME EL MANUSCRITO, FRAY GUILLERMO
+                            EscribirFraseMarcador_5026(5)
+                            'decrementa la vida de guillermo en 2 unidades
+                            '55CE
+                            DecrementarObsequium_55D3(2)
+                        End If
+                    End If
+                    '5BB0
+                    Exit Sub
+                End If
+                '5BB2
+                'compara la distancia entre guillermo y bernardo gui (si está muy cerca devuelve 0, en otro caso != 0)
+                If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                    '5BB7
+                    'va a la celda de los monjes
+                    TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = 3
+                    Exit Sub
+                End If
+                '5BBB
+                'cambia el estado de berengario
+                TablaVariablesLogica_3C85(EstadoBerengario_3CE8 - &H3C85) = 7
+                Exit Sub
+            End If
+            '5BC1
+            'va a por el pergamino
+            TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = &HFC
+        End If
+        '5BC5
+    End Sub
+
+    Public Sub DejarLibro_40AF()
+        'jorge dejael libro
+        Dim ObjetosSeverinoJorgeIX As Integer 'apunta a TablaObjetosPersonajes_2DEC
+        ObjetosSeverinoJorgeIX = &H2E0F
+        DejarObjeto_5277(ObjetosSeverinoJorgeIX)
+    End Sub
+
+    Public Sub ApagarLuzQuitarLibro_4248()
+        'apaga la luz de la pantalla y le quita el libro a guillermo
+        Dim ObjetosGuillermoC As Byte
+        Dim MascaraA As Byte
+        'indica que la pantalla no está iluminada
+        HabitacionOscura_156C = True
+        'le quita el libro a guillermo
+        ClearBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 7)
+        ObjetosGuillermoC = TablaObjetosPersonajes_2DEC(ObjetosGuillermo_2DEF - &H2DEC)
+        MascaraA = &H80
+        'actualiza el marcador el marcador para que no se muestre el libro
+        ActualizarMarcador_51DA(ObjetosGuillermoC, MascaraA)
+        'copia en 0x3008 -> 00 00 00 00 00 (hace desaparecer el libro)
+        CopiarDatosPersonajeObjeto_4145(&H3008, {0, 0, 0, 0, 0})
+    End Sub
+
+    Public Sub ProcesarLogicaSeverinoJorge_5BC6(ByVal PersonajeIY As Integer, ByVal DatosBerengarioIX As Integer)
+        'lógica de severino/jorge
+        If TablaVariablesLogica_3C85(JorgeActivo_3CA3 - &H3C85) = 1 Then
+            '5BCC
+            '3E5B
+            'indica que el personaje no quiere buscar ninguna ruta
+            TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+            Exit Sub
+        End If
+        '5BCF
+        'si está en el día 6 o 7, el personaje es jorge y no severino
+        If NumeroDia_2D80 >= 6 Then
+            '5BD6
+            'si está en el estado 0x0b
+            If TablaVariablesLogica_3C85(EstadoSeverino_3D00 - &H3C85) = &H0B Then
+                '5BDC
+                'si no está reproduciendo una voz
+                If Not ReproduciendoFrase_2DA1 Then
+                    '5BE2
+                    'deja el libro
+                    DejarLibro_40AF()
+                    'cambia a estado 0c
+                    TablaVariablesLogica_3C85(EstadoSeverino_3D00 - &H3C85) = &H0C
+                End If
+                '5BE8
+                '3E5B
+                'indica que el personaje no quiere buscar ninguna ruta
+                TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                Exit Sub
+            End If
+            '5BEB
+            'si está en el estado 0x0c
+            If TablaVariablesLogica_3C85(EstadoSeverino_3D00 - &H3C85) = &H0C Then
+                '5BF1
+                'si guillermo no tiene el libro
+                If Not LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 7) Then
+                    '5BF8
+                    '3E5B
+                    'indica que el personaje no quiere buscar ninguna ruta
+                    TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                    Exit Sub
+                End If
+                '5BFB
+                'pone en el marcador la frase
+                'ES EL COENA CIPRIANI DE ARISTOTELES. AHORA COMPRENDEREIS POR QUE TENIA QUE PROTEGERLO. CADA PALABRA ESCRITA POR EL FILOSOFO HA DESTRUIDO UNA PARTE DEL SABER DE LA CRISTIANDAD. SE QUE HE ACTUADO SIGUIENDO LA VOLUNTAD DEL SEÑOR... LEEDLO, PUES, FRAY GUILLERMO. DESPUES TE LO MOSTRATE A TI MUCHACHO
+                EscribirFraseMarcador_5026(&H2E)
+                'cambia al estado 0d
+                TablaVariablesLogica_3C85(EstadoSeverino_3D00 - &H3C85) = &H0D
+                '3E5B
+                'indica que el personaje no quiere buscar ninguna ruta
+                TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                Exit Sub
+            End If
+            '5C05
+            'si está en el estado 0x0d
+            If TablaVariablesLogica_3C85(EstadoSeverino_3D00 - &H3C85) = &H0D Then
+                '5C0B
+                'si guillermo no tiene los guantes
+                If Not LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 6) Then
+                    '5C12
+                    'si guillermo sigue vivo
+                    If TablaVariablesLogica_3C85(GuillermoMuerto_3C97 - &H3C85) = 0 Then
+                        '5C18
+                        'si ha salido a la habitación del espejo o ha terminado de reproducir la frase
+                        If (NumeroPantallaActual_2DBD = &H72) Or Not ReproduciendoFrase_2DA1 Then
+                            '5C20
+                            'pone el contador para matar a guillermo en la siguiente ejecución de lógica por leer el libro sin los guantes
+                            TablaVariablesLogica_3C85(ContadorLeyendoLibroSinGuantes_3C85 - &H3C85) = &HFF
+                            '3E5B
+                            'indica que el personaje no quiere buscar ninguna ruta
+                            TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                            Exit Sub
+                        End If
+                        '5C26
+                        'inicia el contador para matar a guillermo por leer el libro sin los guantes
+                        TablaVariablesLogica_3C85(ContadorLeyendoLibroSinGuantes_3C85 - &H3C85) = 1
+                    End If
+                    '5C29
+                    '3E5B
+                    'indica que el personaje no quiere buscar ninguna ruta
+                    TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                    Exit Sub
+                End If
+                '5C2C
+                'si no se está reproduciendo una frase
+                If Not ReproduciendoFrase_2DA1 Then
+                    '5C32
+                    'pone en el marcador la frase
+                    'VENERABLE JORGE, VOIS NO PODEIS VERLO, PERO MI MAESTRO LLEVA GUANTES.  PARA SEPARAR LOS FOLIOS TENDRIA QUE HUMEDECER LOS DEDOS EN LA LENGUA, HASTA QUE HUBIERA RECIBIDO SUFICIENTE VENENO
+                    EscribirFraseMarcador_5026(&H23)
+                    'cambia al estado 0e
+                    TablaVariablesLogica_3C85(EstadoSeverino_3D00 - &H3C85) = &H0E
+                End If
+                '5C39
+                '3E5B
+                'indica que el personaje no quiere buscar ninguna ruta
+                TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                Exit Sub
+            End If
+            '5C3C
+            'si está en el estado 0x0e
+            If TablaVariablesLogica_3C85(EstadoSeverino_3D00 - &H3C85) = &H0E Then
+                '5C42
+                'si no está reproduciendo una frase
+                If Not ReproduciendoFrase_2DA1 Then
+                    '5C48
+                    'pone a cero el contador para apagar la luz
+                    TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = 0
+                    'cambia al estado 0f
+                    TablaVariablesLogica_3C85(EstadoSeverino_3D00 - &H3C85) = &H0F
+                    'pone en el marcador la frase
+                    'FUE UNA BUENA IDEA ¿VERDAD?; PERO YA ES TARDE
+                    EscribirFraseMarcador_5026(&H2F)
+                End If
+                '5C52
+                '3E5B
+                'indica que el personaje no quiere buscar ninguna ruta
+                TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                Exit Sub
+            End If
+            '5C55
+            If TablaVariablesLogica_3C85(EstadoSeverino_3D00 - &H3C85) = &H0F Then
+                '5C5B
+                'incrementa el contador para apagar la luz
+                TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) + 1
+                'si el contador ha llegado al límite
+                If TablaVariablesLogica_3C85(Contador_3C98 - &H3C85) = &H28 Then
+                    '5C66
+                    'oculta el área de juego
+                    PintarAreaJuego_1A7D(&HFF)
+                    'jorge va a la habitación donde muere
+                    TablaVariablesLogica_3C85(DondeVaSeverino_3D01 - &H3C85) = 4
+                    'apaga la luz de la pantalla y le quita el libro a guillermo
+                    ApagarLuzQuitarLibro_4248()
+                    'cambia al estado 10
+                    TablaVariablesLogica_3C85(EstadoSeverino_3D00 - &H3C85) = &H10
+                    Exit Sub
+                End If
+                '5C76
+                '3E5B
+                'indica que el personaje no quiere buscar ninguna ruta
+                TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                Exit Sub
+            End If
+            '5C79
+            'si está en estado 10
+            If TablaVariablesLogica_3C85(EstadoSeverino_3D00 - &H3C85) = &H10 Then
+                '5C7F
+                'si jorge ha llegado a su destino y guillermo está en la habitación donde se va jorge con el libro y se acerca a éste
+                If (TablaVariablesLogica_3C85(DondeEstaSeverino_3CFF - &H3C85) = 4) And (NumeroPantallaActual_2DBD = &H67) And (TablaCaracteristicasPersonajes_3036(&H303A - &H3036) < &H1E) Then
+                    '5C8D
+                    'indica que se ha completado la investigación
+                    TablaVariablesLogica_3C85(InvestigacionNoTerminada_3CA7 - &H3C85) = 0
+                    'indica que ha muerto jorge
+                    TablaVariablesLogica_3C85(JorgeActivo_3CA3 - &H3C85) = 1
+                    'escribe en el marcador la frase
+                    'SE ESTA COMIENDO EL LIBRO, MAESTRO
+                    EscribirFraseMarcador_501B(&H24)
+                    'indica que la investigación ha concluido
+                    TablaVariablesLogica_3C85(GuillermoMuerto_3C97 - &H3C85) = 1
+                End If
+                '5C9A
+                Exit Sub
+            End If
+            '5C9B
+            'si se está en la habitación de detrás del espejo, le da un bonus
+            If NumeroPantallaActual_2DBD = &H73 Then
+                '5CA1
+                'obtiene un bonus
+                Bonus2_2DBF = Bonus2_2DBF Or &H08
+                'escribe en el marcador la frase
+                'SOIS VOS, GUILERMO... PASAD, OS ESTABA ESPERANDO. TOMAD, AQUI ESTA VUESTRO PREMIO
+                EscribirFraseMarcador_501B(&H21)
+                'inicia el estado de la secuencia final
+                TablaVariablesLogica_3C85(EstadoSeverino_3D00 - &H3C85) = &H0B
+            End If
+            '5CAD
+            '3E5B
+            'indica que el personaje no quiere buscar ninguna ruta
+            TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+            Exit Sub
+        End If
+        '5CB0
+        'aquí llega el día < 6 (si es severino)
+        'si es de noche o completas
+        If (MomentoDia_2D81 = 0) Or (MomentoDia_2D81 = 6) Then
+            '5CBA
+            'indica que ha llegado a su celda
+            TablaVariablesLogica_3C85(DondeEstaSeverino_3CFF - &H3C85) = 2
+            'se va a su celda
+            TablaVariablesLogica_3C85(DondeVaSeverino_3D01 - &H3C85) = 2
+            Exit Sub
+        End If
+        '5CC1
+        'si es prima
+        If MomentoDia_2D81 = 1 Then
+            '5CC7
+            'si está reproduciendo una voz y va a por guillermo, sale
+            If ReproduciendoFrase_2DA1 And (TablaVariablesLogica_3C85(DondeVaSeverino_3D01 - &H3C85) = &HFF) Then
+                Exit Sub
+            End If
+            '5CD3
+            'va a la iglesia
+            TablaVariablesLogica_3C85(DondeVaSeverino_3D01 - &H3C85) = 0
+            'si es el quinto día y guillermo ha sido avisado del libro en la celda de severino
+            If (NumeroDia_2D80 = 5) And (TablaVariablesLogica_3C85(GuillermoAvisadoLibro_3CA4 - &H3C85) = 0) Then
+                '5CE0
+                'si guillermo está en el ala izquierda de la abadía
+                If TablaCaracteristicasPersonajes_3036(&H3038 - &H3036) < &H60 Then
+                    '5CE6
+                    'se ha perdido la oportunidad de avisar a guillermo
+                    TablaVariablesLogica_3C85(GuillermoAvisadoLibro_3CA4 - &H3C85) = 1
+                    Exit Sub
+                End If
+                '5CEA
+                'va a por guillermo
+                TablaVariablesLogica_3C85(DondeVaSeverino_3D01 - &H3C85) = &HFF
+                'si ha llegado a donde está guillermo
+                If TablaVariablesLogica_3C85(DondeEstaSeverino_3CFF - &H3C85) = &HFF Then
+                    '5CF5
+                    'escribe en el marcador la frase
+                    'ESCUCHAD HERMANO, HE ENCONTRADO UN EXTRAÑO LIBRO EN MI CELDA
+                    EscribirFraseMarcador_501B(&H0F)
+                    'indica que ya le ha dado el mensaje
+                    TablaVariablesLogica_3C85(GuillermoAvisadoLibro_3CA4 - &H3C85) = 1
+                End If
+            End If
+            '5CFC
+            Exit Sub
+        End If
+        '5CFD
+        'si es sexta
+        If MomentoDia_2D81 = 3 Then
+            '5D03
+            'va al refectorio
+            TablaVariablesLogica_3C85(DondeVaSeverino_3D01 - &H3C85) = 1
+            Exit Sub
+        End If
+        '5D07
+        'si aun no es vísperas
+        If MomentoDia_2D81 < 5 Then
+            '5D0E
+            'si no va a su celda, si se está paseando, si el día es >= 2 y si el abad no va a por guillermo
+            If (Not LeerBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 1)) And (TablaVariablesLogica_3C85(DondeEstaSeverino_3CFF - &H3C85) >= 2) And (NumeroDia_2D80 >= 2) And (TablaVariablesLogica_3C85(DondeVaAbad_3CC8 - &H3C85) <= &HFF) Then
+                '5D21
+                'si severino no se ha presentado y no se está reproduciendo una voz
+                If (Not LeerBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 2)) And Not ReproduciendoFrase_2DA1 Then
+                    '5D29
+                    'compara la distancia entre guillermo y severino (si está muy cerca devuelve 0, en otro caso != 0)
+                    If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                        '5D2E
+                        'si severino está cerca de guillermo
+                        'se presenta
+                        TablaVariablesLogica_3C85(EstadosVarios_3CA5 - &H3C85) = 4
+                        'va a por guillermo
+                        TablaVariablesLogica_3C85(DondeVaSeverino_3D01 - &H3C85) = &HFF
+                        'pone en el marcador la frase
+                        'VENERABLE HERMANO, SOY SEVERINO, EL ENCARGADO DEL HOSPITAL. QUIERO ADVERTIROS QUE EN ESTA ABADIA SUCEDEN COSAS MUY EXTRAÑAS. ALGUIEN NO QUIERE QUE LOS MONJES DECIDAN POR SI SOLOS LO QUE DEBEN SABER
+                        EscribirFraseMarcador_5026(&H37)
+                        Exit Sub
+                    End If
+                End If
+                '5D3A
+                'si se ha presentado severino, continúa
+                If LeerBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 2) Then
+                    '5D42
+                    'sigue a guillermo
+                    TablaVariablesLogica_3C85(DondeVaSeverino_3D01 - &H3C85) = &HFF
+                    'si ha terminado de hablar
+                    If Not ReproduciendoFrase_2DA1 Then
+                        '5D4C
+                        'va a su celda
+                        TablaVariablesLogica_3C85(DondeVaSeverino_3D01 - &H3C85) = 2
+                        'indica que severino está cerca de las celdas de los monjes
+                        TablaVariablesLogica_3C85(DondeEstaSeverino_3CFF - &H3C85) = 3
+                        'indica que va a su celda
+                        SetBitArray(TablaVariablesLogica_3C85, EstadosVarios_3CA5 - &H3C85, 1)
+                    End If
+                    '5D57
+                    Exit Sub
+                End If
+            End If
+            '5D58
+            'si ha llegado a la posición de guillermo
+            If TablaVariablesLogica_3C85(DondeEstaSeverino_3CFF - &H3C85) = &HFF Then
+                '5D5F
+                'si no se está reproduciendo una voz
+                If Not ReproduciendoFrase_2DA1 Then
+                    '5D65
+                    'pone en el marcador la frase
+                    'ES MUY EXTRAÑO, HERMANO GUILLERMO. BERENGARIO TENIA MANCHAS NEGRAS EN LA LENGUA Y EN LOS DEDOS
+                    EscribirFraseMarcador_5026(&H26)
+                    'indica que al acabar la frase avanza el momento del día
+                    TablaVariablesLogica_3C85(AvanzarMomentoDia_3C9A - &H3C85) = 1
+                End If
+                '5D6C
+                Exit Sub
+            End If
+            '5D6D
+            'si ha llegado a su celda
+            If TablaVariablesLogica_3C85(DondeEstaSeverino_3CFF - &H3C85) = 2 Then
+                '5D73
+                'si es el quinto día
+                If NumeroDia_2D80 = 5 Then
+                    '5D79
+                    '3E5B
+                    'indica que el personaje no quiere buscar ninguna ruta
+                    TablaVariablesLogica_3C85(PersonajeNoquiereMoverse_3C9C - &H3C85) = 1
+                    Exit Sub
+                End If
+                '5D7C
+                'si es tercia del cuarto día
+                If (MomentoDia_2D81 = 2) And (NumeroDia_2D80 = 4) Then
+                    '5D86
+                    'va a por guillermo
+                    TablaVariablesLogica_3C85(DondeVaSeverino_3D01 - &H3C85) = &HFF
+                    'compara la distancia entre guillermo y severino (si está muy cerca devuelve 0, en otro caso != 0)
+                    If CompararDistanciaGuillermo_3E61(PersonajeIY) = 0 Then
+                        '5D8F
+                        'pone en el marcador la frase
+                        'ESPERAD, HERMANO
+                        EscribirFraseMarcador_5026(&H2C)
+                    End If
+                    '5D93
+                    Exit Sub
+                End If
+                '5D94
+                'va a la habitación de al lado de las celdas de los monjes
+                TablaVariablesLogica_3C85(DondeVaSeverino_3D01 - &H3C85) = 3
+                Exit Sub
+            End If
+            '5D99
+            'va a su celda
+            TablaVariablesLogica_3C85(DondeVaSeverino_3D01 - &H3C85) = 2
+            Exit Sub
+        End If
+        '5D9D
+        'va a la iglesia
+        TablaVariablesLogica_3C85(DondeVaSeverino_3D01 - &H3C85) = 0
+    End Sub
+
+    Public Sub AñadirNumerosRomanosPergamino_5643(NumeroA As Byte)
+        'copia a la cadena del pergamino los números romanos de la habitación del espejo
+        Dim PunteroNumeroHL As Integer
+        Dim PunteroCadenaPergaminoDE As Integer
+        Dim Contador As Integer
+        Dim TablaNumerosRomanos_5621() = {&H49, &H58, &HD8, &H58, &H49, &HD8, &H58, &H58, &HC9}
+        '5621: 	49 58 D8 -> IXX
+        '		58 49 D8 -> XIX
+        '		58 58 C9 -> XXI
+        'obtiene la entrada al número romano de las escaleras en las que hay que pulsar QR frente al espejo
+        'cada entrada ocupa 3 bytes
+        NumeroRomanoHabitacionEspejo_2DBC = NumeroA
+        PunteroNumeroHL = (NumeroRomanoHabitacionEspejo_2DBC - 1) * 3
+        'tabla con los números romanos de las escaleras de la habitación del espejo
+        PunteroNumeroHL = PunteroNumeroHL + &H5621
+        'apunta a los datos de la cadena del pergamino
+        PunteroCadenaPergaminoDE = &HB59E
+        'copia los números romanos a las cadena del pergamino
+        For Contador = 0 To 2
+            TablaCaracteresPalabrasFrases_B400(PunteroCadenaPergaminoDE + Contador - &HB400) = TablaNumerosRomanos_5621(PunteroNumeroHL + Contador - &H5621)
+        Next
+    End Sub
+
+
+    Public Sub GenerarNumeroEspejo_562E()
+        'si no se había generado el número romano del enigma de la habitación del espejo, lo genera
+        Dim NumeroA As Byte
+        'si no se había calculado el número
+        If NumeroRomanoHabitacionEspejo_2DBC = 0 Then
+            '5634
+            'genera un número aleatorio entre 1 y 3
+            Randomize()
+            NumeroA = CByte(Rnd() * 128)
+            NumeroA = NumeroA And &H03
+            If NumeroA = 0 Then NumeroA = 1
+        Else
+            Exit Sub
+        End If
+        '563B
+        'copia a la cadena del pergamino el número generado
+        AñadirNumerosRomanosPergamino_5643(NumeroA)
+        'pone en el marcador la frase 
+        'SECRETUM FINISH AFRICAE, MANUS SUPRA XXX AGE PRIMUM ET SEPTIMUM DE QUATOR
+        '(donde XXX es el número generado)
+        EscribirFraseMarcador_5026(0)
+    End Sub
+
+    Public Sub ActualizarPuertasGuillermoAdso_5241()
+        'actualiza las puertas a las que pueden entrar guillermo y adso
+        Dim PermisosC As Byte
+        Dim PermisosA As Byte
+        Dim PermisoPuertaHL As Integer
+        'lee los objetos de adso
+        PermisosC = TablaObjetosPersonajes_2DEC(ObjetosAdso_2DF6 - &H2DEC)
+        'se queda con la llave 3
+        PermisosC = PermisosC And &H02
+        'desplaza 3 posiciones a la izquierda
+        PermisosC = PermisosC << 3
+        'apunta a las puertas que puede abrir adso
+        PermisoPuertaHL = &H2DDC
+        'se queda con el bit 4 (permiso para la puerta del pasadizo de detrás de la cocina)
+        PermisosA = &HEF And TablaPermisosPuertas_2DD9(PermisoPuertaHL - &H2DD9)
+        'combina con la llave3
+        PermisosA = PermisosA Or PermisosC
+        'actualiza el valor
+        TablaPermisosPuertas_2DD9(PermisoPuertaHL - &H2DD9) = PermisosA
+        'lee los objetos que tiene guillermo
+        PermisosC = TablaObjetosPersonajes_2DEC(ObjetosGuillermo_2DEF - &H2DEC)
+        'se queda con la llave 1 y la llave 2
+        PermisosC = PermisosC And &H0C
+        PermisosA = PermisosC
+        'se queda sólo con la llave 1 en c
+        ClearBit(PermisosC, 2)
+        'mueve la llave 1 al bit 0
+        PermisosC = PermisosC >> 3
+        'se queda con la llave 2 en a (bit 2)
+        PermisosA = PermisosA And &H04
+        'combina a y c
+        PermisosC = PermisosC Or PermisosA
+        'apunta a las puertas que puede abrir guillermo
+        PermisoPuertaHL = &H2DD9
+        'actualiza las puertas que puede abrir guillermo según las llaves que tenga
+        PermisosA = &HFA And TablaPermisosPuertas_2DD9(PermisoPuertaHL - &H2DD9)
+        PermisosA = PermisosA Or PermisosC
+        TablaPermisosPuertas_2DD9(PermisoPuertaHL - &H2DD9) = PermisosA
+    End Sub
+
+    Public Sub ComprobarDejarObjeto_526D()
+        'comprueba si dejamos algún objeto y si es así, marca el sprite del objeto para dibujar
+        'si se estaba pulsando el espacio
+        If TeclaPulsadaNivel_3482(&H2F) Then
+            'apunta a los datos de los objetos de guillermo
+            DejarObjeto_5277(&H2DEC)
+        End If
+    End Sub
+
+    Public Sub CogerDejarObjetos_50F0(ByVal ObjetoIX As Integer)
+        'comprueba si los personajes cogen algún objeto
+        'ix apunta a la tabla relacionada con los objetos de los personajes
+        Dim PosicionObjetoBC As Integer
+        Dim AlturaObjetoA As Byte
+        Dim ObjetosA As Byte
+        Dim MascaraA As Byte
+        Dim ObjetosHL As Integer
+        Dim NoPuedeQuitar_5154 As Boolean 'el personaje no puede quitar objetos
+        Dim SpriteIX As Integer 'apunta a TablaSprites_2E17
+        Dim ObjetoIY As Integer 'apunta a TablaPosicionObjetos_3008
+        Dim ObjetoCogible As Boolean 'objeto representado por el bit 15 de hl
+        Dim ObjetoXL As Byte 'posición del objeto que se coge/deja 
+        Dim ObjetoYH As Byte
+        Dim ObjetoZA As Byte
+        Dim ObjetoHL As Integer 'posición del objeto o dirección del personaje que lo tiene
+        Dim ObjetosPersonajeHL As Integer 'si el objeto está cogido, dirección del personaje que lo tiene. apunta a TablaObjetosPersonajes_2DEC
+        Dim PersonajeHL As Integer 'si el objeto está cogido, dirección del personaje que lo tiene. apunta a TablaCaracteristicasPersonajes_3036
+        Dim Saltar_5166 As Boolean 'true para no pasar por 5166 cuando salta desde 5156
+        Dim PersonajeXL As Integer 'posición del personaje que tiene el objeto
+        Dim PersonajeYH As Integer
+        Dim PersonajeZA As Integer
+        Dim MascaraObjetoHL As Integer 'máscara con un bit indicando el objeto que está siendo comprobado
+        Dim MascaraObjetoH As Byte 'nibbles de MascaraObjetoHL
+        Dim MascaraObjetoL As Byte
+        Dim ValorA As Byte
+        Do
+            If TablaObjetosPersonajes_2DEC(ObjetoIX - &H2DEC) = &HFF Then Exit Sub
+            '50F6
+            'decrementa el contador para no coger/dejar varias veces
+            TablaObjetosPersonajes_2DEC(ObjetoIX + 6 - &H2DEC) = Z80Dec(TablaObjetosPersonajes_2DEC(ObjetoIX + 6 - &H2DEC))
+            'si (ix+$06) era 0 al entrar
+            If TablaObjetosPersonajes_2DEC(ObjetoIX + 6 - &H2DEC) = &HFF Then
+                '5101
+                'restaura el contador
+                TablaObjetosPersonajes_2DEC(ObjetoIX + 6 - &H2DEC) = Z80Inc(TablaObjetosPersonajes_2DEC(ObjetoIX + 6 - &H2DEC))
+                'modifica una rutina con los datos de posición del personaje y su orientación
+                LeerPosicionObjetoDejar_534F(ObjetoIX, PosicionObjetoBC, AlturaObjetoA)
+                'lee los objetos que se pueden coger
+                ObjetosA = TablaObjetosPersonajes_2DEC(ObjetoIX + 4 - &H2DEC)
+                'elimina de la lista los que ya tenemos
+                ObjetosA = ObjetosA Xor TablaObjetosPersonajes_2DEC(ObjetoIX + 0 - &H2DEC)
+                'bits que indican los objetos que podemos coger (2)
+                ObjetosA = ObjetosA And TablaObjetosPersonajes_2DEC(ObjetoIX + 4 - &H2DEC)
+                'lee la máscara de los objetos que podemos coger
+                MascaraA = TablaObjetosPersonajes_2DEC(ObjetoIX + 5 - &H2DEC)
+                'elimina de la lista los que ya tenemos
+                MascaraA = MascaraA Xor TablaObjetosPersonajes_2DEC(ObjetoIX + 3 - &H2DEC)
+                'bits que indican los objetos que podemos coger
+                MascaraA = MascaraA And TablaObjetosPersonajes_2DEC(ObjetoIX + 5 - &H2DEC)
+                'bit 0 de (ix+00)
+                NoPuedeQuitar_5154 = LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetoIX + 0 - &H2DEC, 0)
+                '5123
+                'aquí llega con hl = máscara de los objetos que podemos coger
+                ObjetosHL = CInt(MascaraA) << 8 Or ObjetosA
+                'inicia la comprobación con el objeto representado por el bit 7 de hl
+                MascaraObjetoHL = &H8000
+                Integer2Nibbles(MascaraObjetoHL, MascaraObjetoH, MascaraObjetoL)
+                'apunta a los sprites de los objetos
+                SpriteIX = &H2F1B
+                'apunta a las posiciones de los objetos
+                ObjetoIY = &H3008
+                '5132
+                Do
+                    'inicia la comprobación con el objeto representado por el bit 15 de hl
+                    ObjetoCogible = ((ObjetosHL And &H8000) <> 0)
+                    ObjetosHL = (ObjetosHL << 1) And &HFFFF
+                    'si el bit era 1, podemos coger el objeto
+                    If ObjetoCogible Then
+                        '5137
+                        'comprueba si el objeto se está cogiendo/dejando
+                        If Not LeerBitArray(TablaPosicionObjetos_3008, ObjetoIY - &H3008, 0) Then
+                            '513F
+                            'aquí llega si el bit 0 es 0 el objeto se está cogiendo/dejando?
+                            'si el bit 6 es 0 (se usa este bit???)
+                            If Not LeerBitArray(TablaPosicionObjetos_3008, ObjetoIY - &H3008, 6) Then
+                                '5144
+                                'posición del objeto
+                                ObjetoYH = TablaPosicionObjetos_3008(ObjetoIY + 3 - &H3008)
+                                ObjetoXL = TablaPosicionObjetos_3008(ObjetoIY + 2 - &H3008)
+                                ObjetoZA = TablaPosicionObjetos_3008(ObjetoIY + 4 - &H3008)
+                                ObjetoHL = Leer16(TablaPosicionObjetos_3008, ObjetoIY + 2 - &H3008)
+                                'personaje que tiene el objeto, si está cogido
+                                ObjetosPersonajeHL = Leer16(TablaPosicionObjetos_3008, ObjetoIY + 2 - &H3008)
+                                Saltar_5166 = False
+                                'si el objeto  está cogido
+                                If LeerBitArray(TablaPosicionObjetos_3008, ObjetoIY - &H3008, 7) Then
+                                    '5153
+                                    'si el objeto está cogido en (iy+$02) y en (iy+$03) se guarda la dirección del personaje que lo tiene
+                                    'si al personaje puede quitar objetos
+                                    If Not NoPuedeQuitar_5154 Then
+                                        Saltar_5166 = False
+                                        '5159
+                                        'hl = dirección de datos del personaje que ha cogido el objeto
+                                        ObjetoHL = Leer16(TablaObjetosPersonajes_2DEC, ObjetosPersonajeHL + 1 - &H2DEC)
+                                        'hl = posición del personaje que ha cogido el objeto
+                                        ObjetoXL = TablaCaracteristicasPersonajes_3036(ObjetoHL - &H3036)
+                                        ObjetoYH = TablaCaracteristicasPersonajes_3036(ObjetoHL + 1 - &H3036)
+                                        'a = altura del personaje que ha cogido el objeto
+                                        ObjetoZA = TablaCaracteristicasPersonajes_3036(ObjetoHL + 2 - &H3036)
+                                    Else
+                                        Saltar_5166 = True
+                                        'jp 51b1
+                                    End If
+                                End If
+                                If Not Saltar_5166 Then
+                                    '5166
+                                    'aqui llega con hl = posición del objeto o posición del personaje que tiene el objeto
+                                    ' si la diferencia de alturas es <= 5
+                                    If Z80Sub(ObjetoZA, AlturaPersonajeCoger_5167) <= 5 Then
+                                        '516C
+                                        'si el personaje está al lado del objeto y mirandolo en x
+                                        If ObjetoXL = PosicionXPersonajeCoger_516E Then
+                                            '5171
+                                            'si el personaje no está al lado del objeto y mirandolo en y, salta a procesar el siguiente objeto
+                                            If ObjetoYH = PosicionYPersonajeCoger_5173 Then
+                                                '5176
+                                                'si el objeto está cogido por un personaje
+                                                If LeerBitArray(TablaPosicionObjetos_3008, ObjetoIY - &H3008, 7) Then
+                                                    '517C
+
+                                                    ValorA = TablaObjetosPersonajes_2DEC(ObjetosPersonajeHL + 0 - &H2DEC)
+                                                    'le quita al personaje el objeto que se está procesando
+                                                    ValorA = ValorA Xor MascaraObjetoL
+                                                    TablaObjetosPersonajes_2DEC(ObjetosPersonajeHL + 0 - &H2DEC) = ValorA
+                                                    ValorA = TablaObjetosPersonajes_2DEC(ObjetosPersonajeHL + 3 - &H2DEC)
+                                                    'le quita al personaje el objeto que se está procesando
+                                                    ValorA = ValorA Xor MascaraObjetoH
+                                                    TablaObjetosPersonajes_2DEC(ObjetosPersonajeHL + 3 - &H2DEC) = ValorA
+                                                End If
+                                                '5189
+                                                'si el sprite es visible, indica que hay que redibujarlo e indica que pase a inactivo después de resturar la zona que ocupaba
+                                                MarcarSpriteInactivo_2ACE(SpriteIX)
+                                                'guarda la dirección de los datos del personaje que tiene el objeto donde antes se guardaba la posición del objeto
+                                                Escribir16(TablaPosicionObjetos_3008, ObjetoIY + 2 - &H3008, ObjetoIX)
+                                                'indica que el objeto se ha cogido
+                                                TablaPosicionObjetos_3008(ObjetoIY + 0 - &H3008) = &H81
+                                                'inicia el contador
+                                                TablaObjetosPersonajes_2DEC(ObjetoIX + 6 - &H2DEC) = &H10
+                                                '519F
+                                                ValorA = TablaObjetosPersonajes_2DEC(ObjetoIX + 0 - &H2DEC)
+                                                'indica que el personaje tiene el objeto
+                                                ValorA = ValorA Or MascaraObjetoL
+                                                TablaObjetosPersonajes_2DEC(ObjetoIX + 0 - &H2DEC) = ValorA
+                                                ValorA = TablaObjetosPersonajes_2DEC(ObjetoIX + 3 - &H2DEC)
+                                                'indica que el personaje tiene el objeto
+                                                ValorA = ValorA Or MascaraObjetoH
+                                                TablaObjetosPersonajes_2DEC(ObjetoIX + 3 - &H2DEC) = ValorA
+                                                Exit Do
+                                            End If
+                                        End If
+                                    End If
+                                End If
+                            End If
+                        End If
+                    End If
+                    '51b1
+                    'aquí llega para pasar al siguiente objeto
+                    'pasa a la siguiente entrada del objeto
+                    ObjetoIY = ObjetoIY + 5
+                    'pasa al siguiente sprite del objeto
+                    SpriteIX = SpriteIX + &H14
+                    'prueba el siguiente bit de hl
+                    MascaraObjetoHL = MascaraObjetoHL >> 1
+                    Integer2Nibbles(MascaraObjetoHL, MascaraObjetoH, MascaraObjetoL)
+                    'si se ha llegado al último objeto pasa al siguiente personaje
+                    If TablaPosicionObjetos_3008(ObjetoIY + 0 - &H3008) = &HFF Then
+                        Exit Do
+                    End If
+                Loop 'sigue procesando el siguiente objeto
+            End If
+            '51CC
+            'apunta al siguiente personaje
+            ObjetoIX = ObjetoIX + 7
+        Loop 'sigue procesando los objetos para el siguiente personaje
+
+    End Sub
+
+    Public Sub CogerDejarObjetos_5096()
+        'comprueba si los personajes cogen o dejan algún objeto, y si es una llave, 
+        'actualiza sus permisos y si puede leer el pergamino, lo lee
+        Dim TablaObjetosIX As Integer 'apunta a TablaObjetosPersonajes_2DEC
+        Dim ObjetosGuillermoAntesA As Byte
+        Dim ObjetosAdso1AntesA As Byte
+        Dim ObjetosAdso2AntesA As Byte
+        Dim ObjetosGuillermoDespuesA As Byte
+        Dim ObjetosAdso1DespuesA As Byte
+        Dim ObjetosAdso2DespuesA As Byte
+        Dim ObjetoHL As Integer 'apunta a TablaPosicionObjetos_3008
+        'apunta a la tabla relacionada con los objetos de los personajes
+        TablaObjetosIX = &H2DEC
+        'lee los objetos que tiene guillermo
+        ObjetosGuillermoAntesA = TablaObjetosPersonajes_2DEC(TablaObjetosIX + 3 - &H2DEC)
+        'lee el primer byte de objetos de adso
+        ObjetosAdso1AntesA = TablaObjetosPersonajes_2DEC(TablaObjetosIX + 7 - &H2DEC)
+        'lee el segundo byte de objetos de adso
+        ObjetosAdso2AntesA = TablaObjetosPersonajes_2DEC(&H2DF6 - &H2DEC)
+        'comprueba si los personajes cogen algún objeto
+        CogerDejarObjetos_50F0(TablaObjetosIX)
+        'comprueba si se deja algún objeto
+        ComprobarDejarObjeto_526D()
+        'actualiza las puertas a las que pueden entrar guillermo y adso
+        ActualizarPuertasGuillermoAdso_5241()
+        '50B1
+        'obtiene los objetos de adso
+        ObjetosAdso2DespuesA = TablaObjetosPersonajes_2DEC(&H2DF6 - &H2DEC)
+        ObjetosAdso1DespuesA = TablaObjetosPersonajes_2DEC(&H2DF3 - &H2DEC)
+        'obtiene los objetos que tiene guillermo
+        ObjetosGuillermoDespuesA = TablaObjetosPersonajes_2DEC(&H2DEF - &H2DEC)
+        If (ObjetosGuillermoAntesA <> ObjetosGuillermoDespuesA) Or (ObjetosAdso1AntesA <> ObjetosAdso1DespuesA) Or (ObjetosAdso2AntesA <> ObjetosAdso2DespuesA) Then
+            'si han cambiado los objetos, reproduce un sonido
+            ReproducirSonido_5088()
+        End If
+        '50D0
+        'comprueba si hemos cogido las gafas y el pergamino
+        If (ObjetosGuillermoDespuesA And &H30) = &H30 Then
+            'si no se había generado el número romano del enigma de la habitación del espejo, lo genera
+            GenerarNumeroEspejo_562E()
+        End If
+        '50DC
+        'si han cambiado los objetos de guillermo
+        If (ObjetosGuillermoAntesA <> ObjetosGuillermoDespuesA) Then
+            'dibuja los objetos indicados por a en el marcador
+            ActualizarMarcador_51DA(ObjetosGuillermoDespuesA, ObjetosGuillermoAntesA Xor ObjetosGuillermoDespuesA)
+        End If
+        '50E1
+        'apunta a los datos de posición de los objetos
+        ObjetoHL = &H3008
+        Do
+            If TablaPosicionObjetos_3008(ObjetoHL - &H3008) = &HFF Then Exit Do
+            'limpia el bit 0, que indicaba que se estaba cogiendo/dejando
+            ClearBitArray(TablaPosicionObjetos_3008, ObjetoHL - &H3008, 0)
+            ObjetoHL = ObjetoHL + 5
+        Loop
+    End Sub
+
+    Public Function ComprobarQREscalerasEspejo_33F1() As Byte
+        'comprueba si pulsa Q y R en alguna de las escaleras del espejo
+        'e indica si se ha pulsado QR en alguna escalera y en que escalera se pulsa
+        'inicialmente e vale 0
+        ComprobarQREscalerasEspejo_33F1 = 0
+        'lee la posición x. si no está en el lugar apropiado, sale
+        If TablaCaracteristicasPersonajes_3036(&H3036 + 2 - &H3036) <> &H22 Then Exit Function
+        '33FD
+        'si no está en la altura apropiada, sale
+        If TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) <> &H1A Then Exit Function
+        '3403
+        'si no se ha pulsado la tecla Q, sale
+        If Not TeclaPulsadaNivel_3482(&H43) Then Exit Function
+        'si no se ha pulsado la tecla R, sale
+        If Not TeclaPulsadaNivel_3482(&H32) Then Exit Function
+        '340F
+        'lee la posición y de guillermo y modifica e según sea esta posición
+        Select Case TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036)
+            Case = &H6D
+                'si está en la escalera de la izquierda, sale con e = 1
+                ComprobarQREscalerasEspejo_33F1 = 1
+            Case = &H69
+                'si está en la escalera del centro, sale con e = 2
+                ComprobarQREscalerasEspejo_33F1 = 2
+            Case = &H65
+                'si está en la escalera de la derecha, sale con e = 3
+                ComprobarQREscalerasEspejo_33F1 = 3
+        End Select
+    End Function
+
+    Public Sub ComprobarQREspejo_3311()
+        'comprueba si se pulsó QR en la habitación del espejo y actúa en consecuencia
+        Dim EscaleraE As Byte 'escalera sobre la que se pulsa QR
+        'comprueba si se ha abierto el espejo. si ya se ha abierto, sale
+        If Not HabitacionEspejoCerrada_2D8C Then Exit Sub
+        '331F
+        'comprueba si está delante del espejo y si es así, si se pulsó la Q y la R, devolviendo en e el resultado
+        EscaleraE = ComprobarQREscalerasEspejo_33F1()
+        'si no se pulsó QR en alguna escalera, sale
+        If EscaleraE = 0 Then Exit Sub
+        '3325
+        'apunta a los bonus
+        'pone a 1 el bit que indica que se ha pulsado QR en alguna de las escaleras del espejo
+        SetBit(Bonus2_2DBF, 2)
+        'si no coincide con la escalera del número romano, muere
+        If NumeroRomanoHabitacionEspejo_2DBC <> EscaleraE Then
+            '3334
+            'si llega aquí, guillermo muere
+            'indica que guillermo muere
+            TablaVariablesLogica_3C85(GuillermoMuerto_3C97 - &H3C85) = 1
+            'cambia el estado de guillermo
+            EstadoGuillermo_288F = &H14
+            'cambia los datos de un bloque de la habitación del espejo para que se abra una trampa y se caiga guillermo
+            EscribirValorBloqueHabitacionEspejo_3372(&H6B, PunteroHabitacionEspejo_34E0 - 2)
+            'escribe en el marcador la frase
+            'ESTAIS MUERTO, FRAY GUILLERMO, HABEIS CAIDO EN LA TRAMPA
+            EscribirFraseMarcador_501B(&H22)
+        Else
+            '334E
+            'si llega aquí, guillermo sobrevive
+            'modifica los datos de altura de la habitación del espejo
+            '3365
+            'EscribirValorBloqueHabitacionEspejo_3372(&HFF, PunteroDatosAlturaHabitacionEspejo_34D9)
+            TablaAlturasPantallas_4A00(PunteroDatosAlturaHabitacionEspejo_34D9 - &H4A00) = &HFF
+            'modifica los datos de la habitación del espejo para que el espejo esté abierto
+            EscribirValorBloqueHabitacionEspejo_336F(&H51)
+        End If
+        '335A
+        'indica un cambio de pantalla
+        PosicionXPersonajeActual_2D75 = 0
+        'indica que se ha abierto el espejo
+        HabitacionEspejoCerrada_2D8C = False
+        'reproduce un sonido
+        ReproducirSonidoCanal1_0FFD()
+    End Sub
+
+    Public Sub ProcesarLogicaBonusCamara_5691()
+        'cálculo de bonus y cambios de cámara
+        'si berengario está vivo, va a por el libro y su posición X es <0x50, o va a por el abad
+        If ((TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = &HFD) And (TablaCaracteristicasPersonajes_3036(&H3074 - &H3036) < &H050) And (TablaVariablesLogica_3C85(JorgeOBernardoActivo_3CA1 - &H3C85) = 0)) Or (TablaVariablesLogica_3C85(DondeVa_Berengario_3CE9 - &H3C85) = &HFE) Then
+            '56A3
+            'indica que la cámara siga a berengario
+            TablaVariablesLogica_3C85(PersonajeSeguidoPorCamaraReposo_3C92 - &H3C85) = 4
+            Exit Sub
+        End If
+        '56A7
+        'si el momento del día es sexta y y el abad ha llegado a algún sitio interesante) o (el abad va a dejar el pergamino)
+        'o (el abad va a perdirle a guillermo el pergamino)
+        'o (si el abad va a echar a guillermo)
+        If ((MomentoDia_2D81 = 3) And (TablaVariablesLogica_3C85(DondeEstaAbad_3CC6 - &H3C85) >= 2)) Or (TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H15) Or (TablaVariablesLogica_3C85(BerengarioChivato_3C94 - &H3C85) = 1) Or (TablaVariablesLogica_3C85(EstadoAbad_3CC7 - &H3C85) = &H0B) Then
+            '56BD
+            'indica que la cámara siga al abad
+            TablaVariablesLogica_3C85(PersonajeSeguidoPorCamaraReposo_3C92 - &H3C85) = 3
+            Exit Sub
+        End If
+        '56C1
+        '(si el momento del día es vísperas) y (el estado de malaquías  < 0x06)) o (si malaquías va a avisar al abad
+        If ((MomentoDia_2D81 = 5) And (TablaVariablesLogica_3C85(EstadoMalaquias_3CA9 - &H3C85) < 6)) Or (TablaVariablesLogica_3C85(DondeVaMalaquias_3CAA - &H3C85) = &HFE) Then
+            '56D0
+            'indica que la cámara siga a malaquías
+            TablaVariablesLogica_3C85(PersonajeSeguidoPorCamaraReposo_3C92 - &H3C85) = 2
+            Exit Sub
+        End If
+        '56D4
+        'si severino va a por guillermo
+        If TablaVariablesLogica_3C85(DondeVaSeverino_3D01 - &H3C85) = &HFF Then
+            '56DB
+            'indica que la cámara siga a severino
+            TablaVariablesLogica_3C85(PersonajeSeguidoPorCamaraReposo_3C92 - &H3C85) = 5
+            Exit Sub
+        End If
+        '56DF
+        'indica que la cámara siga a guillermo
+        TablaVariablesLogica_3C85(PersonajeSeguidoPorCamaraReposo_3C92 - &H3C85) = 0
+        'si tenemos el pergamino
+        If LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 4) Then
+            '56EA
+            'si es el tercer día y es de noche
+            If (NumeroDia_2D80 = 3) And (MomentoDia_2D81 = 0) Then
+                '56F4
+                'nos da un bonus
+                SetBit(Bonus2_2DBF, 4)
+            End If
+            '56F9
+            'si guillermo tiene las gafas
+            If LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 5) Then
+                '5703
+                'nos da un bonus
+                SetBit(Bonus2_2DBF, 0)
+            End If
+            '5708
+            'si guillermo entra a la habitación del abad
+            If (NumeroPantallaActual_2DBD = &H0D) And (TablaVariablesLogica_3C85(PersonajeSeguidoPorCamaraReposo_3C92 - &H3C85) = 0) Then
+                '5712
+                'obtiene un bonus
+                SetBit(Bonus2_2DBF, 5)
+            End If
+        End If
+        '5718
+        'si es de noche y guillermo está en el ala izquierda de la abadía
+        If (MomentoDia_2D81 = 0) And (TablaCaracteristicasPersonajes_3036(&H3038 - &H3036) < &H60) Then
+            '5722
+            'obtiene un bonus
+            SetBit(Bonus1_2DBE, 0)
+        End If
+        '5727
+        'si guillermo sube a la biblioteca
+        If TablaCaracteristicasPersonajes_3036(&H303A - &H3036) >= &H16 Then
+            '572D
+            'si guillermo tiene las gafas
+            If LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 5) Then
+                '5737
+                'obtiene un bonus
+                SetBit(Bonus1_2DBE, 7)
+            End If
+            '573D
+            'si adso tiene la lámpara
+            If LeerBitArray(TablaObjetosPersonajes_2DEC, &H2DF3 - &H2DEC, 7) Then
+                '5747
+                'obtiene un bonus
+                SetBit(Bonus1_2DBE, 5)
+            End If
+            '574D
+            'obtiene un bonus
+            SetBit(Bonus1_2DBE, 4)
+        End If
+        '5752
+        'si está en la habitación del espejo
+        If NumeroPantallaActual_2DBD = &H72 Then
+            '5758
+            'obtiene un bonus
+            SetBit(Bonus2_2DBF, 1)
+        End If
+        '575D
+    End Sub
+
+    Public Function LeerEstadoJorgeGuantes_416F() As Boolean
+        'si tenemos los guantes y el estado de jorge es 0x0d, 0x0e o 0x0f (está hablando sobre el libro), sale con cf = 1, en otro caso con cf = 0
+        Dim EstadoJorgeA As Byte
+        LeerEstadoJorgeGuantes_416F = False
+        'si no tenemos los guantes, sale
+        If Not LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 6) Then Exit Function
+        '4175
+        'si el estado de jorge es 0x0d, 0x0e o 0x0f, sale con cf = 1, en otro caso con cf = 0
+        EstadoJorgeA = TablaVariablesLogica_3C85(EstadoSeverino_3D00 - &H3C85)
+        If EstadoJorgeA = &H0D Or EstadoJorgeA = &H0E Or EstadoJorgeA = &H0F Then LeerEstadoJorgeGuantes_416F = True
+    End Function
+
+    Public Function AjustarCamaraEstadoJorge_4150(ByVal GuantesGuillermo As Boolean) As Boolean
+        'comprueba si se pulsaron los cursores (cf = 1)
+        AjustarCamaraEstadoJorge_4150 = False
+        If GuantesGuillermo Then
+            '4152
+            'aqui llega si tenemos los guantes y el estado de jorge es 0x0d, 0x0e o 0x0f
+            'indica que no hay que esperar para mostrar a jorge
+            TablaVariablesLogica_3C85(ContadorReposo_3C93 - &H3C85) = &H32
+            'indica que la cámara siga a jorge si no se mueve guillermo
+            TablaVariablesLogica_3C85(PersonajeSeguidoPorCamaraReposo_3C92 - &H3C85) = 5
+        Else
+            '415E
+            'si no tenemos los guantes o el estado de jorge no es 0x0d, 0x0e o 0x0f, comprueba si se pulsaron los cursores de movimiento de guillermo
+            If TeclaPulsadaNivel_3482(0) Or TeclaPulsadaNivel_3482(8) Or TeclaPulsadaNivel_3482(1) Then
+                AjustarCamaraEstadoJorge_4150 = True
+            End If
+        End If
+    End Function
+
+    Public Sub AjustarCamara_Bonus_4186()
+        'comprueba si hay que cambiar el personaje al que sigue la cámara y calcula los bonus que hemos conseguido (interpretado)
+        Dim GuillermoGuantes As Boolean
+        Dim Cursores As Boolean
+        Dim PersonajeCamaraA As Byte
+        'procesa la lógica de la cámara y calcula los bonus
+        ProcesarLogicaBonusCamara_5691()
+        'si tenemos los guantes y el estado de jorge es 0x0d, 0x0e o 0x0f, sale con cf = 1, en otro caso con cf = 0
+        GuillermoGuantes = LeerEstadoJorgeGuantes_416F()
+        'comprueba si se pulsaron los cursores (cf = 1)
+        Cursores = AjustarCamaraEstadoJorge_4150(GuillermoGuantes)
+        PersonajeCamaraA = 0
+        'si no se ha pulsado el cursor arriba, izquierda o derecha
+        If Not Cursores Then
+            '4191
+            TablaVariablesLogica_3C85(ContadorReposo_3C93 - &H3C85) = TablaVariablesLogica_3C85(ContadorReposo_3C93 - &H3C85) + 1
+            'si es < 0x32, sale
+            If TablaVariablesLogica_3C85(ContadorReposo_3C93 - &H3C85) < &H32 Then Exit Sub
+            '419D
+            'deja el contador como estaba
+            TablaVariablesLogica_3C85(ContadorReposo_3C93 - &H3C85) = TablaVariablesLogica_3C85(ContadorReposo_3C93 - &H3C85) - 1
+            'si se está mostrando una frase, restaura el valor del contador de espera del bucle principal
+            If ReproduciendoFrase_2DA1 Then
+                '41BF
+                'restaura el valor del contador de espera del bucle principal
+                VelocidadPasosGuillermo_2618 = 36
+            Else
+                '41A8
+                'en otro caso, pone a 0 el contador del bucle principal (para que no se espere nada)
+                VelocidadPasosGuillermo_2618 = 0
+            End If
+            '41AB
+            'inicia un sonido en el canal 1
+            ReproducirSonido_1007()
+            'obtiene el personaje al que sigue la cámara
+            PersonajeCamaraA = TablaVariablesLogica_3C85(PersonajeSeguidoPorCamaraReposo_3C92 - &H3C85)
+            'lee el personaje al que se sigue si guillermo se está quieto
+            'si son iguales, sale
+            If PersonajeCamaraA = TablaVariablesLogica_3C85(PersonajeSeguidoPorCamara_3C8F - &H3C85) Then Exit Sub
+        End If
+        '41B7
+        'si se han pulsado los cursores o la cámara sigue a guillermo
+        'hace que la cámara siga al personaje indicado en a
+        TablaVariablesLogica_3C85(PersonajeSeguidoPorCamara_3C8F - &H3C85) = PersonajeCamaraA
+        'actualiza el contador con el valor introducido
+        TablaVariablesLogica_3C85(ContadorReposo_3C93 - &H3C85) = PersonajeCamaraA
+        'si el personaje a seguir no es el nuestro, sale
+        If PersonajeCamaraA <> 0 Then Exit Sub
+        '41BF
+        'restaura el valor del contador de espera del bucle principal
+        VelocidadPasosGuillermo_2618 = 36
+    End Sub
+
+    Public Sub AjustarCamara_Bonus_41D6()
+        'comprueba si hay que cambiar el personaje al que sigue la cámara y calcula los bonus que hemos conseguido (interpretado)
+        Dim PersonajeDE As Integer
+        AjustarCamara_Bonus_4186()
+        'de = dirección de los datos del personaje que sigue la camara
+        PersonajeDE = &H3036 + &H0F * TablaVariablesLogica_3C85(PersonajeSeguidoPorCamara_3C8F - &H3C85)
+        PunteroDatosPersonajeActual_2D88 = PersonajeDE
+    End Sub
+
+    Public Sub ComprobarSaludGuillermo_42AC()
+        'actualiza los bonus si tenemos los guantes, las llaves y algo mas y si se está leyendo el libro sin los guantes, mata a guillermo
+        Dim ObjetosB As Byte
+        '0x2dbe
+        '		bit 7: si tiene las gafas estando en la biblioteca
+        '        bit 6: a 1 si ha cogido los guantes
+        '        bit 5: que adso tenga la lámpara en la biblioteca
+        '        bit 4: que hayan subido a la biblioteca
+        '        bit 3: a 1 si ha cogido la llave 1
+        '        bit 2: a 1 si ha cogido la llave 2
+        '        bit 1: a 1 si ha cogido la llave 3
+        '        bit 0: llegar al ala izquierda de la abadía por la noche
+
+        '    0x2dbf
+        '		bit 7: no usado
+        '        bit 6: no usado
+        '        bit 5: entrar a la habitación del abad con el pergamino
+        '        bit 4: tener el pergamino el tercer día por la noche
+        '        bit 3: entrar en la habitación del espejo cuando jorge está esperándonos
+        '        bit 2: a 1 si se ha abierto el espejo
+        '        bit 1: entrar en la habitación de detrás del espejo
+        '        bit 0: si guillermo tiene el pergamino y las gafas
+        'lee los objetos de guillermo
+        'se queda solo con los guantes y las 2 primeras llaves
+        ObjetosB = TablaObjetosPersonajes_2DEC(ObjetosGuillermo_2DEF - &H2DEC) And &H4C
+        'lee los objetos de adso
+        'se queda con la llave 3
+        ObjetosB = ObjetosB Or (TablaObjetosPersonajes_2DEC(ObjetosAdso_2DF6 - &H2DEC) And &H02)
+        'actualiza los bonus con los objetos que tenemos
+        Bonus1_2DBE = Bonus1_2DBE Or ObjetosB
+        '42C1
+        'si no tenemos el libro, sale
+        If Not LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 7) Then Exit Sub
+        '42C5
+        'si tenemos los guantes, sale
+        If LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 6) Then Exit Sub
+        '42C8
+        'incrementa el contador del tiempo que está leyendo el libro sin guantes
+        TablaVariablesLogica_3C85(ContadorLeyendoLibroSinGuantes_3C85 - &H3C85) = Z80Inc(TablaVariablesLogica_3C85(ContadorLeyendoLibroSinGuantes_3C85 - &H3C85))
+        If TablaVariablesLogica_3C85(ContadorLeyendoLibroSinGuantes_3C85 - &H3C85) <> 0 Then Exit Sub
+        '42D0
+        'estado de guillermo = posición en y del sprite de guillermo / 2
+        EstadoGuillermo_288F = TablaSprites_2E17(&H2E19 - &H2E17) >> 1
+        'modifica una instrucción que hace que se sume a la posición y del sprite de guillermo -2
+        AjustePosicionYSpriteGuillermo_28B1 = &HFE
+        'mata a guillermo
+        TablaVariablesLogica_3C85(GuillermoMuerto_3C97 - &H3C85) = 1
+        'escribe en el marcador una frase
+        'ESTAIS MUERTO, FRAY GUILLERMO, HABEIS CAIDO EN LA TRAMPA
+        EscribirFraseMarcador_501B(&H22)
+    End Sub
+
+    Public Sub DibujarPergaminoFinal_3868()
+        '###pendiente
+
+    End Sub
+
+    Public Function CalcularPorcentajeJuegoResuelto_4269() As Byte()
+        'calcula el porcentaje de misión completada y lo guarda en 0x431e
+        Dim PuntuacionA As Byte
+        Dim BonusHL As Integer
+        Dim Contador As Byte
+        Dim Unidades As Byte
+        Dim Decenas As Byte
+        Dim Resultado() As Byte = {&H20, &H30}
+        '0x2dbe
+        '		bit 7: si tiene las gafas estando en la biblioteca
+        '        bit 6: a 1 si ha cogido los guantes
+        '        bit 5: que adso tenga la lámpara en la biblioteca
+        '        bit 4: que hayan subido a la biblioteca
+        '        bit 3: a 1 si ha cogido la llave 1
+        '        bit 2: a 1 si ha cogido la llave 2
+        '        bit 1: a 1 si ha cogido la llave 3
+        '        bit 0: llegar al ala izquierda de la abadía por la noche
+
+        '    0x2dbf
+        '		bit 7: no usado
+        '        bit 6: no usado
+        '        bit 5: entrar a la habitación del abad con el pergamino
+        '        bit 4: tener el pergamino el tercer día por la noche
+        '        bit 3: entrar en la habitación del espejo cuando jorge está esperándonos
+        '        bit 2: a 1 si se ha abierto el espejo
+        '        bit 1: entrar en la habitación de detrás del espejo
+        '        bit 0: si guillermo tiene el pergamino y las gafas
+
+        CalcularPorcentajeJuegoResuelto_4269 = Resultado
+        'si 0x3ca7 es 0, muestra el final
+        If TablaVariablesLogica_3C85(InvestigacionNoTerminada_3CA7 - &H3C85) = 0 Then
+            DibujarPergaminoFinal_3868()
+            MsgBox("Juego Completado")
+            Exit Function
+        End If
+        '4270
+        PuntuacionA = 7 * (NumeroDia_2D80 - 1) + MomentoDia_2D81
+        'lee los bonus conseguidos
+        BonusHL = CInt(Bonus2_2DBF) << 8 Or Bonus1_2DBE
+        'comprueba 16 bits
+        For Contador = 1 To 16
+            'por cada bonus, suma 4
+            If BonusHL And &H8000 Then PuntuacionA = PuntuacionA + 4
+            BonusHL = BonusHL << 1
+        Next
+        '428B
+        'si no hemos obtenido una puntuación >= 5, pone la puntuación a 0
+        If PuntuacionA < 5 Then PuntuacionA = 0
+        '4290
+        'aquí llega con a = puntuación obtenida
+        'convierte el valor en unidades y decenas
+        Unidades = PuntuacionA
+        Decenas = 0
+        While Unidades >= 10
+            Unidades = Unidades - 10
+            Decenas = Decenas + 1
+        End While
+        'pasa el valor a ascii
+        Resultado(1) = Unidades + &H30
+        Resultado(0) = Decenas + &H30
+    End Function
+
+    Public Sub MostrarResultadoJuego_42E7()
+        'si guillermo está muerto, calcula el % de misión completado y lo muestra por pantalla
+        Dim Puntuacion_431E As Byte()
+        'lee si guillermo está vivo y si es así, sale
+        If TablaVariablesLogica_3C85(GuillermoMuerto_3C97 - &H3C85) = 0 Then Exit Sub
+        '42EC
+        'indica que la camara sigua a guillermo y que lo haga ya
+        TablaVariablesLogica_3C85(PersonajeSeguidoPorCamara_3C8F - &H3C85) = 0
+        'si está mostrando una frase/reproduciendo una voz, sale
+        If ReproduciendoFrase_2DA1 Then Exit Sub
+        '42F6
+        'oculta el área de juego
+        PintarAreaJuego_1A7D(&HFF)
+        'calcula el porcentaje de misión completada y lo guarda en 0x431e
+        Puntuacion_431E = CalcularPorcentajeJuegoResuelto_4269()
+        '42FC
+        '(h = y en pixels, l = x en bytes) (x = 64, y = 32)
+        'modifica la variable usada como la dirección para poner caracteres en pantalla
+        PunteroCaracteresPantalla_2D97 = &H2010
+        'imprime la frase que sigue a la llamada en la posición de pantalla actual
+        'HAS RESUELTO EL
+        ImprimirFrase_4FEE({&H48, &H41, &H53, &H20, &H52, &H45, &H53, &H55, &H45, &H4C, &H54, &H4F, &H20, &H45, &H4C})
+        '4315
+        '(h = y en pixels, l = x en bytes) (x = 56, y = 48)
+        'modifica la variable usada como la dirección para poner caracteres en pantalla
+        PunteroCaracteresPantalla_2D97 = &H300E
+        'imprime la frase que sigue a la llamada en la posición de pantalla actual
+        '  00 POR CIENTO
+        ImprimirFrase_4FEE({&H20, &H20, Puntuacion_431E(0), Puntuacion_431E(1), &H20, &H50, &H4F, &H52, &H20, &H43, &H49, &H45, &H4E, &H54, &H4F})
+        '432E
+        '(h = y en pixels, l = x en bytes) (x = 48, y = 64)
+        'modifica la variable usada como la dirección para poner caracteres en pantalla
+        PunteroCaracteresPantalla_2D97 = &H400C
+        'imprime la frase que sigue a la llamada en la posición de pantalla actual
+        'DE LA INVESTIGACION
+        ImprimirFrase_4FEE({&H44, &H45, &H20, &H4C, &H41, &H20, &H49, &H4E, &H56, &H45, &H53, &H54, &H49, &H47, &H41, &H43, &H49, &H4F, &H4E})
+        '434B
+        '(h = y en pixels, l = x en bytes) (x = 24, y = 128)
+        'modifica la variable usada como la dirección para poner caracteres en pantalla
+        PunteroCaracteresPantalla_2D97 = &H8006
+        'imprime la frase que sigue a la llamada en la posición de pantalla actual
+        'PULSA ESPACIO PARA EMPEZAR
+        ImprimirFrase_4FEE({&H50, &H55, &H4C, &H53, &H41, &H20, &H45, &H53, &H50, &H41, &H43, &H49, &H4F, &H20, &H50, &H41, &H52, &H41, &H20, &H45, &H4D, &H50, &H45, &H5A, &H41, &H52})
+        SiguienteTick(100, "MostrarResultadoJuego_42E7_b")
+        MostrarResultadoJuego_42E7_b()
+    End Sub
+
+    Public Sub MostrarResultadoJuego_42E7_b()
+        If TeclaPulsadaNivel_3482(&H2F) Then
+            InicializarPartida_2509()
+        End If
+    End Sub
 
 End Module
+
+

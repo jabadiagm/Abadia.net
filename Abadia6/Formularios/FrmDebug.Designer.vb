@@ -40,8 +40,17 @@ Partial Class FrmDebug
         Me.ChDesconectarDimensionesAmpliadas = New System.Windows.Forms.CheckBox()
         Me.ChQuitarRetardos = New System.Windows.Forms.CheckBox()
         Me.ChSaltarPresentacion = New System.Windows.Forms.CheckBox()
+        Me.GbCamara = New System.Windows.Forms.GroupBox()
+        Me.ChCamara = New System.Windows.Forms.CheckBox()
+        Me.OpCamaraGuillermo = New System.Windows.Forms.RadioButton()
+        Me.OpCamaraAdso = New System.Windows.Forms.RadioButton()
+        Me.OpCamaraMalaquias = New System.Windows.Forms.RadioButton()
+        Me.OpCamaraAbad = New System.Windows.Forms.RadioButton()
+        Me.OpCamaraBerengario = New System.Windows.Forms.RadioButton()
+        Me.OpCamaraSeverino = New System.Windows.Forms.RadioButton()
         Me.GbPersonajes.SuspendLayout()
         Me.GbLuz.SuspendLayout()
+        Me.GbCamara.SuspendLayout()
         Me.SuspendLayout()
         '
         'GbPersonajes
@@ -197,7 +206,6 @@ Partial Class FrmDebug
         'OpLuzNormal
         '
         Me.OpLuzNormal.AutoSize = True
-        'Me.OpLuzNormal.Checked = True
         Me.OpLuzNormal.Location = New System.Drawing.Point(16, 16)
         Me.OpLuzNormal.Name = "OpLuzNormal"
         Me.OpLuzNormal.Size = New System.Drawing.Size(58, 17)
@@ -246,11 +254,104 @@ Partial Class FrmDebug
         Me.ChSaltarPresentacion.Text = "Saltar Presentación"
         Me.ChSaltarPresentacion.UseVisualStyleBackColor = True
         '
+        'GbCamara
+        '
+        Me.GbCamara.Controls.Add(Me.OpCamaraSeverino)
+        Me.GbCamara.Controls.Add(Me.OpCamaraBerengario)
+        Me.GbCamara.Controls.Add(Me.OpCamaraAbad)
+        Me.GbCamara.Controls.Add(Me.OpCamaraMalaquias)
+        Me.GbCamara.Controls.Add(Me.OpCamaraAdso)
+        Me.GbCamara.Controls.Add(Me.OpCamaraGuillermo)
+        Me.GbCamara.Controls.Add(Me.ChCamara)
+        Me.GbCamara.Location = New System.Drawing.Point(208, 0)
+        Me.GbCamara.Name = "GbCamara"
+        Me.GbCamara.Size = New System.Drawing.Size(96, 136)
+        Me.GbCamara.TabIndex = 6
+        Me.GbCamara.TabStop = False
+        Me.GbCamara.Text = "Cámara"
+        '
+        'ChCamara
+        '
+        Me.ChCamara.AutoSize = True
+        Me.ChCamara.Location = New System.Drawing.Point(8, 16)
+        Me.ChCamara.Name = "ChCamara"
+        Me.ChCamara.Size = New System.Drawing.Size(61, 17)
+        Me.ChCamara.TabIndex = 4
+        Me.ChCamara.Text = "Manual"
+        Me.ChCamara.UseVisualStyleBackColor = True
+        '
+        'OpCamaraGuillermo
+        '
+        Me.OpCamaraGuillermo.AutoSize = True
+        Me.OpCamaraGuillermo.Location = New System.Drawing.Point(16, 32)
+        Me.OpCamaraGuillermo.Name = "OpCamaraGuillermo"
+        Me.OpCamaraGuillermo.Size = New System.Drawing.Size(68, 17)
+        Me.OpCamaraGuillermo.TabIndex = 5
+        Me.OpCamaraGuillermo.TabStop = True
+        Me.OpCamaraGuillermo.Text = "Guillermo"
+        Me.OpCamaraGuillermo.UseVisualStyleBackColor = True
+        '
+        'OpCamaraAdso
+        '
+        Me.OpCamaraAdso.AutoSize = True
+        Me.OpCamaraAdso.Location = New System.Drawing.Point(16, 48)
+        Me.OpCamaraAdso.Name = "OpCamaraAdso"
+        Me.OpCamaraAdso.Size = New System.Drawing.Size(49, 17)
+        Me.OpCamaraAdso.TabIndex = 6
+        Me.OpCamaraAdso.TabStop = True
+        Me.OpCamaraAdso.Text = "Adso"
+        Me.OpCamaraAdso.UseVisualStyleBackColor = True
+        '
+        'OpCamaraMalaquias
+        '
+        Me.OpCamaraMalaquias.AutoSize = True
+        Me.OpCamaraMalaquias.Location = New System.Drawing.Point(16, 64)
+        Me.OpCamaraMalaquias.Name = "OpCamaraMalaquias"
+        Me.OpCamaraMalaquias.Size = New System.Drawing.Size(75, 17)
+        Me.OpCamaraMalaquias.TabIndex = 7
+        Me.OpCamaraMalaquias.TabStop = True
+        Me.OpCamaraMalaquias.Text = "Malaquías"
+        Me.OpCamaraMalaquias.UseVisualStyleBackColor = True
+        '
+        'OpCamaraAbad
+        '
+        Me.OpCamaraAbad.AutoSize = True
+        Me.OpCamaraAbad.Location = New System.Drawing.Point(16, 80)
+        Me.OpCamaraAbad.Name = "OpCamaraAbad"
+        Me.OpCamaraAbad.Size = New System.Drawing.Size(50, 17)
+        Me.OpCamaraAbad.TabIndex = 8
+        Me.OpCamaraAbad.TabStop = True
+        Me.OpCamaraAbad.Text = "Abad"
+        Me.OpCamaraAbad.UseVisualStyleBackColor = True
+        '
+        'OpCamaraBerengario
+        '
+        Me.OpCamaraBerengario.AutoSize = True
+        Me.OpCamaraBerengario.Location = New System.Drawing.Point(16, 96)
+        Me.OpCamaraBerengario.Name = "OpCamaraBerengario"
+        Me.OpCamaraBerengario.Size = New System.Drawing.Size(76, 17)
+        Me.OpCamaraBerengario.TabIndex = 9
+        Me.OpCamaraBerengario.TabStop = True
+        Me.OpCamaraBerengario.Text = "Berengario"
+        Me.OpCamaraBerengario.UseVisualStyleBackColor = True
+        '
+        'OpCamaraSeverino
+        '
+        Me.OpCamaraSeverino.AutoSize = True
+        Me.OpCamaraSeverino.Location = New System.Drawing.Point(16, 112)
+        Me.OpCamaraSeverino.Name = "OpCamaraSeverino"
+        Me.OpCamaraSeverino.Size = New System.Drawing.Size(67, 17)
+        Me.OpCamaraSeverino.TabIndex = 10
+        Me.OpCamaraSeverino.TabStop = True
+        Me.OpCamaraSeverino.Text = "Severino"
+        Me.OpCamaraSeverino.UseVisualStyleBackColor = True
+        '
         'FrmDebug
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
-        Me.ClientSize = New System.Drawing.Size(204, 205)
+        Me.ClientSize = New System.Drawing.Size(307, 205)
+        Me.Controls.Add(Me.GbCamara)
         Me.Controls.Add(Me.ChSaltarPresentacion)
         Me.Controls.Add(Me.ChQuitarRetardos)
         Me.Controls.Add(Me.ChDesconectarDimensionesAmpliadas)
@@ -259,11 +360,13 @@ Partial Class FrmDebug
         Me.Controls.Add(Me.GbPersonajes)
         Me.Name = "FrmDebug"
         Me.Text = "FrmDebug"
-        Me.GbPersonajes.ResumeLayout(false)
-        Me.GbPersonajes.PerformLayout
-        Me.GbLuz.ResumeLayout(false)
-        Me.GbLuz.PerformLayout
-        Me.ResumeLayout(false)
+        Me.GbPersonajes.ResumeLayout(False)
+        Me.GbPersonajes.PerformLayout()
+        Me.GbLuz.ResumeLayout(False)
+        Me.GbLuz.PerformLayout()
+        Me.GbCamara.ResumeLayout(False)
+        Me.GbCamara.PerformLayout()
+        Me.ResumeLayout(False)
         Me.PerformLayout
 
 End Sub
@@ -286,4 +389,12 @@ End Sub
     Friend WithEvents ChDesconectarDimensionesAmpliadas As CheckBox
     Friend WithEvents ChQuitarRetardos As CheckBox
     Friend WithEvents ChSaltarPresentacion As CheckBox
+    Friend WithEvents GbCamara As GroupBox
+    Friend WithEvents OpCamaraAbad As RadioButton
+    Friend WithEvents OpCamaraMalaquias As RadioButton
+    Friend WithEvents OpCamaraAdso As RadioButton
+    Friend WithEvents OpCamaraGuillermo As RadioButton
+    Friend WithEvents ChCamara As CheckBox
+    Friend WithEvents OpCamaraSeverino As RadioButton
+    Friend WithEvents OpCamaraBerengario As RadioButton
 End Class

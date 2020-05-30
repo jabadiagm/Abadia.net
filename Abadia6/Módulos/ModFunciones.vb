@@ -98,9 +98,9 @@
         End If
     End Function
 
-    Public Function Leer8Signo(Bytes() As Byte, Posicion As Long) As Long
+    Public Function Leer8Signo(Bytes() As Byte, Posicion As Integer) As Integer
         'lee un valor de 16 bits con signo de una cadena de bytes
-        Dim Valor As Long
+        Dim Valor As Integer
         Valor = Bytes(Posicion)
         If Valor >= 128 Then 'complemento a 2
             Leer8Signo = Valor - 256
@@ -349,6 +349,11 @@ CatchError:
         Data = Data Or Weights(NBit)
     End Sub
 
+    Public Sub ClearBit(ByRef Data As Byte, NBit As Byte)
+        Static Weights() As Byte = {&HFE, &HFD, &HFB, &HF7, &HEF, &HDF, &HBF, &H7F}
+        Data = Data And Weights(NBit)
+    End Sub
+
     Public Sub ClearBitArray(DataArray() As Byte, Pointer As Integer, NBit As Byte)
         Static Weights() As Byte = {&HFE, &HFD, &HFB, &HF7, &HEF, &HDF, &HBF, &H7F}
         DataArray(Pointer) = DataArray(Pointer) And Weights(NBit)
@@ -413,6 +418,30 @@ CatchError:
         End If
     End Function
 
+    Public Function Z80Add(Operando1 As Byte, Operando2 As Byte) As Byte
+        'devuelve operanco1+operando2 tomando los operandos como números
+        'con signo, y devolviendo la representación de un entero
+        Dim Op1 As Integer
+        Dim Op2 As Integer
+        Dim Res As Integer
+        If Operando1 < 128 Then
+            Op1 = Operando1
+        Else
+            Op1 = Operando1 - 256
+        End If
+        If Operando2 < 128 Then
+            Op2 = Operando2
+        Else
+            Op2 = Operando2 - 256
+        End If
+        Res = Op1 + Op2
+        If Res >= 0 Then
+            Z80Add = CByte(Res And &H000000FF)
+        Else
+            Z80Add = CByte((Res + 256) And &H000000FF)
+        End If
+    End Function
+
     Public Function Z80Inc(Valor As Byte) As Byte
         'incrementa un byte como lo haría el Z80
         Dim ValorInt As Integer
@@ -426,6 +455,16 @@ CatchError:
             Z80Inc = CByte(ValorInt And &H000000FF)
         Else
             Z80Inc = CByte((ValorInt + 256) And &H000000FF)
+        End If
+
+    End Function
+
+    Public Function Z80Dec(Valor As Byte) As Byte
+        'decrementa un byte comolo haría el Z80
+        If Valor = 0 Then
+            Z80Dec = &HFF
+        Else
+            Z80Dec = Valor - 1
         End If
 
     End Function
