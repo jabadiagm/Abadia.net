@@ -23,6 +23,7 @@ Module ModAbadia
     Private WaveOut As New cWaveOut(AY38910) 'reproductor de sonido
     Private CancelarTareaSonido As Boolean
     Private TareaSonidoActiva As Boolean
+    Private BloqueoSonido As Boolean 'avisa a la tarea de sonido de que se está cambiando el sonido a reproducir
     Private CambiarPaletaColores As Byte = &HFF
     Private Parado As Boolean
     Private CheckPantalla As String
@@ -304,31 +305,31 @@ Module ModAbadia
         Dim BugDejarObjeto(255) As Byte
         Try
             Conjunto = [Assembly].GetExecutingAssembly()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.ABADIA0.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia9.ABADIA0.BIN")
             StrArchivo.Read(Abadia0, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.ABADIA1.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia9.ABADIA1.BIN")
             StrArchivo.Read(Abadia1, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.ABADIA2.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia9.ABADIA2.BIN")
             StrArchivo.Read(Abadia2, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.ABADIA3.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia9.ABADIA3.BIN")
             StrArchivo.Read(Abadia3, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.ABADIA5.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia9.ABADIA5.BIN")
             StrArchivo.Read(Abadia5, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.ABADIA6.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia9.ABADIA6.BIN")
             StrArchivo.Read(Abadia6, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.ABADIA7.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia9.ABADIA7.BIN")
             StrArchivo.Read(Abadia7, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.ABADIA8.BIN")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia9.ABADIA8.BIN")
             StrArchivo.Read(Abadia8, 0, 16384)
             StrArchivo.Dispose()
-            StrArchivo = Conjunto.GetManifestResourceStream("Abadia8.BugDejarObjeto.bin")
+            StrArchivo = Conjunto.GetManifestResourceStream("Abadia9.BugDejarObjeto.bin")
             StrArchivo.Read(BugDejarObjeto, 0, 256)
             StrArchivo.Dispose()
         Catch ex As Exception
@@ -513,6 +514,15 @@ Module ModAbadia
             Pintar = True
             Bloque = DatosHabitaciones_4000(PunteroPantallaGlobal)
             BloqueHex = Hex$(Bloque)
+            '    Eva = Eva + 1
+            '    If Eva = CInt(frmPrincipal.TxNbloque.Text) Then
+            '        Pintar = True
+            '        EvaY CInt(frmPrincipal.TxDeltaX.Text), CInt(frmPrincipal.TxDeltaY.Text), CInt(frmPrincipal.TxProfundidad.Text)
+            '        'LoveY CInt(frmPrincipal.TxDeltaX.Text), CInt(frmPrincipal.TxDeltaY.Text), CInt(frmPrincipal.TxProfundidad.Text)
+            '        DatosHabitaciones_4000(PunteroPantalla + 3) = 255
+            '        salir = True
+            '        'Stop
+            '    End If
             '1A0D
             If Bloque = 255 Then Exit Sub '0xff indica el fin de pantalla
             'Bloque = Bloque And &HFE& 'desprecia el bit inferior para indexar
@@ -2126,7 +2136,7 @@ Module ModAbadia
         TeclaPulsadaNivel_3482 = ModTeclado.TeclaPulsadaNivel(TraducirCodigoTecla(CodigoTecla))
     End Function
 
-    Function TeclaPulsadaFlanco_3472(ByVal CodigoTecla As Byte)
+    Function TeclaPulsadaFlanco_3472(ByVal CodigoTecla As Byte) As Boolean
         'comprueba si ha sido pulsanda la tecla con el código indicado. si no ha sido pulsada o ya se ha preguntado antes, devuelve true
         TeclaPulsadaFlanco_3472 = ModTeclado.TeclaPulsadaFlanco(TraducirCodigoTecla(CodigoTecla))
     End Function
@@ -2364,6 +2374,63 @@ Module ModAbadia
 
     End Sub
 
+    Sub EvaY(DeltaX As Integer, DeltaY As Integer, Profundidad As Byte)
+
+        'GenerarBloqueSuelto &H2, 10 + DeltaX, 25 + DeltaY, 10, 12, Profundidad
+        GenerarBloqueSuelto(&H70, 10 + DeltaX, 25 + DeltaY, 10, 12, Profundidad)
+        'E
+        GenerarBloqueSuelto(&H2A, 11 + DeltaX, 22 + DeltaY, 2, 1, Profundidad)
+        GenerarBloqueSuelto(&H2A, 11 + DeltaX, 21 + DeltaY, 1, 0, Profundidad)
+        'V
+        GenerarBloqueSuelto(&H2A, 15 + DeltaX, 18 + DeltaY, 0, 0, Profundidad)
+        GenerarBloqueSuelto(&H2A, 15 + DeltaX, 17 + DeltaY, 0, 0, Profundidad)
+
+        GenerarBloqueSuelto(&H2A, 14 + DeltaX, 17 + DeltaY, 1, 0, Profundidad)
+        GenerarBloqueSuelto(&H2A, 14 + DeltaX, 16 + DeltaY, 0, 0, Profundidad)
+
+        GenerarBloqueSuelto(&H2A, 16 + DeltaX, 15 + DeltaY, 1, 0, Profundidad)
+        GenerarBloqueSuelto(&H2A, 16 + DeltaX, 14 + DeltaY, 0, 0, Profundidad)
+
+        'A
+        GenerarBloqueSuelto(&H2A, 18 + DeltaX, 15 + DeltaY, 1, 0, Profundidad)
+        GenerarBloqueSuelto(&H2A, 20 + DeltaX, 13 + DeltaY, 1, 0, Profundidad)
+        GenerarBloqueSuelto(&H2A, 18 + DeltaX, 14 + DeltaY, 1, 2, Profundidad)
+        GenerarBloqueSuelto(&H2A, 19 + DeltaX, 10 + DeltaY, 0, 0, Profundidad)
+    End Sub
+
+    Sub LoveY(DeltaX As Integer, DeltaY As Integer, Profundidad As Byte)
+
+        GenerarBloqueSuelto(&H70, 7 + DeltaX, 27 + DeltaY, 10, 12, Profundidad)
+
+        'L
+        GenerarBloqueSuelto(&H2A, 8 + DeltaX, 24 + DeltaY, 0, 1, Profundidad)
+        GenerarBloqueSuelto(&H2A, 8 + DeltaX, 23 + DeltaY, 1, 0, Profundidad)
+        GenerarBloqueSuelto(&H2A, 8 + DeltaX, 22 + DeltaY, 1, 0, Profundidad)
+
+        'O
+        GenerarBloqueSuelto(&H2A, 12 + DeltaX, 20 + DeltaY, 0, 0, Profundidad)
+        GenerarBloqueSuelto(&H2A, 11 + DeltaX, 20 + DeltaY, 1, 0, Profundidad)
+        GenerarBloqueSuelto(&H2A, 11 + DeltaX, 19 + DeltaY, 0, 0, Profundidad)
+        GenerarBloqueSuelto(&H2A, 12 + DeltaX, 16 + DeltaY, 0, 0, Profundidad)
+        GenerarBloqueSuelto(&H2A, 13 + DeltaX, 17 + DeltaY, 0, 0, Profundidad)
+        GenerarBloqueSuelto(&H2A, 13 + DeltaX, 18 + DeltaY, 1, 0, Profundidad)
+
+        'V
+        GenerarBloqueSuelto(&H2A, 16 + DeltaX, 16 + DeltaY, 0, 0, Profundidad)
+        GenerarBloqueSuelto(&H2A, 16 + DeltaX, 15 + DeltaY, 0, 0, Profundidad)
+
+        GenerarBloqueSuelto(&H2A, 15 + DeltaX, 15 + DeltaY, 1, 0, Profundidad)
+        GenerarBloqueSuelto(&H2A, 15 + DeltaX, 14 + DeltaY, 0, 0, Profundidad)
+
+        GenerarBloqueSuelto(&H2A, 17 + DeltaX, 13 + DeltaY, 1, 0, Profundidad)
+        GenerarBloqueSuelto(&H2A, 17 + DeltaX, 12 + DeltaY, 0, 0, Profundidad)
+
+        'E
+        GenerarBloqueSuelto(&H2A, 19 + DeltaX, 13 + DeltaY, 2, 1, Profundidad)
+        GenerarBloqueSuelto(&H2A, 19 + DeltaX, 12 + DeltaY, 1, 0, Profundidad)
+
+
+    End Sub
 
     Sub CopiarVariables_37B6()
         CopiarTabla(TablaPermisosPuertas_2DD9, CopiaTablaPermisosPuertas_2DD9) 'puertas a las que pueden entrar los personajes
@@ -2692,6 +2759,46 @@ Module ModAbadia
             'TablaCaracteristicasPersonajes_3036(&H3045 + 3 - &H3036) = &H85
             'TablaCaracteristicasPersonajes_3036(&H3045 + 4 - &H3036) = &H2
             Inicializado = True
+        End If
+
+        If Depuracion.PaseoGuillermo Then
+            Static Estado As Integer = 0
+            Static PosicionYAnterior As Byte = 0
+            Static ContadorBloqueos As Integer = 0
+            Dim PosicionY As Byte
+            Dim Bloqueo As Boolean
+            Obsequium_2D7F = 5
+            PosicionY = TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036)
+            If PosicionYAnterior = PosicionY Then
+                ContadorBloqueos = ContadorBloqueos + 1
+                If ContadorBloqueos > 30 Then
+                    Bloqueo = True
+                    'ContadorBloqueos = 0
+                    If ContadorBloqueos > 60 Then
+                        TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H50
+                    End If
+                End If
+            Else
+                ContadorBloqueos = 0
+            End If
+            PosicionYAnterior = PosicionY
+            Select Case Estado
+                Case = 0
+                    TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H01 'orientación norte
+                    ModTeclado.KeyDown(EnumTecla.TeclaArriba) 'andando
+                    Estado = 1
+                Case = 1
+                    If PosicionY = &H40 Or Bloqueo = True Then 'ha llegado al altar o lo bloquea severino
+                        TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H03 'media vuelta
+                        Estado = 2
+                    End If
+                Case = 2
+                    If PosicionY = &HAF Or Bloqueo = True Then 'ha llegado al principio o lo bloquea severino
+                        TablaCaracteristicasPersonajes_3036(&H3036 + 1 - &H3036) = &H01 'media vuelta
+                        Estado = 1
+                    End If
+            End Select
+
         End If
 
         Parado = False
@@ -6260,7 +6367,8 @@ Module ModAbadia
         Dim Altura1A As Integer
         Dim Altura2C As Integer
         Dim PunteroTablaAvanceHL As Integer
-        ContadorInterrupcion_2D4B = &HFF 'pone el contador de la interrupción al máximo para que no se espere nada en el bucle principal
+        '                                 corrección para evitar colisión con tareasonido
+        ContadorInterrupcion_2D4B = &HFE 'pone el contador de la interrupción al máximo para que no se espere nada en el bucle principal
         PunteroPilaCamino = PunteroPilaCaminoHL
         DestinoDE = PopCamino() 'obtiene el movimiento en el tope de la pila
         Integer2Nibbles(DestinoDE, DestinoYD, DestinoXE)
@@ -6580,7 +6688,7 @@ Module ModAbadia
         End If
     End Sub
 
-    Public Function LeerBitBufferAlturas(ByVal Puntero As Integer, NBit As Byte) As Byte
+    Public Function LeerBitBufferAlturas(ByVal Puntero As Integer, NBit As Byte) As Boolean
         LeerBitBufferAlturas = 0
         If PunteroBufferAlturas_2D8A = &H01C0 Then 'buffer principal con la pantalla actual
             LeerBitBufferAlturas = LeerBitArray(TablaBufferAlturas_01C0, Puntero - &H01C0, NBit)
@@ -9335,7 +9443,7 @@ Module ModAbadia
                     'indica que adso siga a guillermo
                     TablaVariablesLogica_3C85(DondeVaAdso_3D13 - &H3C85) = &HFF
                     'si adso no tiene la lámpara
-                    If Not LeerBitArray(TablaObjetosPersonajes_2DEC, &H2DF3 - &H2DEC, 7) Then
+                    If Not LeerBitArray(TablaObjetosPersonajes_2DEC, &H2DF3 - &H2DEC, 7) And Not Depuracion.Lampara Then
                         '5E1A
                         'escribe en el marcador la frase
                         'DEBEMOS ENCONTRAR UNA LAMPARA, MAESTRO
@@ -9799,7 +9907,7 @@ Module ModAbadia
             If AlturaA >= &H0D Then Exit Sub
             '52C0
             'si la altura de la posición donde se deja - altura del personaje que deja el objeto >= 0x05, sale
-            If (AlturaA - AlturaRelativa_52C1) >= 5 Then Exit Sub
+            If (CInt(AlturaA) - CInt(AlturaRelativa_52C1)) >= 5 Then Exit Sub
             '52C6
             AlturaA = AlturaA And &H0F
             'la compara con la de sus vecinos y si no es igual, sale
@@ -10149,11 +10257,11 @@ Module ModAbadia
 
 
         '###depuración
-        If TablaVariablesLogica_3C85(DondeEstaAdso_3D11 - &H3C85) = 1 Then
-            'indica que todos los monjes están listos
-            TablaVariablesLogica_3C85(MonjesListos_3C96 - &H3C85) = 0
-        End If
-        Exit Sub
+        'If TablaVariablesLogica_3C85(DondeEstaAdso_3D11 - &H3C85) = 1 Then
+        ''indica que todos los monjes están listos
+        'TablaVariablesLogica_3C85(MonjesListos_3C96 - &H3C85) = 0
+        'End If
+        'Exit Sub
 
 
 
@@ -11765,7 +11873,7 @@ Module ModAbadia
                         'el abad no tiene ningún objeto
                         TablaObjetosPersonajes_2DEC(ObjetosAbad_2E04 - &H2DEC) = 0
                         'si guillermo no tiene el pergamino
-                        If Not LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 4) Then
+                        If Not LeerBitArray(TablaObjetosPersonajes_2DEC, ObjetosGuillermo_2DEF - &H2DEC, 4) And Not Depuracion.PergaminoNoDesaparece Then
                             '5F78
                             'pone el pergamino en la habitación detrás del espejo
                             CopiarDatosPersonajeObjeto_4145(&H3017, {0, 0, &H18, &H64, &H18})
@@ -13905,7 +14013,7 @@ Module ModAbadia
         'lee si guillermo está vivo y si es así, sale
         If TablaVariablesLogica_3C85(GuillermoMuerto_3C97 - &H3C85) = 0 Then Exit Function
         '42EC
-        'indica que la camara sigua a guillermo y que lo haga ya
+        'indica que la camara siga a guillermo y que lo haga ya
         TablaVariablesLogica_3C85(PersonajeSeguidoPorCamara_3C8F - &H3C85) = 0
         'si está mostrando una frase/reproduciendo una voz, sale
         If ReproduciendoFrase_2DA1 Then Exit Function
@@ -14503,7 +14611,6 @@ Module ModAbadia
         Else
             'ValorA = ValorA - 1
         End If
-
         TablaDatosSonidos_0F96(&H0F98 - &H0F96) = ValorA
         '108A
         'activa los tonos y el generador de ruido para todos los canales
@@ -14523,7 +14630,9 @@ Module ModAbadia
         EscribirDatosSonido_10D0(&H0FD0)
         '10B9
         'si la máscara no ha cambiado, sale
-        If TablaDatosSonidos_0F96(&H0F96 - &H0F96) = TablaDatosSonidos_0F96(&H0F97 - &H0F96) Then Exit Sub
+        If TablaDatosSonidos_0F96(&H0F96 - &H0F96) = TablaDatosSonidos_0F96(&H0F97 - &H0F96) Then
+            Exit Sub
+        End If
         '10C0
         'si la máscara ha cambiado, fija el estado de los canales
         'copia la máscara para evitar fijar el estado si no hay modificaciones
@@ -14536,73 +14645,95 @@ Module ModAbadia
         'no usar.sustituida por tm_tick
     End Sub
 
+    Public Sub EsperarBloqueoSonido()
+        Dim Contador As Integer
+        While BloqueoSonido
+            'Contador = Contador + 1
+            Application.DoEvents()
+        End While
+    End Sub
+
     Public Sub ReproducirSonidoMelodia_1007()
         'apunta al registro de control del canal 3
         If TablaDatosSonidos_0F96(&H0FD0 + &H0E - &H0F96) <> 0 Then Exit Sub
+        If BloqueoSonido Then Exit Sub
         IniciarCanal_104F(&H0FD0, &H13FE)
     End Sub
 
 
     Public Sub ReproducirSonidoPuertaSeverino_102A()
+        If BloqueoSonido Then Exit Sub
         IniciarCanal_104F(&H0FB8, &H1550)
     End Sub
 
     Public Sub ReproducirSonidoAbrir_101B()
         'sonido ??? por el canal 2
         'apunta a la entrada 2
+        If BloqueoSonido Then Exit Sub
         IniciarCanal_104F(&H0FB8, &H14E7)
     End Sub
 
     Public Sub ReproducirSonidoCerrar_1016()
         'sonido ??? por el canal 2
         'apunta a la entrada 2
+        If BloqueoSonido Then Exit Sub
         IniciarCanal_104F(&H0FB8, &H1560)
     End Sub
 
     Public Sub ReproducirSonidoCampanas_100C()
         'sonido ??? por el canal 1
+        If BloqueoSonido Then Exit Sub
         IniciarCanal_104F(&H0FA0, &H14F3)
     End Sub
 
     Public Sub ReproducirSonidoCampanillas_1011()
         'sonido de campanas después de la espiral cuadrada por el canal 1
+        If BloqueoSonido Then Exit Sub
         IniciarCanal_104F(&H0FA0, &H14BA)
     End Sub
 
     Public Sub ReproducirSonidoCoger_1025()
+        If BloqueoSonido Then Exit Sub
         IniciarCanal_104F(&H0FB8, &H149F)
     End Sub
 
     Public Sub ReproducirSonidoDejar_102F()
+        If BloqueoSonido Then Exit Sub
         IniciarCanal_104F(&H0FB8, &H14A8)
     End Sub
 
     Public Sub ReproducirSonidoCogerDejar_5088(ByVal ObjetosAntesA As Byte, ByVal ObjetosDespuesC As Byte)
         If ((ObjetosAntesA Xor ObjetosDespuesC) And ObjetosDespuesC) = 0 Then
             'se ha dejado un objeto
+            EsperarBloqueoSonido()
             ReproducirSonidoDejar_102F()
         Else
             'se ha cogido un objeto
+            EsperarBloqueoSonido()
             ReproducirSonidoCoger_1025()
         End If
     End Sub
 
     Public Sub ReproducirPasos_1002()
         'sonido de guillermo moviéndose por el canal 3
+        If BloqueoSonido Then Exit Sub
         IniciarCanal_104F(&H0FD0, &H1496)
     End Sub
 
     Public Sub ReproducirSonidoAbrirEspejoCanal1_0FFD()
         'sonido ??? por el canal 1
+        If BloqueoSonido Then Exit Sub
         IniciarCanal_104F(&H0FA0, &H1480)
     End Sub
 
     Public Sub ReproducirSonidoVoz_1020()
         'apunta a los datos de inicialización y al canal 3
+        If BloqueoSonido Then Exit Sub
         IniciarCanal_104F(&H0FD0, &H14B1)
     End Sub
 
     Public Sub ReproducirSonidoPergamino()
+        EsperarBloqueoSonido()
         IniciarCanal_104F(&H0FA0, &H8000) ' inicializa la tabla del sonido y habilita las interrupciones
     End Sub
 
@@ -14614,6 +14745,7 @@ Module ModAbadia
         For Contador = &H000 To &H2FF
             TablaMusicaPergamino_8000(Contador) = TablaDatosPergaminoFinal_8000(Contador)
         Next
+        EsperarBloqueoSonido()
         IniciarCanal_104F(&H0FA0, &H8000)
     End Sub
 
@@ -14640,7 +14772,9 @@ Module ModAbadia
             Else
                 ContadorInterrupcion_2D4B = ContadorInterrupcion_2D4B + 1
             End If
+            BloqueoSonido = True
             ActualizarSonidos_1060()
+            BloqueoSonido = False
             If CancelarTareaSonido Then Exit Do
             Relojnose.Restart()
             Do

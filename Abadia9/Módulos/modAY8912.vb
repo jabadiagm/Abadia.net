@@ -33,11 +33,11 @@
         Public PeriodC As Integer
         Public PeriodN As Integer
         Public PeriodE As Integer
-        Public CountA As Integer
-        Public CountB As Integer
-        Public CountC As Integer
-        Public CountN As Integer
-        Public CountE As Integer
+        Public CountA As Long
+        Public CountB As Long
+        Public CountC As Long
+        Public CountN As Long
+        Public CountE As Long
         Public VolA As Integer
         Public VolB As Integer
         Public VolC As Integer
@@ -484,6 +484,11 @@
                 If (AYPSG.EnvelopeC <> 0) Then AYPSG.VolC = AYPSG.VolE
             End If
         End If
+
+
+        If (AYPSG.Regs(AY_ENABLE) And &H1) = &H1 Then VolA = 0
+        If (AYPSG.Regs(AY_ENABLE) And &H2) = &H2 Then VolB = 0
+        If (AYPSG.Regs(AY_ENABLE) And &H4) = &H4 Then VolC = 0
 
         lOut1 = (VolA * AYPSG.VolA) \ 65535
         lOut2 = (VolB * AYPSG.VolB) \ 65535

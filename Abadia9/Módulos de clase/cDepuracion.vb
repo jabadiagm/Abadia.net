@@ -28,6 +28,8 @@ Public Class cDepuracion
     Public CamaraPersonaje As Byte 'número de personaje al que sigue la cámara, si CamaraManual=true
     '                               0 = Guillermo, 1 = Adso, 2 = Malaquías, 3 = Abad, 4 = Berengario, 5 = Severino
     Public QuitarSonido As Boolean
+    Public PergaminoNoDesaparece As Boolean 'true para que no desaparezca el tercer día si no lo tiene guillermo
+    Public PaseoGuillermo As Boolean 'true para que guillermo ande solo
 
 
 
@@ -50,13 +52,15 @@ Public Class cDepuracion
         SaltarMomentoDiaEnter = True
         BugDejarObjetoPresente = False
         PuertasAbiertas = False
+        PergaminoNoDesaparece = False
+        PaseoGuillermo = False
         QuitarSonido = True
     End Sub
 
     Public Sub Init()
         Luz = EnumTipoLuz.EnumTipoLuz_Normal
         LuzEnGuillermo = False
-        Lampara = False
+        Lampara = True
         PersonajesAdso = True
         PersonajesMalaquias = True
         PersonajesAbad = True
@@ -65,12 +69,14 @@ Public Class cDepuracion
         DeshabilitarCalculoDimensionesAmpliadas = False
         QuitarRetardos = False
         SaltarPergamino = False
-        SaltarPresentacion = False
+        SaltarPresentacion = True
         PararAdsoCTRL = True
         SaltarMomentoDiaEnter = True
         BugDejarObjetoPresente = False
-        PuertasAbiertas = False
+        PuertasAbiertas = True
         CamaraManual = False
-        QuitarSonido = False
+        PergaminoNoDesaparece = True
+        PaseoGuillermo = False
+        QuitarSonido = True
     End Sub
 End Class

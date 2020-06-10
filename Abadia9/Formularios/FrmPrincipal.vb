@@ -102,7 +102,8 @@
         Dim nose2
         Nose = &H80
         nose2 = ror8(Nose, 8)
-        DibujarPergaminoFinal_3868()
+        ModAbadia.EscribirFraseMarcador_5026(&H27)
+        'DibujarPergaminoFinal_3868()
     End Sub
 
     Private Sub FrmPrincipal_KeyUp(sender As Object, e As KeyEventArgs) Handles Me.KeyUp
@@ -229,9 +230,9 @@
         TablaCaracteristicasPersonajes_3036(&H3036 + 3 - &H3036) = &H69
         TablaCaracteristicasPersonajes_3036(&H3036 + 4 - &H3036) = &H18
 
-        TablaCaracteristicasPersonajes_3036(&H3045 + 2 - &H3036) = &H26
-        TablaCaracteristicasPersonajes_3036(&H3045 + 3 - &H3036) = &H6B
-        TablaCaracteristicasPersonajes_3036(&H3045 + 4 - &H3036) = &H18
+        'TablaCaracteristicasPersonajes_3036(&H3045 + 2 - &H3036) = &H26
+        'TablaCaracteristicasPersonajes_3036(&H3045 + 3 - &H3036) = &H6B
+        'TablaCaracteristicasPersonajes_3036(&H3045 + 4 - &H3036) = &H18
     End Sub
 
     Private Sub BtLampara_Click(sender As Object, e As EventArgs) Handles BtLampara.Click
